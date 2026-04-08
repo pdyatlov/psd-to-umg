@@ -9,33 +9,33 @@ class UWidgetBlueprint;
 
 
 UCLASS()
-class AUTOPSDUI_API UAutoPSDUILibrary : public UBlueprintFunctionLibrary
+class PSD2UMG_API UPSD2UMGLibrary : public UBlueprintFunctionLibrary
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUILibrary")
-	static void RunPyCmd(const FString& PyCmd);
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static void RunPyCmd(const FString& PyCmd);
 
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUILibrary")
-	static UObject* ImportImage(const FString& SrcFile, const FString& AssetPath);
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static UObject* ImportImage(const FString& SrcFile, const FString& AssetPath);
 
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUILibrary")
-	static UWidgetBlueprint* CreateWBP(const FString& Asset);
-	
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUILibrary")
-	static UWidget* MakeWidgetWithWBP(UClass* WidgetClass, UWidgetBlueprint* ParentWBP, const FString& WidgetName);
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static UWidgetBlueprint* CreateWBP(const FString& Asset);
 
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUILibrary")
-	static void SetWBPRootWidget(UWidgetBlueprint* ParentWBP, UWidget* Widget);
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static UWidget* MakeWidgetWithWBP(UClass* WidgetClass, UWidgetBlueprint* ParentWBP, const FString& WidgetName);
 
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUILibrary")
-	static void CompileAndSaveBP(UBlueprint* BPObject);
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static void SetWBPRootWidget(UWidgetBlueprint* ParentWBP, UWidget* Widget);
 
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUILibrary")
-	static bool ApplyInterfaceToBP(UBlueprint* BPObject, UClass* InterfaceClass);
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static void CompileAndSaveBP(UBlueprint* BPObject);
 
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUILibrary")
-	static TSubclassOf<UObject> GetBPGeneratedClass(UBlueprint* BPObject);
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static bool ApplyInterfaceToBP(UBlueprint* BPObject, UClass* InterfaceClass);
+
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static TSubclassOf<UObject> GetBPGeneratedClass(UBlueprint* BPObject);
 
 };

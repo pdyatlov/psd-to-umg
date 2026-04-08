@@ -7,34 +7,38 @@
 struct FDirectoryPath;
 class UFont;
 
-UCLASS(config = Editor, defaultconfig)
-class AUTOPSDUI_API UAutoPSDUISetting : public UDeveloperSettings
+UCLASS(config = Editor, defaultconfig, meta=(DisplayName="PSD2UMG"))
+class PSD2UMG_API UPSD2UMGSettings : public UDeveloperSettings
 {
-	GENERATED_BODY()
+    GENERATED_BODY()
 
 public:
-	UAutoPSDUISetting();
+    UPSD2UMGSettings();
 
-	/* Whether enabled when import PSD file. */
-	UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "AutoPSDUISetting")
-	bool bEnabled;
+    /** Get the settings singleton */
+    virtual FName GetCategoryName() const override { return FName(TEXT("Plugins")); }
+    virtual FName GetSectionName() const override { return FName(TEXT("PSD2UMG")); }
 
-	/* Source UI Texture Directory */
-	UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "AutoPSDUISetting")
-	FDirectoryPath TextureSrcDir;
+    /* Whether enabled when import PSD file. */
+    UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG")
+    bool bEnabled;
 
-	/* UI Texture Asset Directory */
-	UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "AutoPSDUISetting", meta=(LongPackageName))
-	FDirectoryPath TextureAssetDir;
+    /* Source UI Texture Directory */
+    UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG")
+    FDirectoryPath TextureSrcDir;
 
-	/* Font Map */
-	UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "AutoPSDUISetting", meta = (LongPackageName))
-	TMap<FString, TSoftObjectPtr<UFont>> FontMap;
+    /* UI Texture Asset Directory */
+    UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG", meta=(LongPackageName))
+    FDirectoryPath TextureAssetDir;
 
-	/* Default Map that font not found in font map*/
-	UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "AutoPSDUISetting", meta = (LongPackageName))
-	TSoftObjectPtr<UFont> DefaultFont;
+    /* Font Map */
+    UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG", meta = (LongPackageName))
+    TMap<FString, TSoftObjectPtr<UFont>> FontMap;
 
-	UFUNCTION(BlueprintCallable, Category = "AutoPSDUISetting")
-	static UAutoPSDUISetting* Get();
+    /* Default Map that font not found in font map*/
+    UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG", meta = (LongPackageName))
+    TSoftObjectPtr<UFont> DefaultFont;
+
+    UFUNCTION(BlueprintCallable, Category = "PSD2UMG")
+    static UPSD2UMGSettings* Get();
 };

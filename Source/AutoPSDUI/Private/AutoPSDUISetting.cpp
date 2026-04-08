@@ -2,15 +2,14 @@
 
 #include "AutoPSDUISetting.h"
 
-UAutoPSDUISetting::UAutoPSDUISetting()
+UPSD2UMGSettings::UPSD2UMGSettings()
 {
-	this->CategoryName = TEXT("Plugins");
-	bEnabled = true;
-	TextureSrcDir.Path =  FPaths::ProjectDir() / TEXT("Art/UI/Texture");
-	TextureAssetDir.Path = TEXT("/Game/Widgets/Texture");
+    bEnabled = true;
+    TextureSrcDir.Path = FPaths::ProjectDir() / TEXT("Art/UI/Texture");
+    TextureAssetDir.Path = TEXT("/Game/Widgets/Texture");
 }
 
-UAutoPSDUISetting* UAutoPSDUISetting::Get()
+UPSD2UMGSettings* UPSD2UMGSettings::Get()
 {
-	return Cast<UAutoPSDUISetting>(StaticClass()->GetDefaultObject());
+    return Cast<UPSD2UMGSettings>(StaticClass()->GetDefaultObject());
 }

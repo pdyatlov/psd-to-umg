@@ -5,14 +5,14 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
-class FAutoPSDUIModule : public IModuleInterface
+class FPSD2UMGModule : public IModuleInterface
 {
 public:
 
-	/** IModuleInterface implementation */
-	virtual void StartupModule() override;
-	virtual void ShutdownModule() override;
+    /** IModuleInterface implementation */
+    virtual void StartupModule() override;
+    virtual void ShutdownModule() override;
 
 protected:
-	void OnPSDImport(UObject* PSDTextureAsset);
+    void OnPSDImport(UObject* PSDTextureAsset);
 };

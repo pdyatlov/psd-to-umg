@@ -19,8 +19,7 @@
             "Type": "Editor",
             "LoadingPhase": "PostEngineInit",
             "PlatformAllowList": [
-                "Win64",
-                "Mac"
+                "Win64"
             ]
         }
     ]

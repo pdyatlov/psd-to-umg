@@ -8,6 +8,12 @@ public class PSD2UMG : ModuleRules
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
+        // PhotoshopAPI requires C++20, RTTI (dynamic_pointer_cast for layer-type
+        // detection), and exceptions. See .planning/phases/02-c-psd-parser/02-CONTEXT.md.
+        CppStandard = CppStandardVersion.Cpp20;
+        bUseRTTI = true;
+        bEnableExceptions = true;
+
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
@@ -27,6 +33,9 @@ public class PSD2UMG : ModuleRules
                 "UMGEditor",
                 "UMG",
                 "AssetRegistry",
+                // ThirdParty: must stay private -- PhotoshopAPI symbols never
+                // leak through public headers (PIMPL inside FPsdParser).
+                "PhotoshopAPI",
             }
         );
     }

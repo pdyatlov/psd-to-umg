@@ -122,6 +122,10 @@ REM Bundled submodule headers PhotoshopAPI sources reference via angle brackets.
 robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\compressed-image\compressed_image\include\compressed" "%VENDOR_INCLUDE%\compressed" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\mio\include\mio" "%VENDOR_INCLUDE%\mio" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 
+REM compressed-image's bundled c-blosc2 + nlohmann json headers.
+robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\compressed-image\thirdparty\c-blosc2\include" "%VENDOR_INCLUDE%" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\compressed-image\thirdparty\json\single_include\nlohmann" "%VENDOR_INCLUDE%\nlohmann" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+
 echo === Collecting LICENSE files ===
 set "VENDOR_LICENSES=%VENDOR_ROOT%\LICENSES"
 if not exist "%VENDOR_LICENSES%" mkdir "%VENDOR_LICENSES%"

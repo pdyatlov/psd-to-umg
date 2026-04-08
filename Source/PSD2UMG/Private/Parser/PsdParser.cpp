@@ -25,6 +25,15 @@
 // `check`). PhotoshopAPI uses `std::numeric_limits<T>::max()` and an
 // internal `PSAPI_LOG_ERROR` macro whose expansion contains the bare
 // token `ERROR`, both of which collide with the Win32 macros.
+// NOMINMAX must be defined BEFORE PhotoshopAPI.h pulls in <iostream>/<filesystem>,
+// because those std headers transitively include <windows.h> on MSVC. Without
+// NOMINMAX, windows.h re-defines `min`/`max` as macros (even if we #undef them
+// here first) and PhotoshopAPI's `std::numeric_limits<T>::max()` calls then get
+// macro-expanded into syntax errors.
+#ifndef NOMINMAX
+    #define NOMINMAX
+#endif
+
 THIRD_PARTY_INCLUDES_START
 #pragma push_macro("max")
 #pragma push_macro("min")

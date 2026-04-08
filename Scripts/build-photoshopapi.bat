@@ -126,6 +126,9 @@ REM compressed-image's bundled c-blosc2 + nlohmann json headers.
 robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\compressed-image\thirdparty\c-blosc2\include" "%VENDOR_INCLUDE%" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\compressed-image\thirdparty\json\single_include\nlohmann" "%VENDOR_INCLUDE%\nlohmann" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 
+REM simdutf bundled headers (PhotoshopAPI's UnicodeString.h includes "simdutf.h").
+robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\simdutf\include" "%VENDOR_INCLUDE%" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+
 echo === Patching Util/Logger.h to use __VA_OPT__ branch on MSVC ===
 REM Upstream gates the __VA_OPT__ branch on !_MSC_VER, but UE 5.7 builds the
 REM legacy-preprocessor branch and rejects empty __VA_ARGS__ with a trailing

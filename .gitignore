@@ -1,3 +1,11 @@
 *.pyc
 *.pxd
 .planning/
+
+# UE plugin build artifacts (generated locally)
+Binaries/
+Intermediate/
+DerivedDataCache/
+
+# PhotoshopAPI bootstrap log
+build-photoshopapi.log

@@ -2,7 +2,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
-#include "AutoPSDUILibrary.generated.h"
+#include "PSD2UMGLibrary.generated.h"
 
 class UWidget;
 class UWidgetBlueprint;

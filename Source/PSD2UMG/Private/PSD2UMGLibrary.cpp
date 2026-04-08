@@ -1,6 +1,6 @@
 // Copyright 2018-2021 - John snow wind
-#include "AutoPSDUILibrary.h"
-#include "AutoPSDUISetting.h"
+#include "PSD2UMGLibrary.h"
+#include "PSD2UMGSetting.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 

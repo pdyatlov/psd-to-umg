@@ -1,12 +1,12 @@
 // Copyright 2018-2021 - John snow wind
 
-#include "AutoPSDUI.h"
+#include "PSD2UMG.h"
 #include "Editor.h"
 #include "Subsystems/ImportSubsystem.h"
 #include "EditorFramework/AssetImportData.h"
 
-#include "AutoPSDUISetting.h"
-#include "AutoPSDUILibrary.h"
+#include "PSD2UMGSetting.h"
+#include "PSD2UMGLibrary.h"
 
 #include "AssetRegistry/AssetRegistryModule.h"
 

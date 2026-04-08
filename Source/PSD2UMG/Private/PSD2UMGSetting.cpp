@@ -1,6 +1,6 @@
 // Copyright 2018-2021 - John snow wind
 
-#include "AutoPSDUISetting.h"
+#include "PSD2UMGSetting.h"
 
 UPSD2UMGSettings::UPSD2UMGSettings()
 {

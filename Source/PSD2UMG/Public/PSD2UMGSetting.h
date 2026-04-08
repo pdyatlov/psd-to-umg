@@ -2,7 +2,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
-#include "AutoPSDUISetting.generated.h"
+#include "PSD2UMGSetting.generated.h"
 
 struct FDirectoryPath;
 class UFont;

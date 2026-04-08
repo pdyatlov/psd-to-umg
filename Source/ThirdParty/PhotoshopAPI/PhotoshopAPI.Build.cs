@@ -38,7 +38,25 @@ public class PhotoshopAPI : ModuleRules
         // Lib enumeration:
         // The bootstrap script copies built libs into a nested tree under Win64/lib/.
         // Recurse, skip anything under a /debug/ folder (those are debug-only vcpkg libs),
-        // and de-duplicate by basename so we don't link the same symbol twice.
+        // skip libs whose symbols are already statically embedded in PhotoshopAPI.lib or
+        // its submodule sibling libs, and de-duplicate by basename.
+        //
+        // Why the deny list:
+        //   - fmt.lib (vcpkg)        — PhotoshopAPI.lib already embeds fmt template instantiations
+        //                              (e.g. fmt::v11::vformat is in LayeredFileImpl.obj). Linking
+        //                              vcpkg's fmt.lib produces LNK2005 duplicates.
+        //   - blosc2.lib (vcpkg)     — Conflicts with libblosc2.lib built from PhotoshopAPI's
+        //                              submodule (thirdparty/compressed-image/thirdparty/c-blosc2).
+        //                              PhotoshopAPI was compiled against the submodule headers,
+        //                              so the submodule lib is the right one. The vcpkg version
+        //                              of blosc2 is unused but vcpkg installs it as a transitive
+        //                              dep of openimageio.
+        HashSet<string> DenyList = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "fmt.lib",
+            "blosc2.lib",
+        };
+
         string LibDir = Path.Combine(ModuleDirectory, "Win64", "lib");
         if (Directory.Exists(LibDir))
         {
@@ -54,6 +72,12 @@ public class PhotoshopAPI : ModuleRules
                 }
 
                 string BaseName = Path.GetFileName(LibFile);
+
+                if (DenyList.Contains(BaseName))
+                {
+                    continue;
+                }
+
                 if (SeenBaseNames.Add(BaseName))
                 {
                     PublicAdditionalLibraries.Add(LibFile);

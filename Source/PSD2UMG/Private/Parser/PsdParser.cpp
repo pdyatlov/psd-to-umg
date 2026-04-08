@@ -217,12 +217,25 @@ namespace PSD2UMG::Parser::Internal
 			}
 
 			// Fill colour. PhotoshopAPI reports 0..1 doubles (RGB[A]) in sRGB space.
-			if (auto Fill = Text->style_run_fill_color(0); Fill.has_value() && Fill->size() >= 3)
+			// Single-color text layers store the color at the "normal style" level
+			// (layer default); only text with mixed styling has a per-run override.
+			// Try the run override first, then fall back to the normal style.
+			std::optional<std::vector<double>> Fill = Text->style_run_fill_color(0);
+			if (!Fill.has_value() || Fill->size() < 3)
+			{
+				Fill = Text->style_normal_fill_color();
+			}
+			if (Fill.has_value() && Fill->size() >= 3)
 			{
 				const uint8 R = static_cast<uint8>(FMath::Clamp((*Fill)[0], 0.0, 1.0) * 255.0);
 				const uint8 G = static_cast<uint8>(FMath::Clamp((*Fill)[1], 0.0, 1.0) * 255.0);
 				const uint8 B = static_cast<uint8>(FMath::Clamp((*Fill)[2], 0.0, 1.0) * 255.0);
 				OutLayer.Text.Color = FLinearColor::FromSRGBColor(FColor(R, G, B));
+			}
+			else
+			{
+				OutDiag.AddWarning(OutLayer.Name,
+					TEXT("Text layer fill color not found in run or normal style; leaving default."));
 			}
 
 			// Justification (first paragraph run).

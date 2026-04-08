@@ -27,17 +27,35 @@ REM ============================================================================
 
 setlocal enableextensions enabledelayedexpansion
 
-if "%VCPKG_ROOT%"=="" (
-    echo [ERROR] VCPKG_ROOT is not set. Point it at your local vcpkg clone.
-    exit /b 1
+REM If launched directly (double-click), re-launch ourselves piping all output
+REM to a log file and a console that stays open. The %PSAPI_LOGGED% guard
+REM prevents infinite recursion.
+if "%PSAPI_LOGGED%"=="" (
+    set "PSAPI_LOG=%~dp0..\build-photoshopapi.log"
+    set "PSAPI_LOGGED=1"
+    call "%~f0" %* > "!PSAPI_LOG!" 2>&1
+    set "RC=!ERRORLEVEL!"
+    echo.
+    echo === Build script finished with exit code !RC! ===
+    echo Full log: !PSAPI_LOG!
+    echo.
+    echo --- last 40 lines ---
+    powershell -NoProfile -Command "Get-Content -Tail 40 '!PSAPI_LOG!'"
+    echo.
+    pause
+    exit /b !RC!
 )
+
+REM PhotoshopAPI bundles its own vcpkg as a git submodule, so VCPKG_ROOT is not used.
 
 set "REPO_ROOT=%~dp0.."
 set "VENDOR_ROOT=%REPO_ROOT%\Source\ThirdParty\PhotoshopAPI"
 set "VENDOR_INCLUDE=%VENDOR_ROOT%\Win64\include"
 set "VENDOR_LIB=%VENDOR_ROOT%\Win64\lib"
-set "WORK_DIR=%TEMP%\psd2umg-photoshopapi-build"
-set "PSAPI_TAG=main"
+REM Short work dir to avoid Windows MAX_PATH=260 issues with deeply-nested submodules
+REM (PhotoshopAPI -> compressed-image -> pybind11_image_util -> doctest -> ...).
+set "WORK_DIR=C:\psapi-build"
+set "PSAPI_TAG=master"
 REM TODO: pin PSAPI_TAG to a specific release tag once upstream tags stabilize.
 
 echo === PSD2UMG :: PhotoshopAPI bootstrap ===
@@ -51,28 +69,30 @@ echo.
 if exist "%WORK_DIR%" rmdir /s /q "%WORK_DIR%"
 mkdir "%WORK_DIR%" || exit /b 1
 
-echo === [1/5] Cloning PhotoshopAPI @ %PSAPI_TAG% ===
-git clone --depth 1 --branch %PSAPI_TAG% https://github.com/EmilDohne/PhotoshopAPI.git "%WORK_DIR%\PhotoshopAPI" || exit /b 1
+echo === [1/3] Cloning PhotoshopAPI @ %PSAPI_TAG% (with submodules) ===
+REM core.longpaths=true bypasses Windows MAX_PATH=260 inside git checkout/submodule.
+git -c core.longpaths=true clone -c core.longpaths=true --recurse-submodules --branch %PSAPI_TAG% https://github.com/EmilDohne/PhotoshopAPI.git "%WORK_DIR%\PhotoshopAPI" || exit /b 1
 
-echo === [2/5] vcpkg install (x64-windows-static-md) ===
 pushd "%WORK_DIR%\PhotoshopAPI"
-"%VCPKG_ROOT%\vcpkg.exe" install --triplet x64-windows-static-md || (popd & exit /b 1)
 
-echo === [3/5] CMake configure ===
+echo === [2/3] CMake configure (uses bundled vcpkg submodule) ===
+REM PhotoshopAPI's CMakeLists.txt wires up its own bundled vcpkg at thirdparty/vcpkg.
+REM Do NOT pass an external -DCMAKE_TOOLCHAIN_FILE — it overrides the bundled one
+REM and breaks blosc2/simdutf/mio/compressed-image targets. Disable Python bindings
+REM (pybind11 is a submodule we don't need) and tests/examples to keep the build lean.
 cmake -B build -S . ^
-    -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake ^
-    -DVCPKG_TARGET_TRIPLET=x64-windows-static-md ^
-    -DPSAPI_BUILD_STATIC=ON ^
+    -DPSAPI_BUILD_PYTHON=OFF ^
     -DPSAPI_BUILD_TESTS=OFF ^
     -DPSAPI_BUILD_EXAMPLES=OFF ^
     -DPSAPI_BUILD_BENCHMARKS=OFF ^
+    -DPSAPI_BUILD_DOCS=OFF ^
     -DCMAKE_BUILD_TYPE=Release || (popd & exit /b 1)
 
-echo === [4/5] CMake build (Release) ===
+echo === [3/3] CMake build (Release) ===
 cmake --build build --config Release || (popd & exit /b 1)
 popd
 
-echo === [5/5] Copying libs and headers into vendor tree ===
+echo === Copying libs and headers into vendor tree ===
 if not exist "%VENDOR_LIB%" mkdir "%VENDOR_LIB%"
 if not exist "%VENDOR_INCLUDE%" mkdir "%VENDOR_INCLUDE%"
 
@@ -84,11 +104,34 @@ REM Copy PhotoshopAPI public headers and the vcpkg include tree.
 robocopy "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\include" "%VENDOR_INCLUDE%\PhotoshopAPI" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 robocopy "%WORK_DIR%\PhotoshopAPI\build\vcpkg_installed\x64-windows-static-md\include" "%VENDOR_INCLUDE%" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 
+echo === Collecting LICENSE files ===
+set "VENDOR_LICENSES=%VENDOR_ROOT%\LICENSES"
+if not exist "%VENDOR_LICENSES%" mkdir "%VENDOR_LICENSES%"
+
+REM PhotoshopAPI's own license
+if exist "%WORK_DIR%\PhotoshopAPI\LICENSE" copy /y "%WORK_DIR%\PhotoshopAPI\LICENSE" "%VENDOR_LICENSES%\PhotoshopAPI-LICENSE.txt" >nul
+
+REM vcpkg writes per-package "copyright" files at:
+REM   build\vcpkg_installed\x64-windows-static-md\share\<pkg>\copyright
+for /d %%P in ("%WORK_DIR%\PhotoshopAPI\build\vcpkg_installed\x64-windows-static-md\share\*") do (
+    if exist "%%P\copyright" copy /y "%%P\copyright" "%VENDOR_LICENSES%\%%~nxP-LICENSE.txt" >nul
+)
+
+REM Submodule licenses (blosc2, simdutf, mio, compressed-image, etc.) live under thirdparty\
+for /d %%S in ("%WORK_DIR%\PhotoshopAPI\thirdparty\*") do (
+    if exist "%%S\LICENSE" copy /y "%%S\LICENSE" "%VENDOR_LICENSES%\%%~nxS-LICENSE.txt" >nul
+    if exist "%%S\LICENSE.txt" copy /y "%%S\LICENSE.txt" "%VENDOR_LICENSES%\%%~nxS-LICENSE.txt" >nul
+    if exist "%%S\COPYING" copy /y "%%S\COPYING" "%VENDOR_LICENSES%\%%~nxS-COPYING.txt" >nul
+)
+
 echo.
 echo === DONE ===
-echo Reminder: drop LICENSE files for every vendored library into
-echo   %VENDOR_ROOT%\LICENSES\
-echo before committing. See LICENSES\README.md for the required list.
+echo Vendored libs at:    %VENDOR_LIB%
+echo Vendored headers at: %VENDOR_INCLUDE%
+echo License files at:    %VENDOR_LICENSES%
+echo.
+echo Review LICENSES\ before committing — verify every .lib in Win64\lib\
+echo has a corresponding LICENSE file. Anything missing must be added by hand.
 echo.
 endlocal
 exit /b 0

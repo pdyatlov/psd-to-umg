@@ -216,17 +216,36 @@ namespace PSD2UMG::Parser::Internal
 				OutLayer.Text.SizePx = static_cast<float>(*FontSize);
 			}
 
-			// Fill colour. PhotoshopAPI reports 0..1 doubles (RGB[A]) in sRGB space.
-			// Single-color text layers store the color at the "normal style" level
-			// (layer default); only text with mixed styling has a per-run override.
-			// Try the run override first, then fall back to the normal style.
+			// Fill colour. Try every color source PhotoshopAPI exposes and log
+			// each attempt so we can diagnose fixture-specific storage paths.
+			const TCHAR* FillSource = TEXT("none");
 			std::optional<std::vector<double>> Fill = Text->style_run_fill_color(0);
-			if (!Fill.has_value() || Fill->size() < 3)
-			{
-				Fill = Text->style_normal_fill_color();
-			}
 			if (Fill.has_value() && Fill->size() >= 3)
 			{
+				FillSource = TEXT("run[0]");
+			}
+			else
+			{
+				Fill = Text->style_normal_fill_color();
+				if (Fill.has_value() && Fill->size() >= 3)
+				{
+					FillSource = TEXT("normal");
+				}
+			}
+
+			if (Fill.has_value() && Fill->size() >= 3)
+			{
+				// Log raw values so we can see the native channel order and range.
+				FString RawValues;
+				for (size_t k = 0; k < Fill->size(); ++k)
+				{
+					RawValues += FString::Printf(TEXT("%s%.4f"),
+						k == 0 ? TEXT("") : TEXT(", "), (*Fill)[k]);
+				}
+				UE_LOG(LogPSD2UMG, Log,
+					TEXT("Text layer '%s' fill color source=%s, raw=[%s]"),
+					*OutLayer.Name, FillSource, *RawValues);
+
 				const uint8 R = static_cast<uint8>(FMath::Clamp((*Fill)[0], 0.0, 1.0) * 255.0);
 				const uint8 G = static_cast<uint8>(FMath::Clamp((*Fill)[1], 0.0, 1.0) * 255.0);
 				const uint8 B = static_cast<uint8>(FMath::Clamp((*Fill)[2], 0.0, 1.0) * 255.0);
@@ -234,6 +253,9 @@ namespace PSD2UMG::Parser::Internal
 			}
 			else
 			{
+				UE_LOG(LogPSD2UMG, Warning,
+					TEXT("Text layer '%s' fill color not found in run[0] or normal style; leaving default."),
+					*OutLayer.Name);
 				OutDiag.AddWarning(OutLayer.Name,
 					TEXT("Text layer fill color not found in run or normal style; leaving default."));
 			}

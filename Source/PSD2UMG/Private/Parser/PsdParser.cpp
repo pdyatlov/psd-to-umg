@@ -233,19 +233,24 @@ namespace PSD2UMG::Parser::Internal
 				}
 			}
 
-			if (Fill.has_value() && Fill->size() >= 3)
+			if (Fill.has_value() && Fill->size() >= 4)
 			{
-				// Log raw values so we can see the native channel order and range.
-				FString RawValues;
-				for (size_t k = 0; k < Fill->size(); ++k)
-				{
-					RawValues += FString::Printf(TEXT("%s%.4f"),
-						k == 0 ? TEXT("") : TEXT(", "), (*Fill)[k]);
-				}
-				UE_LOG(LogPSD2UMG, Log,
-					TEXT("Text layer '%s' fill color source=%s, raw=[%s]"),
-					*OutLayer.Name, FillSource, *RawValues);
-
+				// PhotoshopAPI returns text fill color as ARGB doubles in [0..1],
+				// verified empirically against a pure-red (#FF0000) fixture which
+				// came back as [1.0, 1.0, 0.0, 0.0] = (A=1, R=1, G=0, B=0).
+				const double A = (*Fill)[0];
+				const double Rd = (*Fill)[1];
+				const double Gd = (*Fill)[2];
+				const double Bd = (*Fill)[3];
+				const uint8 R = static_cast<uint8>(FMath::Clamp(Rd, 0.0, 1.0) * 255.0);
+				const uint8 G = static_cast<uint8>(FMath::Clamp(Gd, 0.0, 1.0) * 255.0);
+				const uint8 B = static_cast<uint8>(FMath::Clamp(Bd, 0.0, 1.0) * 255.0);
+				const uint8 Alpha = static_cast<uint8>(FMath::Clamp(A, 0.0, 1.0) * 255.0);
+				OutLayer.Text.Color = FLinearColor::FromSRGBColor(FColor(R, G, B, Alpha));
+			}
+			else if (Fill.has_value() && Fill->size() == 3)
+			{
+				// Fallback for 3-channel RGB (no alpha). Treat as pure RGB in [0..1].
 				const uint8 R = static_cast<uint8>(FMath::Clamp((*Fill)[0], 0.0, 1.0) * 255.0);
 				const uint8 G = static_cast<uint8>(FMath::Clamp((*Fill)[1], 0.0, 1.0) * 255.0);
 				const uint8 B = static_cast<uint8>(FMath::Clamp((*Fill)[2], 0.0, 1.0) * 255.0);

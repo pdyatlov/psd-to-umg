@@ -8,9 +8,8 @@
 void FPSD2UMGModule::StartupModule()
 {
     // The .psd import entry point is now UPsdImportFactory (auto-discovered
-    // by UE via UFactory reflection). The Phase 1 ImportSubsystem->OnAssetReimport
-    // delegate hook has been removed -- see 02-CONTEXT.md D-Factory and
-    // 02-04-PLAN.md.
+    // by UE via UFactory reflection). The Phase 1 reimport delegate hook has
+    // been removed -- see 02-CONTEXT.md D-Factory and 02-04-PLAN.md.
     UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG module loaded"));
 }
 

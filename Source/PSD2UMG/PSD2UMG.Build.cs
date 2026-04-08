@@ -43,6 +43,8 @@ public class PSD2UMG : ModuleRules
                 // Used by the legacy PSD2UMGLibrary stub (UEditorAssetLibrary::SaveLoadedAsset).
                 // The stub is preserved through Phase 2 per 02-CONTEXT.md and is removed in Phase 6+.
                 "EditorScriptingUtilities",
+                // Used by FPsdParserSpec to resolve fixture path via IPluginManager.
+                "Projects",
                 // ThirdParty: must stay private -- PhotoshopAPI symbols never
                 // leak through public headers (PIMPL inside FPsdParser).
                 "PhotoshopAPI",

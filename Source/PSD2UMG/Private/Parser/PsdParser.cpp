@@ -19,8 +19,35 @@
 // so its fmt/eigen/openimageio headers don't trip the default warning
 // set. All vendor symbols are confined to this translation unit per
 // the PIMPL rule in 02-CONTEXT.md D-Linkage.
+//
+// We also have to push and undefine the Windows.h macros that UE leaks
+// into every TU on Win64 (`min`, `max`, `ERROR`, `TEXT`, `IN`, `OUT`,
+// `check`). PhotoshopAPI uses `std::numeric_limits<T>::max()` and an
+// internal `PSAPI_LOG_ERROR` macro whose expansion contains the bare
+// token `ERROR`, both of which collide with the Win32 macros.
 THIRD_PARTY_INCLUDES_START
+#pragma push_macro("max")
+#pragma push_macro("min")
+#pragma push_macro("ERROR")
+#pragma push_macro("TEXT")
+#pragma push_macro("IN")
+#pragma push_macro("OUT")
+#pragma push_macro("check")
+#undef max
+#undef min
+#undef ERROR
+#undef TEXT
+#undef IN
+#undef OUT
+#undef check
 #include <PhotoshopAPI.h>
+#pragma pop_macro("check")
+#pragma pop_macro("OUT")
+#pragma pop_macro("IN")
+#pragma pop_macro("TEXT")
+#pragma pop_macro("ERROR")
+#pragma pop_macro("min")
+#pragma pop_macro("max")
 THIRD_PARTY_INCLUDES_END
 
 namespace PSD2UMG::Parser::Internal

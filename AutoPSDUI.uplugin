@@ -1,37 +1,27 @@
 {
-	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "1.0",
-	"FriendlyName": "AutoPSDUI",
-	"Description": "Import PSD file as Widget Blueprint",
-	"Category": "Widgets",
-	"CreatedBy": "Kangjian",
-	"CreatedByURL": "",
-	"DocsURL": "https://github.com/JohnSnowWind/AutoPSDUIDoc",
-	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/d5362c4d44784473ad84d946d95659e3",
-	"SupportURL": "",
-	"EngineVersion": "4.26.0",
-	"CanContainContent": true,
-	"Installed": true,
-	"Modules": [
-		{
-			"Name": "AutoPSDUI",
-			"Type": "Editor",
-			"LoadingPhase": "PostEngineInit",
-			"WhitelistPlatforms": [
-				"Win64",
-				"Mac"
-			]
-		}
-	],
-	"Plugins": [
-		{
-			"Name": "PythonScriptPlugin",
-			"Enabled": true
-		},
-		{
-			"Name": "EditorScriptingUtilities",
-			"Enabled": true
-		}
-	]
+    "FileVersion": 3,
+    "Version": 1,
+    "VersionName": "1.0",
+    "FriendlyName": "PSD2UMG",
+    "Description": "Import PSD files as UMG Widget Blueprints",
+    "Category": "Editor",
+    "CreatedBy": "",
+    "CreatedByURL": "",
+    "DocsURL": "",
+    "MarketplaceURL": "",
+    "SupportURL": "",
+    "EngineVersion": "5.7",
+    "CanContainContent": true,
+    "Installed": false,
+    "Modules": [
+        {
+            "Name": "PSD2UMG",
+            "Type": "Editor",
+            "LoadingPhase": "PostEngineInit",
+            "PlatformAllowList": [
+                "Win64",
+                "Mac"
+            ]
+        }
+    ]
 }

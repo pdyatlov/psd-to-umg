@@ -126,6 +126,13 @@ REM compressed-image's bundled c-blosc2 + nlohmann json headers.
 robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\compressed-image\thirdparty\c-blosc2\include" "%VENDOR_INCLUDE%" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\compressed-image\thirdparty\json\single_include\nlohmann" "%VENDOR_INCLUDE%\nlohmann" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 
+echo === Patching Util/Logger.h to use __VA_OPT__ branch on MSVC ===
+REM Upstream gates the __VA_OPT__ branch on !_MSC_VER, but UE 5.7 builds the
+REM legacy-preprocessor branch and rejects empty __VA_ARGS__ with a trailing
+REM comma. Force the conforming branch by replacing "#ifdef _MSC_VER" with
+REM "#if 0" inside Logger.h.
+powershell -NoProfile -Command "$f='%VENDOR_INCLUDE%\PhotoshopAPI\Util\Logger.h'; (Get-Content $f -Raw) -replace '#ifdef _MSC_VER','#if 0  /* PSD2UMG patch: force __VA_OPT__ branch */' | Set-Content -NoNewline $f"
+
 echo === Collecting LICENSE files ===
 set "VENDOR_LICENSES=%VENDOR_ROOT%\LICENSES"
 if not exist "%VENDOR_LICENSES%" mkdir "%VENDOR_LICENSES%"

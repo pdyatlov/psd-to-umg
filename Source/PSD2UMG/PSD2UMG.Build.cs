@@ -14,21 +14,12 @@ public class PSD2UMG : ModuleRules
         bUseRTTI = true;
         bEnableExceptions = true;
 
-        // PhotoshopAPI's PSAPI_LOG_ERROR macro uses `format, __VA_ARGS__` on the
-        // _MSC_VER branch. With MSVC's legacy preprocessor, an empty __VA_ARGS__
-        // leaves a trailing comma -> "syntax error: ')'" at every call site that
-        // passes only the format string. The conforming preprocessor (/Zc:preprocessor)
-        // makes empty __VA_ARGS__ produce nothing instead, so the same macro works.
-        // UE 5.7 supports this on Win64; we enable it for the entire PSD2UMG TU.
-        if (Target.Platform == UnrealTargetPlatform.Win64)
-        {
-            bUseUnity = false; // PhotoshopAPI's macro-heavy headers are unity-unfriendly.
-            PrivateDefinitions.Add("PSAPI_USE_VA_OPT=1");
-            // /Zc:preprocessor enables MSVC's conforming preprocessor (C++20 __VA_OPT__
-            // semantics for empty variadic args). UE exposes this via the bUseConformingPreprocessor
-            // module property when present; otherwise pass it as a raw compiler argument.
-            AdditionalCompilerArguments = "/Zc:preprocessor";
-        }
+        // PhotoshopAPI's macro-heavy headers don't tolerate unity-build TU concatenation.
+        bUseUnity = false;
+        // Note: PhotoshopAPI's Util/Logger.h has been patched in the vendored tree
+        // to always use the __VA_OPT__ branch (was gated on _MSC_VER, which broke
+        // legacy-preprocessor UE builds). See Scripts/build-photoshopapi.bat — the
+        // patch is reapplied automatically when re-vendoring from upstream.
 
         PublicDependencyModuleNames.AddRange(
             new string[]

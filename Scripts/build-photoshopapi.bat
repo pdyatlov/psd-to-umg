@@ -92,17 +92,35 @@ echo === [3/3] CMake build (Release) ===
 cmake --build build --config Release || (popd & exit /b 1)
 popd
 
-echo === Copying libs and headers into vendor tree ===
+echo === Copying libs, dlls, and headers into vendor tree ===
+set "VENDOR_BIN=%VENDOR_ROOT%\Win64\bin"
 if not exist "%VENDOR_LIB%" mkdir "%VENDOR_LIB%"
 if not exist "%VENDOR_INCLUDE%" mkdir "%VENDOR_INCLUDE%"
+if not exist "%VENDOR_BIN%" mkdir "%VENDOR_BIN%"
 
-REM Copy PhotoshopAPI's own .lib + all transitive .libs from vcpkg installed tree.
+REM PhotoshopAPI's own .lib + all transitive .libs from build tree (recursive).
 robocopy "%WORK_DIR%\PhotoshopAPI\build" "%VENDOR_LIB%" *.lib /S /NFL /NDL /NJH /NJS /NC /NS /NP
-robocopy "%WORK_DIR%\PhotoshopAPI\build\vcpkg_installed\x64-windows-static-md\lib" "%VENDOR_LIB%" *.lib /NFL /NDL /NJH /NJS /NC /NS /NP
 
-REM Copy PhotoshopAPI public headers and the vcpkg include tree.
-robocopy "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\include" "%VENDOR_INCLUDE%\PhotoshopAPI" /E /NFL /NDL /NJH /NJS /NC /NS /NP
-robocopy "%WORK_DIR%\PhotoshopAPI\build\vcpkg_installed\x64-windows-static-md\include" "%VENDOR_INCLUDE%" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+REM Vcpkg deps are built dynamic (default x64-windows triplet) — copy DLLs too.
+REM Build.cs picks them up via RuntimeDependencies.
+robocopy "%WORK_DIR%\PhotoshopAPI\build\vcpkg_installed\x64-windows\bin" "%VENDOR_BIN%" *.dll /NFL /NDL /NJH /NJS /NC /NS /NP
+
+REM PhotoshopAPI source headers live co-located with .cpp under PhotoshopAPI/src/.
+REM Copy *.h only (skip .cpp) into Win64/include/PhotoshopAPI/.
+robocopy "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\src" "%VENDOR_INCLUDE%\PhotoshopAPI" *.h *.hpp /E /NFL /NDL /NJH /NJS /NC /NS /NP
+
+REM Umbrella header lives in PhotoshopAPI/include/ — relocate it inside the
+REM PhotoshopAPI subdir so its quoted #includes resolve relative to itself.
+if exist "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\include\PhotoshopAPI.h" (
+    copy /y "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\include\PhotoshopAPI.h" "%VENDOR_INCLUDE%\PhotoshopAPI\PhotoshopAPI.h" >nul
+)
+
+REM Vcpkg public headers (Eigen, OpenImageIO, fmt, ...).
+robocopy "%WORK_DIR%\PhotoshopAPI\build\vcpkg_installed\x64-windows\include" "%VENDOR_INCLUDE%" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+
+REM Bundled submodule headers PhotoshopAPI sources reference via angle brackets.
+robocopy "%WORK_DIR%\PhotoshopAPI\thirdparty\compressed-image\compressed_image\include\compressed" "%VENDOR_INCLUDE%\compressed" /E /NFL /NDL /NJH /NJS /NC /NS /NP
+robocopy "%WORK_DIR%\PhotoshopAPI\build\thirdparty\mio\include\mio" "%VENDOR_INCLUDE%\mio" /E /NFL /NDL /NJH /NJS /NC /NS /NP
 
 echo === Collecting LICENSE files ===
 set "VENDOR_LICENSES=%VENDOR_ROOT%\LICENSES"

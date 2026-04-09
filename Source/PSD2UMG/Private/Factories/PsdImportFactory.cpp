@@ -10,9 +10,11 @@
 #include "UObject/Package.h"
 
 #include "PSD2UMGLog.h"
+#include "Generator/FWidgetBlueprintGenerator.h"
 #include "Parser/PsdDiagnostics.h"
 #include "Parser/PsdParser.h"
 #include "Parser/PsdTypes.h"
+#include "PSD2UMGSetting.h"
 
 #define LOCTEXT_NAMESPACE "UPsdImportFactory"
 
@@ -139,8 +141,26 @@ UObject* UPsdImportFactory::FactoryCreateBinary(
 		}
 	}
 
-	// Phase 3 will extend this factory to also produce a Widget Blueprint
-	// from Doc. For Phase 2, we return the wrapped UTexture2D as-is.
+	// Phase 3: Generate Widget Blueprint from parsed document.
+	if (bOk)
+	{
+		const UPSD2UMGSettings* Settings = UPSD2UMGSettings::Get();
+		FString PsdName = FPaths::GetBaseFilename(InName.ToString());
+		FString WbpDir = Settings->WidgetBlueprintAssetDir.Path;
+		if (WbpDir.IsEmpty()) { WbpDir = TEXT("/Game/UI/Widgets"); }
+		FString WbpAssetName = FString::Printf(TEXT("WBP_%s"), *PsdName);
+
+		UWidgetBlueprint* WBP = FWidgetBlueprintGenerator::Generate(Doc, WbpDir, WbpAssetName);
+		if (WBP)
+		{
+			UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG: generated Widget Blueprint %s/%s"), *WbpDir, *WbpAssetName);
+		}
+		else
+		{
+			UE_LOG(LogPSD2UMG, Warning, TEXT("PSD2UMG: Widget Blueprint generation failed for %s"), *InName.ToString());
+		}
+	}
+
 	return Result;
 }
 

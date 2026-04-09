@@ -31,6 +31,10 @@ public:
     UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG", meta=(LongPackageName))
     FDirectoryPath TextureAssetDir;
 
+    /* Widget Blueprint Asset Directory */
+    UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG", meta=(LongPackageName))
+    FDirectoryPath WidgetBlueprintAssetDir;
+
     /* Font Map */
     UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG", meta = (LongPackageName))
     TMap<FString, TSoftObjectPtr<UFont>> FontMap;

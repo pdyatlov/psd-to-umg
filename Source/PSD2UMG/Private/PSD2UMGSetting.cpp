@@ -7,6 +7,7 @@ UPSD2UMGSettings::UPSD2UMGSettings()
     bEnabled = true;
     TextureSrcDir.Path = FPaths::ProjectDir() / TEXT("Art/UI/Texture");
     TextureAssetDir.Path = TEXT("/Game/Widgets/Texture");
+    WidgetBlueprintAssetDir.Path = TEXT("/Game/UI/Widgets");
 }
 
 UPSD2UMGSettings* UPSD2UMGSettings::Get()

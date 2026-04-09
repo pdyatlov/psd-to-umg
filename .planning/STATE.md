@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-04-09T13:06:54.232Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-04-09T13:10:05.841Z"
 last_activity: 2026-04-09
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 10
   percent: 30
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 03 (layer-mapping-widget-blueprint-generation) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-04-09
 
@@ -61,6 +61,7 @@ Progress: [███░░░░░░░] 30%
 | Phase 02-c-psd-parser P05 | ~90m | 3 tasks + fix cycle | 4 files |
 | Phase 03-layer-mapping-widget-blueprint-generation P01 | 10m | 3 tasks | 8 files |
 | Phase 03-layer-mapping-widget-blueprint-generation P02 | 5m | 3 tasks | 8 files |
+| Phase 03-layer-mapping-widget-blueprint-generation P03 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,7 @@ Recent decisions affecting current work:
 - [Phase 02-c-psd-parser]: Text extraction uses style_run_*(0) and paragraph_run_justification(0); multi-run flattened with Warning diagnostic; pt->px is 1:1 (UMG DPI scaling deferred to Phase 4 TEXT-01)
 - [Phase 02-c-psd-parser P05]: PhotoshopAPI text fill color array is ARGB, not RGBA — undocumented upstream quirk, discovered empirically via debug log. Phase 4 must verify channel order for stroke/shadow/per-run colors before trusting them.
 - [Phase 03-layer-mapping-widget-blueprint-generation]: AllMappers.h private header declares all 15 mapper classes; .cpps provide out-of-line implementations — avoids ODR, keeps mappers internal
+- [Phase 03-layer-mapping-widget-blueprint-generation]: UWidgetBlueprintFactory::FactoryCreateNew used for WBP creation (canonical editor path); FAnchorCalculator suffix table ordered longest-first; bComputed flag distinguishes fixed vs quadrant-derived stretch anchors
 
 ### Pending Todos
 
@@ -89,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09T13:06:54.228Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-04-09T13:10:05.837Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None

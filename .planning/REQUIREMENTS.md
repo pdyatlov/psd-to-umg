@@ -39,12 +39,12 @@
 
 ### Widget Blueprint Generation
 
-- [ ] **WBP-01**: FWidgetBlueprintGenerator creates valid UWidgetBlueprint asset (ConstructWidget → compile → save sequence)
-- [ ] **WBP-02**: Widget positions and sizes correctly mapped from PSD canvas coordinates to UMG CanvasPanelSlot
-- [ ] **WBP-03**: Anchor heuristics auto-assign anchors based on layer position relative to canvas (top-left, top-right, bottom-left, bottom-right, centered, stretch)
-- [ ] **WBP-04**: Anchor override suffixes work (_anchor-tl, _anchor-c, _stretch-h, _stretch-v, _fill)
-- [ ] **WBP-05**: Layer z-order preserved in widget tree
-- [ ] **WBP-06**: Widget Blueprint opens correctly in UMG Designer without errors
+- [x] **WBP-01**: FWidgetBlueprintGenerator creates valid UWidgetBlueprint asset (ConstructWidget → compile → save sequence)
+- [x] **WBP-02**: Widget positions and sizes correctly mapped from PSD canvas coordinates to UMG CanvasPanelSlot
+- [x] **WBP-03**: Anchor heuristics auto-assign anchors based on layer position relative to canvas (top-left, top-right, bottom-left, bottom-right, centered, stretch)
+- [x] **WBP-04**: Anchor override suffixes work (_anchor-tl, _anchor-c, _stretch-h, _stretch-v, _fill)
+- [x] **WBP-05**: Layer z-order preserved in widget tree
+- [x] **WBP-06**: Widget Blueprint opens correctly in UMG Designer without errors
 
 ### Texture Import
 
@@ -168,12 +168,12 @@
 | MAP-10 | Phase 3 | Complete |
 | MAP-11 | Phase 3 | Complete |
 | MAP-12 | Phase 3 | Complete |
-| WBP-01 | Phase 3 | Pending |
-| WBP-02 | Phase 3 | Pending |
-| WBP-03 | Phase 3 | Pending |
-| WBP-04 | Phase 3 | Pending |
-| WBP-05 | Phase 3 | Pending |
-| WBP-06 | Phase 3 | Pending |
+| WBP-01 | Phase 3 | Complete |
+| WBP-02 | Phase 3 | Complete |
+| WBP-03 | Phase 3 | Complete |
+| WBP-04 | Phase 3 | Complete |
+| WBP-05 | Phase 3 | Complete |
+| WBP-06 | Phase 3 | Complete |
 | TEX-01 | Phase 3 | Complete |
 | TEX-02 | Phase 3 | Complete |
 | TEX-03 | Phase 3 | Complete |

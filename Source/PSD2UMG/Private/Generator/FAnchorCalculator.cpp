@@ -36,30 +36,19 @@ static const FSuffixEntry GSuffixes[] = {
 // ---------------------------------------------------------------------------
 FAnchors FAnchorCalculator::QuadrantAnchor(const FIntRect& Bounds, const FIntPoint& CanvasSize, bool& bOutStretchH, bool& bOutStretchV)
 {
+    // Auto-stretch is disabled by default: layers keep their PSD position/size.
+    // Use the _stretch-h, _stretch-v, or _fill suffix to opt into stretch behavior.
+    bOutStretchH = false;
+    bOutStretchV = false;
+
     const float CX = (Bounds.Min.X + Bounds.Max.X) * 0.5f;
     const float CY = (Bounds.Min.Y + Bounds.Max.Y) * 0.5f;
     const float W  = static_cast<float>(CanvasSize.X);
     const float H  = static_cast<float>(CanvasSize.Y);
 
-    bOutStretchH = (W > 0.f) && (Bounds.Width()  >= W * 0.8f);
-    bOutStretchV = (H > 0.f) && (Bounds.Height() >= H * 0.8f);
-
-    if (bOutStretchH && bOutStretchV)
-    {
-        return FAnchors(0.f, 0.f, 1.f, 1.f);
-    }
-
     const float VZone = (H > 0.f && CY < H / 3.f) ? 0.f : (H > 0.f && CY < H * 2.f / 3.f) ? 0.5f : 1.f;
     const float HZone = (W > 0.f && CX < W / 3.f) ? 0.f : (W > 0.f && CX < W * 2.f / 3.f) ? 0.5f : 1.f;
 
-    if (bOutStretchH)
-    {
-        return FAnchors(0.f, VZone, 1.f, VZone);
-    }
-    if (bOutStretchV)
-    {
-        return FAnchors(HZone, 0.f, HZone, 1.f);
-    }
     return FAnchors(HZone, VZone);
 }
 

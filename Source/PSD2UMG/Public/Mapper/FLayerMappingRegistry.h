@@ -1,8 +1,8 @@
 // Copyright 2018-2021 - John snow wind
 #pragma once
 #include "CoreMinimal.h"
+#include "Mapper/IPsdLayerMapper.h"
 
-class IPsdLayerMapper;
 struct FPsdLayer;
 struct FPsdDocument;
 class UWidgetTree;

@@ -50,8 +50,8 @@ void FWidgetBlueprintGenSpec::Define()
             TestNotNull(TEXT("WBP created"), WBP);
             if (!WBP) return;
 
-            TestNotNull(TEXT("WidgetTree exists"), WBP->WidgetTree);
-            TestNotNull(TEXT("Root widget exists"), WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("WidgetTree exists"), WBP->WidgetTree.Get());
+            TestNotNull(TEXT("Root widget exists"), WBP->WidgetTree->RootWidget.Get());
 
             UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
             TestNotNull(TEXT("Root is UCanvasPanel"), Root);

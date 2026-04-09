@@ -19,12 +19,12 @@ decisions:
   - "WBP generation is a side-effect from the factory; UTexture2D result returned unchanged for backward compat"
   - "WbpDir falls back to /Game/UI/Widgets if WidgetBlueprintAssetDir is empty"
 metrics:
-  duration: "~5m"
+  duration: "~5m + ~45m verification/fixes"
   completed_date: "2026-04-09"
-  tasks_completed: 2
+  tasks_completed: 3
   tasks_total: 3
   files_created: 1
-  files_modified: 1
+  files_modified: 5
 ---
 
 # Phase 03 Plan 04: Wire WBP Generator + E2E Spec Summary
@@ -38,9 +38,24 @@ Wire FWidgetBlueprintGenerator into PsdImportFactory as a side-effect call after
 | 1 | Wire FWidgetBlueprintGenerator into UPsdImportFactory | 41126b1 | PsdImportFactory.cpp |
 | 2 | Automation spec for WBP generation pipeline | 12308a9 | Tests/FWidgetBlueprintGenSpec.cpp |
 
-## Task 3 — Pending Human Verification
+## Task 3 — Human Verification: APPROVED
 
-Task 3 is a `checkpoint:human-verify` gate. See CHECKPOINT REACHED message returned by the executor.
+Verified manually in UE 5.7.4 Editor by dragging `MultiLayer.psd` into the Content Browser:
+- `WBP_MultiLayer` created under `/Game/UI/Widgets/` — opens in UMG Designer without errors
+- Title, BtnNormal, Background rendered at correct PSD positions
+- Textures imported as persistent `UTexture2D` assets under `{TextureAssetDir}/Textures/PSD2UMG_<hash>/`
+- Invisible `BtnHover` layer correctly skipped (D-08)
+- All `PSD2UMG.Generator.*` and `PSD2UMG.Parser.MultiLayer.*` automation specs pass (Session Frontend)
+
+### Post-Initial-Implementation Fixes (caught during verification)
+
+| # | Issue | Fix | Commit |
+|---|-------|-----|--------|
+| 1 | `TUniquePtr<IPsdLayerMapper>` copy error in implicit `operator=` | Include `IPsdLayerMapper.h`; `=delete` copy, `=default` move on `FLayerMappingRegistry` | 6e692eb, 166e6f4 |
+| 2 | `TestNotNull(TObjectPtr<T>)` template deduction fails in UE 5.7 | Call `.Get()` on `WidgetTree`/`RootWidget` | 6e692eb |
+| 3 | UImage rendered as thin border instead of filled rect | `SetBrushFromTexture(Tex, bMatchSize=true)` + explicit `DrawAs=Image` | fddec19 |
+| 4 | Group layers had zero bounds → children clipped inside 0×0 parent canvas | Groups always full-stretch with zero margins (transparent containers) | 7a98b78 |
+| 5 | Auto-stretch heuristic (80% threshold) surprised designers | Disabled auto-stretch; point anchors by default; explicit `_stretch-*`/`_fill` suffixes still work | 424c15c |
 
 ## What Was Built
 
@@ -56,7 +71,9 @@ Task 3 is a `checkpoint:human-verify` gate. See CHECKPOINT REACHED message retur
 
 ## Deviations from Plan
 
-None — plan executed exactly as written.
+- **Auto-stretch heuristic disabled** — the plan specified quadrant-based auto-stretch at ≥80% canvas dimension, but field testing showed surprising results (layers barely crossing the threshold stretched unexpectedly). Changed to point-anchor-only by default per user direction; `_stretch-h`, `_stretch-v`, `_fill` suffixes still work as specified.
+- **Group layers always fill parent** — the plan did not account for PhotoshopAPI leaving group layer bounds unset (all zeros). Groups are now transparent containers with full-stretch anchors and zero margins.
+- **Debug layout log added** — not in the plan, but `FWidgetBlueprintGenerator::PopulateCanvas` now logs each layer's bounds, anchors, stretch flags, and computed offsets. Very useful for diagnosing layout issues and worth keeping.
 
 ## Self-Check: PASSED
 

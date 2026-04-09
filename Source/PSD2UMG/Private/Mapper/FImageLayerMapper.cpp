@@ -27,6 +27,13 @@ UWidget* FImageLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc,
     }
 
     UImage* Img = Tree->ConstructWidget<UImage>(UImage::StaticClass(), FName(*Layer.Name));
-    Img->SetBrushFromTexture(Tex);
+    // bMatchSize=true so Brush.ImageSize is set to the texture dimensions.
+    // Without this, ImageSize stays (0,0) and the UImage renders as a thin
+    // border instead of filling the slot.
+    Img->SetBrushFromTexture(Tex, /*bMatchSize=*/true);
+    // Ensure DrawAs is Image (not Border/Box) regardless of archetype defaults.
+    FSlateBrush Brush = Img->GetBrush();
+    Brush.DrawAs = ESlateBrushDrawType::Image;
+    Img->SetBrush(Brush);
     return Img;
 }

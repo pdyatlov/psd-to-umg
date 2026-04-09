@@ -108,6 +108,16 @@ static void PopulateCanvas(
             Slot->SetLayout(Data);
             // ZOrder: PSD index 0 = topmost. UMG higher = on top. Invert.
             Slot->SetZOrder(TotalLayers - 1 - i);
+
+            UE_LOG(LogPSD2UMG, Log,
+                TEXT("Layer '%s': bounds=(%d,%d)-(%d,%d) canvas=%dx%d anchors=(%.2f,%.2f,%.2f,%.2f) stretchH=%d stretchV=%d offsets=(L%.1f T%.1f R%.1f B%.1f)"),
+                *Layer.Name,
+                Layer.Bounds.Min.X, Layer.Bounds.Min.Y, Layer.Bounds.Max.X, Layer.Bounds.Max.Y,
+                CanvasSize.X, CanvasSize.Y,
+                AnchorResult.Anchors.Minimum.X, AnchorResult.Anchors.Minimum.Y,
+                AnchorResult.Anchors.Maximum.X, AnchorResult.Anchors.Maximum.Y,
+                AnchorResult.bStretchH ? 1 : 0, AnchorResult.bStretchV ? 1 : 0,
+                Data.Offsets.Left, Data.Offsets.Top, Data.Offsets.Right, Data.Offsets.Bottom);
         }
 
         // Recurse into group children

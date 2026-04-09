@@ -65,9 +65,9 @@ Plans:
   3. All prefix-mapped widget types work: Progress_, HBox_, VBox_, Overlay_, ScrollBox_, Slider_, CheckBox_, Input_, List_, Tile_, Switcher_
   4. Textures are imported as persistent UTexture2D assets organized in {TargetDir}/Textures/{PsdName}/{LayerName}
   5. Anchor heuristics auto-assign reasonable anchors, and _anchor-*/_stretch-*/_fill suffixes override them correctly
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 Plans:
-- [ ] 03-01-PLAN.md — Contracts + infrastructure: IPsdLayerMapper, FLayerMappingRegistry, FTextureImporter, settings field
+- [x] 03-01-PLAN.md — Contracts + infrastructure: IPsdLayerMapper, FLayerMappingRegistry, FTextureImporter, settings field
 - [ ] 03-02-PLAN.md — All widget mappers: Image, Text, Group, Button_, Progress_, and 10 simple prefix types
 - [ ] 03-03-PLAN.md — WBP generator + anchor calculator: full Generate(), recursive tree, coordinate math, suffix parsing
 - [ ] 03-04-PLAN.md — Factory integration, automation spec, E2E human verification
@@ -143,7 +143,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 |-------|----------------|--------|-----------|
 | 1. UE5 Port | 2/2 | Complete | 2026-04-08 |
 | 2. C++ PSD Parser | 5/5 | Complete | 2026-04-08 |
-| 3. Layer Mapping & WBP Generation | 0/4 | Planning | - |
+| 3. Layer Mapping & WBP Generation | 1/4 | In Progress|  |
 | 4. Text, Fonts & Typography | 0/? | Not started | - |
 | 5. Layer Effects & Blend Modes | 0/? | Not started | - |
 | 6. Advanced Layout | 0/? | Not started | - |

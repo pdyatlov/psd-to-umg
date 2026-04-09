@@ -24,7 +24,7 @@
 
 ### Layer Mapping
 
-- [ ] **MAP-01**: IPsdLayerMapper interface and FLayerMappingRegistry implemented with priority-based first-match dispatch
+- [x] **MAP-01**: IPsdLayerMapper interface and FLayerMappingRegistry implemented with priority-based first-match dispatch
 - [ ] **MAP-02**: Image layers → UImage with SlateBrush pointing to imported UTexture2D
 - [ ] **MAP-03**: Text layers → UTextBlock (content, size with DPI conversion, color, alignment)
 - [ ] **MAP-04**: Group layers → UCanvasPanel (default) with correct child hierarchy
@@ -48,9 +48,9 @@
 
 ### Texture Import
 
-- [ ] **TEX-01**: Image layer pixel data imported as UTexture2D using Source.Init() (not PlatformData) so textures persist across editor restarts
-- [ ] **TEX-02**: Textures organized in target directory: {TargetDir}/Textures/{PsdName}/{LayerName}
-- [ ] **TEX-03**: Duplicate layer names handled by appending index
+- [x] **TEX-01**: Image layer pixel data imported as UTexture2D using Source.Init() (not PlatformData) so textures persist across editor restarts
+- [x] **TEX-02**: Textures organized in target directory: {TargetDir}/Textures/{PsdName}/{LayerName}
+- [x] **TEX-03**: Duplicate layer names handled by appending index
 
 ### Text & Typography
 
@@ -156,7 +156,7 @@
 | PRSR-05 | Phase 2 | Complete |
 | PRSR-06 | Phase 2 | Complete |
 | PRSR-07 | Phase 2 | Complete |
-| MAP-01 | Phase 3 | Pending |
+| MAP-01 | Phase 3 | Complete |
 | MAP-02 | Phase 3 | Pending |
 | MAP-03 | Phase 3 | Pending |
 | MAP-04 | Phase 3 | Pending |
@@ -174,9 +174,9 @@
 | WBP-04 | Phase 3 | Pending |
 | WBP-05 | Phase 3 | Pending |
 | WBP-06 | Phase 3 | Pending |
-| TEX-01 | Phase 3 | Pending |
-| TEX-02 | Phase 3 | Pending |
-| TEX-03 | Phase 3 | Pending |
+| TEX-01 | Phase 3 | Complete |
+| TEX-02 | Phase 3 | Complete |
+| TEX-03 | Phase 3 | Complete |
 | TEXT-01 | Phase 4 | Pending |
 | TEXT-02 | Phase 4 | Pending |
 | TEXT-03 | Phase 4 | Pending |

@@ -58,17 +58,36 @@ static void PopulateCanvas(
         UCanvasPanelSlot* Slot = Parent->AddChildToCanvas(Widget);
         if (Slot)
         {
-            // Compute anchor
-            FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer.Name, Layer.Bounds, CanvasSize);
-
             FAnchorData Data;
-            Data.Anchors   = AnchorResult.Anchors;
             Data.Alignment = FVector2D(0.f, 0.f);
+
+            FAnchorResult AnchorResult;
+            if (Layer.Type == EPsdLayerType::Group)
+            {
+                // Groups are transparent containers: fill the parent canvas so children
+                // stay in the same coordinate system as the root. PhotoshopAPI does not
+                // populate bounds on group layers, so we must not use them here.
+                AnchorResult.Anchors = FAnchors(0.f, 0.f, 1.f, 1.f);
+                AnchorResult.bStretchH = true;
+                AnchorResult.bStretchV = true;
+                AnchorResult.CleanName = Layer.Name;
+            }
+            else
+            {
+                AnchorResult = FAnchorCalculator::Calculate(Layer.Name, Layer.Bounds, CanvasSize);
+            }
+
+            Data.Anchors = AnchorResult.Anchors;
 
             const float AnchorPixelX = AnchorResult.Anchors.Minimum.X * static_cast<float>(CanvasSize.X);
             const float AnchorPixelY = AnchorResult.Anchors.Minimum.Y * static_cast<float>(CanvasSize.Y);
 
-            if (AnchorResult.bStretchH && AnchorResult.bStretchV)
+            if (Layer.Type == EPsdLayerType::Group)
+            {
+                // Group fills parent: zero margins on all sides
+                Data.Offsets = FMargin(0.f, 0.f, 0.f, 0.f);
+            }
+            else if (AnchorResult.bStretchH && AnchorResult.bStretchV)
             {
                 // Full stretch: offsets are margins from all 4 edges
                 Data.Offsets = FMargin(

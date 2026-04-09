@@ -25,17 +25,17 @@
 ### Layer Mapping
 
 - [x] **MAP-01**: IPsdLayerMapper interface and FLayerMappingRegistry implemented with priority-based first-match dispatch
-- [ ] **MAP-02**: Image layers → UImage with SlateBrush pointing to imported UTexture2D
-- [ ] **MAP-03**: Text layers → UTextBlock (content, size with DPI conversion, color, alignment)
-- [ ] **MAP-04**: Group layers → UCanvasPanel (default) with correct child hierarchy
-- [ ] **MAP-05**: Button_ prefix groups → UButton with normal/hovered/pressed/disabled state brushes
-- [ ] **MAP-06**: Progress_ prefix groups → UProgressBar with background/fill brushes
-- [ ] **MAP-07**: HBox_ / VBox_ prefix groups → UHorizontalBox / UVerticalBox
-- [ ] **MAP-08**: Overlay_ prefix groups → UOverlay
-- [ ] **MAP-09**: ScrollBox_ prefix groups → UScrollBox
-- [ ] **MAP-10**: Slider_ / CheckBox_ / Input_ prefix groups → USlider / UCheckBox / UEditableTextBox
-- [ ] **MAP-11**: List_ / Tile_ prefix groups → UListView / UTileView with EntryWidgetClass
-- [ ] **MAP-12**: Switcher_ prefix groups → UWidgetSwitcher
+- [x] **MAP-02**: Image layers → UImage with SlateBrush pointing to imported UTexture2D
+- [x] **MAP-03**: Text layers → UTextBlock (content, size with DPI conversion, color, alignment)
+- [x] **MAP-04**: Group layers → UCanvasPanel (default) with correct child hierarchy
+- [x] **MAP-05**: Button_ prefix groups → UButton with normal/hovered/pressed/disabled state brushes
+- [x] **MAP-06**: Progress_ prefix groups → UProgressBar with background/fill brushes
+- [x] **MAP-07**: HBox_ / VBox_ prefix groups → UHorizontalBox / UVerticalBox
+- [x] **MAP-08**: Overlay_ prefix groups → UOverlay
+- [x] **MAP-09**: ScrollBox_ prefix groups → UScrollBox
+- [x] **MAP-10**: Slider_ / CheckBox_ / Input_ prefix groups → USlider / UCheckBox / UEditableTextBox
+- [x] **MAP-11**: List_ / Tile_ prefix groups → UListView / UTileView with EntryWidgetClass
+- [x] **MAP-12**: Switcher_ prefix groups → UWidgetSwitcher
 
 ### Widget Blueprint Generation
 
@@ -157,17 +157,17 @@
 | PRSR-06 | Phase 2 | Complete |
 | PRSR-07 | Phase 2 | Complete |
 | MAP-01 | Phase 3 | Complete |
-| MAP-02 | Phase 3 | Pending |
-| MAP-03 | Phase 3 | Pending |
-| MAP-04 | Phase 3 | Pending |
-| MAP-05 | Phase 3 | Pending |
-| MAP-06 | Phase 3 | Pending |
-| MAP-07 | Phase 3 | Pending |
-| MAP-08 | Phase 3 | Pending |
-| MAP-09 | Phase 3 | Pending |
-| MAP-10 | Phase 3 | Pending |
-| MAP-11 | Phase 3 | Pending |
-| MAP-12 | Phase 3 | Pending |
+| MAP-02 | Phase 3 | Complete |
+| MAP-03 | Phase 3 | Complete |
+| MAP-04 | Phase 3 | Complete |
+| MAP-05 | Phase 3 | Complete |
+| MAP-06 | Phase 3 | Complete |
+| MAP-07 | Phase 3 | Complete |
+| MAP-08 | Phase 3 | Complete |
+| MAP-09 | Phase 3 | Complete |
+| MAP-10 | Phase 3 | Complete |
+| MAP-11 | Phase 3 | Complete |
+| MAP-12 | Phase 3 | Complete |
 | WBP-01 | Phase 3 | Pending |
 | WBP-02 | Phase 3 | Pending |
 | WBP-03 | Phase 3 | Pending |

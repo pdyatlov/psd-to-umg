@@ -68,7 +68,7 @@ Plans:
 **Plans:** 1/4 plans executed
 Plans:
 - [x] 03-01-PLAN.md — Contracts + infrastructure: IPsdLayerMapper, FLayerMappingRegistry, FTextureImporter, settings field
-- [ ] 03-02-PLAN.md — All widget mappers: Image, Text, Group, Button_, Progress_, and 10 simple prefix types
+- [x] 03-02-PLAN.md — All widget mappers: Image, Text, Group, Button_, Progress_, and 10 simple prefix types
 - [ ] 03-03-PLAN.md — WBP generator + anchor calculator: full Generate(), recursive tree, coordinate math, suffix parsing
 - [ ] 03-04-PLAN.md — Factory integration, automation spec, E2E human verification
 **UI hint**: yes

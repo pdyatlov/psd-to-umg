@@ -1,6 +1,6 @@
 // Copyright 2018-2021 - John snow wind
 
-#include "Mapper/IPsdLayerMapper.h"
+#include "Mapper/AllMappers.h"
 #include "Parser/PsdTypes.h"
 
 #include "Blueprint/WidgetTree.h"
@@ -8,35 +8,31 @@
 #include "Math/UnrealMathUtility.h"
 #include "Styling/SlateColor.h"
 
-class FTextLayerMapper : public IPsdLayerMapper
+int32 FTextLayerMapper::GetPriority() const { return 100; }
+
+bool FTextLayerMapper::CanMap(const FPsdLayer& Layer) const
 {
-public:
-    int32 GetPriority() const override { return 100; }
+    return Layer.Type == EPsdLayerType::Text;
+}
 
-    bool CanMap(const FPsdLayer& Layer) const override
-    {
-        return Layer.Type == EPsdLayerType::Text;
-    }
+UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
+{
+    UTextBlock* TextWidget = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), FName(*Layer.Name));
 
-    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override
-    {
-        UTextBlock* TextWidget = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), FName(*Layer.Name));
+    // Set text content
+    TextWidget->SetText(FText::FromString(Layer.Text.Content));
 
-        // Set text content
-        TextWidget->SetText(FText::FromString(Layer.Text.Content));
+    // DPI conversion: Photoshop 72 DPI -> UMG 96 DPI (multiply by 0.75)
+    const float UmgSize = Layer.Text.SizePx * 0.75f;
+    FSlateFontInfo FontInfo = TextWidget->GetFont();
+    FontInfo.Size = FMath::RoundToInt(UmgSize);
+    TextWidget->SetFont(FontInfo);
 
-        // DPI conversion: Photoshop 72 DPI -> UMG 96 DPI (multiply by 0.75)
-        const float UmgSize = Layer.Text.SizePx * 0.75f;
-        FSlateFontInfo FontInfo = TextWidget->GetFont();
-        FontInfo.Size = FMath::RoundToInt(UmgSize);
-        TextWidget->SetFont(FontInfo);
+    // Set color
+    TextWidget->SetColorAndOpacity(FSlateColor(Layer.Text.Color));
 
-        // Set color
-        TextWidget->SetColorAndOpacity(FSlateColor(Layer.Text.Color));
+    // Set justification
+    TextWidget->SetJustification(Layer.Text.Alignment);
 
-        // Set justification
-        TextWidget->SetJustification(Layer.Text.Alignment);
-
-        return TextWidget;
-    }
-};
+    return TextWidget;
+}

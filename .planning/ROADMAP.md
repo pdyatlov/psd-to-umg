@@ -133,7 +133,7 @@ Plans:
 Plans:
 - [x] 07-01-PLAN.md — Settings extension (4 new properties, category grouping) and Build.cs module deps
 - [x] 07-02-PLAN.md — SPsdImportPreviewDialog Slate widget (layer tree, checkboxes, badges, output path)
-- [ ] 07-03-PLAN.md — Factory integration (preview dialog in import flow), Content Browser context menu, PSD metadata
+- [x] 07-03-PLAN.md — Factory integration (preview dialog in import flow), Content Browser context menu, PSD metadata
 - [ ] 07-04-PLAN.md — CommonUI button mapper with input action binding, animation builder (_show/_hide/_hover)
 - [ ] 07-05-PLAN.md — Reimport handler (FReimportHandler), FWidgetBlueprintGenerator::Update(), change annotations
 **UI hint**: yes

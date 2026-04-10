@@ -84,14 +84,14 @@
 - [x] **EDITOR-02**: Import preview dialog shows layer tree with checkboxes and widget type badges before creating assets
 - [x] **EDITOR-03**: User can toggle individual layers on/off before import
 - [ ] **EDITOR-04**: Reimport support: update changed layers (position, image data, text) without destroying manual Blueprint edits; layer name is stable identity key
-- [ ] **EDITOR-05**: Right-click context menu in Content Browser: "Import as Widget Blueprint"
+- [x] **EDITOR-05**: Right-click context menu in Content Browser: "Import as Widget Blueprint"
 
 ### CommonUI & Interactivity
 
-- [ ] **CUI-01**: Optional CommonUI mode: Button_ prefix → UCommonButtonBase instead of UButton
-- [ ] **CUI-02**: Input action binding via layer name syntax: Button_Confirm[IA_Confirm] → bind to UInputAction asset
-- [ ] **CUI-03**: Animation generation from _show/_hide/_hover layer variants → UWidgetAnimation
-- [ ] **CUI-04**: ScrollBox content height auto-calculated from children
+- [x] **CUI-01**: Optional CommonUI mode: Button_ prefix → UCommonButtonBase instead of UButton
+- [x] **CUI-02**: Input action binding via layer name syntax: Button_Confirm[IA_Confirm] → bind to UInputAction asset
+- [x] **CUI-03**: Animation generation from _show/_hide/_hover layer variants → UWidgetAnimation
+- [x] **CUI-04**: ScrollBox content height auto-calculated from children
 
 ### Testing & Quality
 
@@ -198,11 +198,11 @@
 | EDITOR-02 | Phase 7 | Complete |
 | EDITOR-03 | Phase 7 | Complete |
 | EDITOR-04 | Phase 7 | Pending |
-| EDITOR-05 | Phase 7 | Pending |
-| CUI-01 | Phase 7 | Pending |
-| CUI-02 | Phase 7 | Pending |
-| CUI-03 | Phase 7 | Pending |
-| CUI-04 | Phase 7 | Pending |
+| EDITOR-05 | Phase 7 | Complete |
+| CUI-01 | Phase 7 | Complete |
+| CUI-02 | Phase 7 | Complete |
+| CUI-03 | Phase 7 | Complete |
+| CUI-04 | Phase 7 | Complete |
 | TEST-01 | Phase 8 | Pending |
 | TEST-02 | Phase 8 | Pending |
 | TEST-03 | Phase 8 | Pending |

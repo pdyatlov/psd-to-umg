@@ -83,7 +83,11 @@ Plans:
   3. Text outline (stroke) and drop shadow render correctly on UTextBlock via OutlineSettings and ShadowOffset
   4. Font mapping system resolves Photoshop PostScript font names to UE font assets via plugin settings, with a configurable default fallback
   5. Multi-line text enables AutoWrapText when the text box width is defined in the PSD
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 04-01-PLAN.md — Extend FPsdTextRun + populate bold/italic/box/outline from PhotoshopAPI + Typography.psd fixture + parser spec
+- [x] 04-02-PLAN.md — FFontResolver (exact/case-insensitive/default/engine fallback + suffix parsing) and FTextLayerMapper bold/italic rewrite (TEXT-02, TEXT-05)
+- [ ] 04-03-PLAN.md — Outline, AutoWrapText, TEXT-04 deferred no-op, E2E pipeline spec (TEXT-01, TEXT-03, TEXT-04, TEXT-06)
 
 ### Phase 5: Layer Effects & Blend Modes
 **Goal**: Common Photoshop layer effects translate to UMG equivalents, with a flatten fallback for anything too complex

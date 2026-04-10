@@ -134,3 +134,22 @@ public:
     bool CanMap(const FPsdLayer& Layer) const override;
     UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
 };
+
+// --- Suffix mappers (priority 150 / 200) ---
+// Defined in F9SliceImageLayerMapper.cpp
+class F9SliceImageLayerMapper : public IPsdLayerMapper
+{
+public:
+    int32 GetPriority() const override;
+    bool CanMap(const FPsdLayer& Layer) const override;
+    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
+};
+
+// Defined in FVariantsSuffixMapper.cpp
+class FVariantsSuffixMapper : public IPsdLayerMapper
+{
+public:
+    int32 GetPriority() const override;
+    bool CanMap(const FPsdLayer& Layer) const override;
+    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
+};

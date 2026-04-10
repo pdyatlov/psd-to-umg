@@ -14,6 +14,11 @@ struct FSuffixEntry
 };
 
 static const FSuffixEntry GSuffixes[] = {
+    // Strip-only suffixes (no anchor override; fall through to quadrant logic)
+    // _9slice must come before _9s (longest-first rule)
+    { TEXT("_9slice"),    0.f, 0.f, 0.f, 0.f, false, false, true },
+    { TEXT("_9s"),        0.f, 0.f, 0.f, 0.f, false, false, true },
+    { TEXT("_variants"),  0.f, 0.f, 0.f, 0.f, false, false, true },
     // Fixed-anchor suffixes
     { TEXT("_anchor-tl"),  0.f,   0.f,   0.f,   0.f,   false, false, false },
     { TEXT("_anchor-tc"),  0.5f,  0.f,   0.5f,  0.f,   false, false, false },
@@ -63,6 +68,18 @@ bool FAnchorCalculator::TryParseSuffix(const FString& Name, FAnchors& OutAnchors
         {
             const int32 SuffixLen = FCString::Strlen(Entry.Suffix);
             OutCleanName = Name.LeftChop(SuffixLen);
+
+            // Strip optional [L,T,R,B] margin bracket from the clean name.
+            // Pattern: name ends with ']' — find the matching '[' and remove.
+            if (OutCleanName.EndsWith(TEXT("]")))
+            {
+                int32 BracketOpen = INDEX_NONE;
+                OutCleanName.FindLastChar(TEXT('['), BracketOpen);
+                if (BracketOpen != INDEX_NONE)
+                {
+                    OutCleanName = OutCleanName.Left(BracketOpen);
+                }
+            }
 
             if (Entry.bComputed)
             {

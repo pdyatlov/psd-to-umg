@@ -27,6 +27,12 @@ void FLayerMappingRegistry::RegisterDefaults()
     Mappers.Add(MakeUnique<FTileLayerMapper>());
     Mappers.Add(MakeUnique<FSwitcherLayerMapper>());
 
+    // Suffix mappers (priority 150 — above type, below prefix)
+    Mappers.Add(MakeUnique<F9SliceImageLayerMapper>());
+
+    // Suffix mappers (priority 200 — same tier as prefix mappers)
+    Mappers.Add(MakeUnique<FVariantsSuffixMapper>());
+
     // Type-based mappers (priority 100)
     Mappers.Add(MakeUnique<FImageLayerMapper>());
     Mappers.Add(MakeUnique<FTextLayerMapper>());

@@ -54,11 +54,11 @@
 
 ### Text & Typography
 
-- [x] **TEXT-01**: DPI conversion applied: Photoshop point size × 0.75 = UMG font size (72→96 DPI)
+- [ ] **TEXT-01**: DPI conversion applied: Photoshop point size × 0.75 = UMG font size (72→96 DPI)
 - [x] **TEXT-02**: Bold and italic weight/style applied via TypefaceFontName
-- [x] **TEXT-03**: Text outline (stroke) applied via FSlateFontInfo.OutlineSettings
-- [x] **TEXT-04**: Text shadow applied via SetShadowOffset + SetShadowColorAndOpacity
-- [x] **TEXT-05**: Font mapping system: Photoshop font name → UE font asset via plugin settings
+- [ ] **TEXT-03**: Text outline (stroke) applied via FSlateFontInfo.OutlineSettings
+- [ ] **TEXT-04**: Text shadow applied via SetShadowOffset + SetShadowColorAndOpacity
+- [ ] **TEXT-05**: Font mapping system: Photoshop font name → UE font asset via plugin settings
 - [x] **TEXT-06**: Multi-line text with AutoWrapText enabled when text box width is defined
 
 ### Layer Effects
@@ -177,11 +177,11 @@
 | TEX-01 | Phase 3 | Complete |
 | TEX-02 | Phase 3 | Complete |
 | TEX-03 | Phase 3 | Complete |
-| TEXT-01 | Phase 4 | Complete |
+| TEXT-01 | Phase 4 | Pending |
 | TEXT-02 | Phase 4 | Complete |
-| TEXT-03 | Phase 4 | Complete |
-| TEXT-04 | Phase 4 | Complete |
-| TEXT-05 | Phase 4 | Complete |
+| TEXT-03 | Phase 4 | Pending |
+| TEXT-04 | Phase 4 | Pending |
+| TEXT-05 | Phase 4 | Pending |
 | TEXT-06 | Phase 4 | Complete |
 | FX-01 | Phase 5 | Pending |
 | FX-02 | Phase 5 | Pending |

@@ -270,6 +270,65 @@ namespace PSD2UMG::Parser::Internal
 			{
 				OutLayer.Text.Alignment = MapJustification(*J);
 			}
+
+			// Phase 4 -- weight / style flags (first run).
+			if (auto Bold = Text->style_run_faux_bold(0); Bold.has_value())
+			{
+				OutLayer.Text.bBold = *Bold;
+			}
+			if (auto Italic = Text->style_run_faux_italic(0); Italic.has_value())
+			{
+				OutLayer.Text.bItalic = *Italic;
+			}
+
+			// Phase 4 -- box / point distinction.
+			OutLayer.Text.bHasExplicitWidth = Text->is_box_text();
+			if (OutLayer.Text.bHasExplicitWidth)
+			{
+				if (auto BW = Text->box_width(); BW.has_value())
+				{
+					OutLayer.Text.BoxWidthPx = static_cast<float>(*BW);
+				}
+			}
+
+			// Phase 4 -- outline (stroke).
+			// Stroke color byte order assumed ARGB, same as fill color (Phase 2-03).
+			// If empirical verification shows RGBA instead, swap the indexing here.
+			bool bStroke = false;
+			if (auto SF = Text->style_run_stroke_flag(0); SF.has_value())
+			{
+				bStroke = *SF;
+			}
+			if (bStroke)
+			{
+				if (auto OW = Text->style_run_outline_width(0); OW.has_value())
+				{
+					OutLayer.Text.OutlineSize = static_cast<float>(*OW);
+				}
+				if (auto SC = Text->style_run_stroke_color(0); SC.has_value() && SC->size() >= 3)
+				{
+					// Interpret ARGB to match fill-color quirk (Phase 2-03).
+					double A = 1.0, Rd = 0.0, Gd = 0.0, Bd = 0.0;
+					if (SC->size() >= 4)
+					{
+						A  = (*SC)[0];
+						Rd = (*SC)[1];
+						Gd = (*SC)[2];
+						Bd = (*SC)[3];
+					}
+					else
+					{
+						Rd = (*SC)[0];
+						Gd = (*SC)[1];
+						Bd = (*SC)[2];
+					}
+					const uint8 R = static_cast<uint8>(FMath::Clamp(Rd, 0.0, 1.0) * 255.0);
+					const uint8 G = static_cast<uint8>(FMath::Clamp(Gd, 0.0, 1.0) * 255.0);
+					const uint8 B = static_cast<uint8>(FMath::Clamp(Bd, 0.0, 1.0) * 255.0);
+					const uint8 Alpha = static_cast<uint8>(FMath::Clamp(A, 0.0, 1.0) * 255.0);
+					OutLayer.Text.OutlineColor = FLinearColor::FromSRGBColor(FColor(R, G, B, Alpha));
+				}
+			}
 		}
 		catch (const std::exception& e)
 		{

@@ -82,6 +82,29 @@ UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc
     FontInfo.Size = FMath::RoundToInt(UmgSize);
     TextWidget->SetFont(FontInfo);
 
+    // TEXT-03 — outline via FSlateFontInfo::OutlineSettings.
+    // OutlineSize is in pixels in PhotoshopAPI; apply the same 0.75 DPI conversion
+    // we use for font size.
+    if (Layer.Text.OutlineSize > 0.f)
+    {
+        FSlateFontInfo OutlineInfo = TextWidget->GetFont();
+        OutlineInfo.OutlineSettings.OutlineSize = FMath::RoundToInt(Layer.Text.OutlineSize * 0.75f);
+        OutlineInfo.OutlineSettings.OutlineColor = Layer.Text.OutlineColor;
+        TextWidget->SetFont(OutlineInfo);
+    }
+
+    // TEXT-06 — AutoWrapText on paragraph (box) text only. Point text layers keep
+    // wrap disabled so short button/title labels never wrap unexpectedly.
+    TextWidget->SetAutoWrapText(Layer.Text.bHasExplicitWidth);
+
+    // TEXT-04 — drop shadow DEFERRED.
+    // PhotoshopAPI v0.9 does not expose text drop-shadow effect data (verified
+    // against vendored headers in .planning/phases/04-text-fonts-typography/
+    // 04-RESEARCH.md). The requirement is tracked as a partial delivery; a
+    // follow-up decimal phase (4.1) will close the gap when either PhotoshopAPI
+    // adds support or manual TySh descriptor parsing is implemented.
+    // Intentionally no shadow offset or shadow color calls here.
+
     // Color (Phase 3 baseline).
     TextWidget->SetColorAndOpacity(FSlateColor(Layer.Text.Color));
 

@@ -13,6 +13,9 @@ FLayerMappingRegistry::FLayerMappingRegistry()
 
 void FLayerMappingRegistry::RegisterDefaults()
 {
+    // CommonUI button mapper (priority 210) — checked before FButtonLayerMapper when bUseCommonUI is true
+    Mappers.Add(MakeUnique<FCommonUIButtonLayerMapper>());
+
     // Prefix mappers (priority 200) — must be checked before Group (priority 50)
     Mappers.Add(MakeUnique<FButtonLayerMapper>());
     Mappers.Add(MakeUnique<FProgressLayerMapper>());

@@ -154,6 +154,11 @@ public:
     UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
 };
 
+// --- CommonUI button mapper (priority 210) ---
+// Defined in FCommonUIButtonLayerMapper.cpp
+// Active only when bUseCommonUI = true; falls back to FButtonLayerMapper otherwise.
+#include "FCommonUIButtonLayerMapper.h"
+
 // --- Smart Object mapper (priority 150) ---
 // Defined in FSmartObjectLayerMapper.cpp
 class FSmartObjectLayerMapper : public IPsdLayerMapper

@@ -34,6 +34,18 @@ struct PSD2UMG_API FPsdTextRun
 	float SizePx = 0.f;
 	FLinearColor Color = FLinearColor::White;
 	TEnumAsByte<ETextJustify::Type> Alignment = ETextJustify::Left;
+
+	// Phase 4 additions — weight / style flags
+	bool bBold = false;
+	bool bItalic = false;
+
+	// Phase 4 additions — layout
+	bool bHasExplicitWidth = false;
+	float BoxWidthPx = 0.f;
+
+	// Phase 4 additions — outline (best-effort; zero when not present)
+	FLinearColor OutlineColor = FLinearColor::Transparent;
+	float OutlineSize = 0.f;
 };
 
 /**

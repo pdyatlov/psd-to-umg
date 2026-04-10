@@ -342,6 +342,147 @@ namespace PSD2UMG::Parser::Internal
 		}
 	}
 
+	/**
+	 * Parse the lrFX tagged block for a layer and populate OutLayer.Effects.
+	 * Handles color overlay (sofi), drop shadow (dsdw), and complex effects (isdw, bevl).
+	 * Gracefully skips missing or malformed blocks.
+	 */
+	static void ExtractLayerEffects(
+		const std::shared_ptr<PsdLayer>& InLayer,
+		FPsdLayer& OutLayer,
+		FPsdParseDiagnostics& OutDiag)
+	{
+		try
+		{
+			for (const auto& Block : InLayer->unparsed_tagged_blocks())
+			{
+				if (!Block || Block->getKey() != NAMESPACE_PSAPI::Enum::TaggedBlockKey::fxLayer)
+					continue;
+
+				const auto& Data = Block->m_Data;
+				if (Data.size() < 4) break;
+
+				size_t Pos = 0;
+				auto ReadU16 = [&]() -> uint16 {
+					if (Pos + 2 > Data.size()) return 0;
+					uint16 Val = (static_cast<uint8>(Data[Pos]) << 8) | static_cast<uint8>(Data[Pos + 1]);
+					Pos += 2;
+					return Val;
+				};
+				auto ReadU32 = [&]() -> uint32 {
+					if (Pos + 4 > Data.size()) return 0;
+					uint32 Val = (static_cast<uint8>(Data[Pos]) << 24)
+					           | (static_cast<uint8>(Data[Pos + 1]) << 16)
+					           | (static_cast<uint8>(Data[Pos + 2]) << 8)
+					           | static_cast<uint8>(Data[Pos + 3]);
+					Pos += 4;
+					return Val;
+				};
+				auto ReadU8 = [&]() -> uint8 {
+					if (Pos + 1 > Data.size()) return 0;
+					return static_cast<uint8>(Data[Pos++]);
+				};
+
+				uint16 Version = ReadU16();
+				uint16 EffectCount = ReadU16();
+
+				for (uint16 e = 0; e < EffectCount; ++e)
+				{
+					if (Pos + 8 > Data.size()) break;
+
+					Pos += 4; // skip signature ("8BIM")
+
+					char Key[5] = {};
+					for (int k = 0; k < 4; ++k)
+						Key[k] = static_cast<char>(Data[Pos++]);
+
+					uint32 EffectSize = ReadU32();
+					size_t EffectEnd = Pos + EffectSize;
+					if (EffectEnd > Data.size()) EffectEnd = Data.size();
+
+					if (FCStringAnsi::Strcmp(Key, "sofi") == 0)
+					{
+						// Color overlay / solid fill
+						uint32 SofiVer = ReadU32();
+						uint32 BlendKey = ReadU32();
+						uint16 ColorSpace = ReadU16();
+						// D-16: Parse as R,G,B and log for ARGB verification against fixtures.
+						// Phase 2 found ARGB in descriptor arrays; lrFX color sub-records may differ.
+						float C0 = static_cast<float>(ReadU16()) / 65535.f;
+						float C1 = static_cast<float>(ReadU16()) / 65535.f;
+						float C2 = static_cast<float>(ReadU16()) / 65535.f;
+						ReadU16(); // unused channel
+						uint8 OpacityByte = ReadU8();
+						uint8 Enabled = ReadU8();
+						float A = static_cast<float>(OpacityByte) / 255.f;
+
+						UE_LOG(LogPSD2UMG, Verbose, TEXT("Layer '%s' sofi color: C0=%.3f C1=%.3f C2=%.3f A=%.3f (assuming R,G,B order)"),
+							*OutLayer.Name, C0, C1, C2, A);
+
+						OutLayer.Effects.bHasColorOverlay = (Enabled != 0);
+						OutLayer.Effects.ColorOverlayColor = Enabled ? FLinearColor(C0, C1, C2, A) : FLinearColor::White;
+					}
+					else if (FCStringAnsi::Strcmp(Key, "dsdw") == 0)
+					{
+						// Drop shadow
+						uint32 DsdwVer = ReadU32();
+						uint32 BlurFixed = ReadU32();
+						uint32 IntensityFixed = ReadU32();
+						uint32 AngleFixed = ReadU32();
+						uint32 DistanceFixed = ReadU32();
+						float DistancePx = static_cast<float>(DistanceFixed) / 65536.f;
+						float AngleDeg = static_cast<float>(AngleFixed) / 65536.f;
+						float AngleRad = FMath::DegreesToRadians(AngleDeg);
+						float OffsetX = DistancePx * FMath::Cos(AngleRad);
+						float OffsetY = DistancePx * FMath::Sin(AngleRad);
+
+						uint16 ColorSpace = ReadU16();
+						// D-16: Same channel order verification as sofi
+						float C0 = static_cast<float>(ReadU16()) / 65535.f;
+						float C1 = static_cast<float>(ReadU16()) / 65535.f;
+						float C2 = static_cast<float>(ReadU16()) / 65535.f;
+						ReadU16(); // unused channel
+
+						UE_LOG(LogPSD2UMG, Verbose, TEXT("Layer '%s' dsdw color: C0=%.3f C1=%.3f C2=%.3f (assuming R,G,B order)"),
+							*OutLayer.Name, C0, C1, C2);
+
+						uint8 Sign = ReadU8();
+						if (Sign != 0) OffsetY = -OffsetY;
+						OutLayer.Effects.DropShadowOffset = FVector2D(OffsetX, OffsetY);
+
+						uint8 ShadowOpacity = (Pos < EffectEnd) ? ReadU8() : 128;
+						uint8 ShadowEnabled = (Pos < EffectEnd) ? ReadU8() : 1;
+						float ShadowA = static_cast<float>(ShadowOpacity) / 255.f;
+						OutLayer.Effects.bHasDropShadow = (ShadowEnabled != 0);
+						OutLayer.Effects.DropShadowColor = ShadowEnabled ? FLinearColor(C0, C1, C2, ShadowA) : FLinearColor(0, 0, 0, 0);
+					}
+					else if (FCStringAnsi::Strcmp(Key, "isdw") == 0
+					      || FCStringAnsi::Strcmp(Key, "bevl") == 0)
+					{
+						// Inner shadow or bevel/emboss — complex effects (per D-09)
+						OutLayer.Effects.bHasComplexEffects = true;
+					}
+
+					Pos = EffectEnd; // advance to next effect
+				}
+				break; // only one lrFX block expected
+			}
+		}
+		catch (...)
+		{
+			OutDiag.AddWarning(OutLayer.Name, TEXT("Failed to parse lrFX effects block; effects ignored."));
+		}
+
+		if (OutLayer.Effects.bHasColorOverlay || OutLayer.Effects.bHasDropShadow || OutLayer.Effects.bHasComplexEffects)
+		{
+			UE_LOG(LogPSD2UMG, Log, TEXT("Layer '%s' effects: ColorOverlay=%d DropShadow=%d Complex=%d"),
+				*OutLayer.Name,
+				OutLayer.Effects.bHasColorOverlay ? 1 : 0,
+				OutLayer.Effects.bHasDropShadow ? 1 : 0,
+				OutLayer.Effects.bHasComplexEffects ? 1 : 0);
+		}
+	}
+
 	void ConvertLayerRecursive(
 		const std::shared_ptr<PsdLayer>& InLayer,
 		FPsdLayer& OutLayer,
@@ -359,6 +500,9 @@ namespace PSD2UMG::Parser::Internal
 		// PhotoshopAPI Layer<T>::opacity() already returns a normalised 0..1 float.
 		OutLayer.Opacity = FMath::Clamp(InLayer->opacity(), 0.0f, 1.0f);
 		OutLayer.Bounds = ComputeBounds(InLayer);
+
+		// Phase 5: extract layer effects from lrFX tagged block
+		ExtractLayerEffects(InLayer, OutLayer, OutDiag);
 
 		// Layer-type dispatch via RTTI. bUseRTTI=true is set in PSD2UMG.Build.cs.
 		if (auto Group = std::dynamic_pointer_cast<GroupLayer<PsdPixelType>>(InLayer))

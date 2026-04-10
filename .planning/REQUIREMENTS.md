@@ -83,7 +83,7 @@
 - [x] **EDITOR-01**: Plugin settings in Project Settings → Plugins → PSD2UMG (output dirs, font map, source DPI, effect handling, anchor auto-assign, CommonUI mode)
 - [x] **EDITOR-02**: Import preview dialog shows layer tree with checkboxes and widget type badges before creating assets
 - [x] **EDITOR-03**: User can toggle individual layers on/off before import
-- [ ] **EDITOR-04**: Reimport support: update changed layers (position, image data, text) without destroying manual Blueprint edits; layer name is stable identity key
+- [x] **EDITOR-04**: Reimport support: update changed layers (position, image data, text) without destroying manual Blueprint edits; layer name is stable identity key
 - [x] **EDITOR-05**: Right-click context menu in Content Browser: "Import as Widget Blueprint"
 
 ### CommonUI & Interactivity
@@ -197,7 +197,7 @@
 | EDITOR-01 | Phase 7 | Complete |
 | EDITOR-02 | Phase 7 | Complete |
 | EDITOR-03 | Phase 7 | Complete |
-| EDITOR-04 | Phase 7 | Pending |
+| EDITOR-04 | Phase 7 | Complete |
 | EDITOR-05 | Phase 7 | Complete |
 | CUI-01 | Phase 7 | Complete |
 | CUI-02 | Phase 7 | Complete |

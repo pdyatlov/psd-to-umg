@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 07-04-PLAN.md
-last_updated: "2026-04-10T12:10:39.086Z"
+status: verifying
+stopped_at: Completed 07-05-PLAN.md
+last_updated: "2026-04-10T12:14:42.650Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 24
-  completed_plans: 23
+  completed_plans: 24
   percent: 36
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 07 (editor-ui-preview-settings) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-10
 
 Progress: [████░░░░░░] 36%
@@ -71,6 +71,7 @@ Progress: [████░░░░░░] 36%
 | Phase 07 P02 | 10m | 2 tasks | 3 files |
 | Phase 07 P03 | 15 | 2 tasks | 3 files |
 | Phase 07-editor-ui-preview-settings P04 | 8m | 2 tasks | 6 files |
+| Phase 07 P05 | 15m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase 07]: SPsdImportPreviewDialog: widget type inferred from EPsdLayerType + name prefixes (no FindMapper API)
 - [Phase 07]: Import factory shows SPsdImportPreviewDialog modal via EditorAddModalWindow before WBP generation; cancel skips generation
 - [Phase 07]: FCommonUIButtonLayerMapper at priority 210; CanMap returns false when bUseCommonUI is false; Map returns nullptr if CommonUI module not loaded; AnimationBindings.Add used (no BindPossessableObject)
+- [Phase 07]: FReimportManager auto-registers on FReimportHandler construction; module stores TUniquePtr for lifetime
+- [Phase 07]: Orphan widgets (deleted PSD layers) kept in WidgetTree per D-07 — Update() never removes them
 
 ### Pending Todos
 
@@ -109,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T12:10:39.082Z
-Stopped at: Completed 07-04-PLAN.md
+Last session: 2026-04-10T12:14:36.825Z
+Stopped at: Completed 07-05-PLAN.md
 Resume file: None

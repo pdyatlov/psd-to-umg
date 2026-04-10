@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 4: Text, Fonts & Typography** - Full text layer support with DPI conversion, font mapping, outline, shadow
 - [ ] **Phase 5: Layer Effects & Blend Modes** - Opacity, color overlay, drop shadow, flatten fallback for complex effects
 - [x] **Phase 6: Advanced Layout** - 9-slice, improved anchors, Smart Object recursive import, variant switchers (completed 2026-04-10)
-- [ ] **Phase 7: Editor UI, Preview & Settings** - Plugin settings, import preview dialog, reimport, context menu, CommonUI mode, animations
+- [x] **Phase 7: Editor UI, Preview & Settings** - Plugin settings, import preview dialog, reimport, context menu, CommonUI mode, animations (completed 2026-04-10)
 - [ ] **Phase 8: Testing, Documentation & Release** - Unit/integration tests, test PSDs, docs, CI/CD, example project
 
 ## Phase Details
@@ -129,13 +129,13 @@ Plans:
   3. Reimport updates changed layers (position, image data, text) without destroying manual Blueprint edits, using layer name as stable identity key
   4. Right-click context menu "Import as Widget Blueprint" works in Content Browser
   5. When CommonUI mode is enabled, Button_ prefix produces UCommonButtonBase; input action binding via Button_Confirm[IA_Confirm] syntax works; _show/_hide/_hover variants generate UWidgetAnimation
-**Plans:** 4/5 plans executed
+**Plans:** 5/5 plans complete
 Plans:
 - [x] 07-01-PLAN.md — Settings extension (4 new properties, category grouping) and Build.cs module deps
 - [x] 07-02-PLAN.md — SPsdImportPreviewDialog Slate widget (layer tree, checkboxes, badges, output path)
 - [x] 07-03-PLAN.md — Factory integration (preview dialog in import flow), Content Browser context menu, PSD metadata
 - [x] 07-04-PLAN.md — CommonUI button mapper with input action binding, animation builder (_show/_hide/_hover)
-- [ ] 07-05-PLAN.md — Reimport handler (FReimportHandler), FWidgetBlueprintGenerator::Update(), change annotations
+- [x] 07-05-PLAN.md — Reimport handler (FReimportHandler), FWidgetBlueprintGenerator::Update(), change annotations
 **UI hint**: yes
 
 ### Phase 8: Testing, Documentation & Release
@@ -164,5 +164,5 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 4. Text, Fonts & Typography | 2/3 | In Progress|  |
 | 5. Layer Effects & Blend Modes | 1/2 | In Progress|  |
 | 6. Advanced Layout | 3/3 | Complete   | 2026-04-10 |
-| 7. Editor UI, Preview & Settings | 4/5 | In Progress|  |
+| 7. Editor UI, Preview & Settings | 5/5 | Complete   | 2026-04-10 |
 | 8. Testing, Documentation & Release | 0/? | Not started | - |

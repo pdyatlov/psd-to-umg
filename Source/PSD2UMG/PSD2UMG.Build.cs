@@ -50,5 +50,19 @@ public class PSD2UMG : ModuleRules
                 "PhotoshopAPI",
             }
         );
+
+        // Phase 7: Editor UI, preview dialog, animations, CommonUI
+        PrivateDependencyModuleNames.AddRange(
+            new string[]
+            {
+                "ToolMenus",
+                "ContentBrowser",
+                "MovieScene",
+                "MovieSceneTracks",
+                "EnhancedInput",
+                "CommonUI",
+                "InputCore",
+            }
+        );
     }
 }

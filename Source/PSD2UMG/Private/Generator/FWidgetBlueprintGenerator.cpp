@@ -14,6 +14,7 @@
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
+#include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -458,4 +459,260 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
 
     UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: created and saved WBP: %s"), *FullPath);
     return WBP;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helper: collect all widgets from a WidgetTree into a flat map by name
+// ---------------------------------------------------------------------------
+static void CollectWidgetsByName(UWidgetTree* Tree, TMap<FString, UWidget*>& OutMap)
+{
+    if (!Tree)
+    {
+        return;
+    }
+    Tree->ForEachWidget([&OutMap](UWidget* W)
+    {
+        if (W)
+        {
+            OutMap.Add(W->GetName(), W);
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Internal helper: recursively update canvas from layer array
+// ---------------------------------------------------------------------------
+static void UpdateCanvas(
+    FLayerMappingRegistry& Registry,
+    UWidgetTree* Tree,
+    UCanvasPanel* Parent,
+    const TArray<FPsdLayer>& Layers,
+    const FPsdDocument& Doc,
+    const FIntPoint& CanvasSize,
+    TMap<FString, UWidget*>& ExistingWidgets,
+    const TSet<FString>& SkippedLayerNames)
+{
+    for (const FPsdLayer& Layer : Layers)
+    {
+        if (SkippedLayerNames.Contains(Layer.Name))
+        {
+            continue;
+        }
+
+        UWidget** ExistingPtr = ExistingWidgets.Find(Layer.Name);
+        if (ExistingPtr && *ExistingPtr)
+        {
+            UWidget* Existing = *ExistingPtr;
+            ExistingWidgets.Remove(Layer.Name); // mark as handled
+
+            // Update PSD-sourced properties on existing widget
+            // Update canvas slot position/size
+            if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Existing->Slot))
+            {
+                FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer.Name, Layer.Bounds, CanvasSize);
+                FAnchorData Data;
+                Data.Anchors = AnchorResult.Anchors;
+                Data.Alignment = FVector2D(0.f, 0.f);
+
+                const float AnchorPixelX = AnchorResult.Anchors.Minimum.X * static_cast<float>(CanvasSize.X);
+                const float AnchorPixelY = AnchorResult.Anchors.Minimum.Y * static_cast<float>(CanvasSize.Y);
+
+                if (!AnchorResult.bStretchH && !AnchorResult.bStretchV)
+                {
+                    Data.Offsets = FMargin(
+                        static_cast<float>(Layer.Bounds.Min.X) - AnchorPixelX,
+                        static_cast<float>(Layer.Bounds.Min.Y) - AnchorPixelY,
+                        static_cast<float>(Layer.Bounds.Width()),
+                        static_cast<float>(Layer.Bounds.Height()));
+                }
+                else
+                {
+                    Data.Offsets = FMargin(
+                        static_cast<float>(Layer.Bounds.Min.X),
+                        static_cast<float>(Layer.Bounds.Min.Y),
+                        static_cast<float>(CanvasSize.X - Layer.Bounds.Max.X),
+                        static_cast<float>(CanvasSize.Y - Layer.Bounds.Max.Y));
+                }
+                Slot->SetLayout(Data);
+            }
+
+            // Update text properties for text blocks
+            if (Layer.Type == EPsdLayerType::Text)
+            {
+                if (UTextBlock* TextBlock = Cast<UTextBlock>(Existing))
+                {
+                    TextBlock->SetText(FText::FromString(Layer.Text.PlainText));
+                    FSlateFontInfo FontInfo = TextBlock->GetFont();
+                    if (Layer.Text.FontSizePx > 0.f)
+                    {
+                        FontInfo.Size = static_cast<int32>(Layer.Text.FontSizePx);
+                    }
+                    TextBlock->SetFont(FontInfo);
+                    TextBlock->SetColorAndOpacity(FSlateColor(Layer.Text.FillColor));
+                }
+            }
+
+            // Update opacity and visibility
+            Existing->SetRenderOpacity(Layer.Opacity);
+            Existing->SetVisibility(Layer.bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+
+            UE_LOG(LogPSD2UMG, Log, TEXT("Update: updated existing widget '%s'"), *Layer.Name);
+        }
+        else
+        {
+            // New layer: create widget and add to canvas
+            if (Layer.Bounds.IsEmpty() && Layer.Type != EPsdLayerType::Group)
+            {
+                UE_LOG(LogPSD2UMG, Warning, TEXT("Update: skipping zero-size new layer: %s"), *Layer.Name);
+                continue;
+            }
+
+            UWidget* NewWidget = Registry.MapLayer(Layer, Doc, Tree);
+            if (!NewWidget)
+            {
+                UE_LOG(LogPSD2UMG, Warning, TEXT("Update: no mapper for new layer '%s'"), *Layer.Name);
+                continue;
+            }
+
+            UCanvasPanelSlot* Slot = Parent->AddChildToCanvas(NewWidget);
+            if (Slot)
+            {
+                FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer.Name, Layer.Bounds, CanvasSize);
+                FAnchorData Data;
+                Data.Alignment = FVector2D(0.f, 0.f);
+                Data.Anchors = AnchorResult.Anchors;
+
+                const float AnchorPixelX = AnchorResult.Anchors.Minimum.X * static_cast<float>(CanvasSize.X);
+                const float AnchorPixelY = AnchorResult.Anchors.Minimum.Y * static_cast<float>(CanvasSize.Y);
+
+                if (!AnchorResult.bStretchH && !AnchorResult.bStretchV)
+                {
+                    Data.Offsets = FMargin(
+                        static_cast<float>(Layer.Bounds.Min.X) - AnchorPixelX,
+                        static_cast<float>(Layer.Bounds.Min.Y) - AnchorPixelY,
+                        static_cast<float>(Layer.Bounds.Width()),
+                        static_cast<float>(Layer.Bounds.Height()));
+                }
+                else
+                {
+                    Data.Offsets = FMargin(
+                        static_cast<float>(Layer.Bounds.Min.X),
+                        static_cast<float>(Layer.Bounds.Min.Y),
+                        static_cast<float>(CanvasSize.X - Layer.Bounds.Max.X),
+                        static_cast<float>(CanvasSize.Y - Layer.Bounds.Max.Y));
+                }
+                Slot->SetLayout(Data);
+            }
+            UE_LOG(LogPSD2UMG, Log, TEXT("Update: added new widget '%s'"), *Layer.Name);
+        }
+
+        // Recurse into group children
+        if (Layer.Type == EPsdLayerType::Group && !Layer.Children.IsEmpty())
+        {
+            UWidget** GroupWidgetPtr = ExistingWidgets.Find(Layer.Name);
+            UCanvasPanel* ChildCanvas = nullptr;
+            if (GroupWidgetPtr)
+            {
+                ChildCanvas = Cast<UCanvasPanel>(*GroupWidgetPtr);
+            }
+            if (!ChildCanvas)
+            {
+                // Try to find from the newly added widget
+                UWidget* Added = Tree->FindWidget(FName(*Layer.Name));
+                ChildCanvas = Cast<UCanvasPanel>(Added);
+            }
+            if (ChildCanvas)
+            {
+                UpdateCanvas(Registry, Tree, ChildCanvas, Layer.Children, Doc, CanvasSize, ExistingWidgets, SkippedLayerNames);
+            }
+        }
+    }
+    // Widgets remaining in ExistingWidgets after traversal are orphans (deleted PSD layers).
+    // Per D-07, they are kept as-is — do NOT remove them.
+}
+
+// ---------------------------------------------------------------------------
+// FWidgetBlueprintGenerator::Update
+// ---------------------------------------------------------------------------
+bool FWidgetBlueprintGenerator::Update(
+    UWidgetBlueprint* ExistingWBP,
+    const FPsdDocument& NewDoc,
+    const TSet<FString>& SkippedLayerNames)
+{
+    if (!ExistingWBP || !ExistingWBP->WidgetTree)
+    {
+        UE_LOG(LogPSD2UMG, Error, TEXT("FWidgetBlueprintGenerator::Update: null WBP or WidgetTree"));
+        return false;
+    }
+
+    // Build map of existing widgets by name
+    TMap<FString, UWidget*> ExistingWidgets;
+    CollectWidgetsByName(ExistingWBP->WidgetTree, ExistingWidgets);
+
+    // Find root canvas
+    UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(ExistingWBP->WidgetTree->RootWidget);
+    if (!RootCanvas)
+    {
+        UE_LOG(LogPSD2UMG, Error, TEXT("FWidgetBlueprintGenerator::Update: root widget is not a UCanvasPanel"));
+        return false;
+    }
+
+    // Populate updates using new document
+    FSmartObjectImporter::SetCurrentPackagePath(ExistingWBP->GetOutermost()->GetName());
+    FLayerMappingRegistry Registry;
+    UpdateCanvas(Registry, ExistingWBP->WidgetTree, RootCanvas, NewDoc.RootLayers, NewDoc, NewDoc.CanvasSize, ExistingWidgets, SkippedLayerNames);
+
+    // Compile and save
+    FKismetEditorUtilities::CompileBlueprint(ExistingWBP);
+    ExistingWBP->GetOutermost()->MarkPackageDirty();
+    UEditorAssetLibrary::SaveLoadedAsset(ExistingWBP, false);
+
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator::Update: reimport complete for %s"), *ExistingWBP->GetName());
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// FWidgetBlueprintGenerator::DetectChange
+// ---------------------------------------------------------------------------
+EPsdChangeAnnotation FWidgetBlueprintGenerator::DetectChange(
+    const FPsdLayer& NewLayer,
+    UWidget* ExistingWidget)
+{
+    if (!ExistingWidget)
+    {
+        return EPsdChangeAnnotation::New;
+    }
+
+    // Check position/size via canvas slot
+    if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(ExistingWidget->Slot))
+    {
+        const FAnchorData Layout = Slot->GetLayout();
+        // Compare offset magnitudes loosely (1px tolerance)
+        const float W = static_cast<float>(NewLayer.Bounds.Width());
+        const float H = static_cast<float>(NewLayer.Bounds.Height());
+        if (FMath::Abs(Layout.Offsets.Right - W) > 1.f || FMath::Abs(Layout.Offsets.Bottom - H) > 1.f)
+        {
+            return EPsdChangeAnnotation::Changed;
+        }
+    }
+
+    // Check text content for text layers
+    if (NewLayer.Type == EPsdLayerType::Text)
+    {
+        if (UTextBlock* TextBlock = Cast<UTextBlock>(ExistingWidget))
+        {
+            if (!TextBlock->GetText().EqualTo(FText::FromString(NewLayer.Text.PlainText)))
+            {
+                return EPsdChangeAnnotation::Changed;
+            }
+        }
+    }
+
+    // Check opacity
+    if (FMath::Abs(ExistingWidget->GetRenderOpacity() - NewLayer.Opacity) > 0.01f)
+    {
+        return EPsdChangeAnnotation::Changed;
+    }
+
+    return EPsdChangeAnnotation::Unchanged;
 }

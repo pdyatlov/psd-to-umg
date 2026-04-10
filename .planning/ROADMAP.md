@@ -83,11 +83,11 @@ Plans:
   3. Text outline (stroke) and drop shadow render correctly on UTextBlock via OutlineSettings and ShadowOffset
   4. Font mapping system resolves Photoshop PostScript font names to UE font assets via plugin settings, with a configurable default fallback
   5. Multi-line text enables AutoWrapText when the text box width is defined in the PSD
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 Plans:
 - [ ] 04-01-PLAN.md — Extend FPsdTextRun + populate bold/italic/box/outline from PhotoshopAPI + Typography.psd fixture + parser spec
 - [x] 04-02-PLAN.md — FFontResolver (exact/case-insensitive/default/engine fallback + suffix parsing) and FTextLayerMapper bold/italic rewrite (TEXT-02, TEXT-05)
-- [ ] 04-03-PLAN.md — Outline, AutoWrapText, TEXT-04 deferred no-op, E2E pipeline spec (TEXT-01, TEXT-03, TEXT-04, TEXT-06)
+- [x] 04-03-PLAN.md — Outline, AutoWrapText, TEXT-04 deferred no-op, E2E pipeline spec (TEXT-01, TEXT-03, TEXT-04, TEXT-06)
 
 ### Phase 5: Layer Effects & Blend Modes
 **Goal**: Common Photoshop layer effects translate to UMG equivalents, with a flatten fallback for anything too complex
@@ -148,7 +148,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 1. UE5 Port | 2/2 | Complete | 2026-04-08 |
 | 2. C++ PSD Parser | 5/5 | Complete | 2026-04-08 |
 | 3. Layer Mapping & WBP Generation | 4/4 | Complete   | 2026-04-09 |
-| 4. Text, Fonts & Typography | 0/? | Not started | - |
+| 4. Text, Fonts & Typography | 2/3 | In Progress|  |
 | 5. Layer Effects & Blend Modes | 0/? | Not started | - |
 | 6. Advanced Layout | 0/? | Not started | - |
 | 7. Editor UI, Preview & Settings | 0/? | Not started | - |

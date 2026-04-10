@@ -129,9 +129,9 @@ Plans:
   3. Reimport updates changed layers (position, image data, text) without destroying manual Blueprint edits, using layer name as stable identity key
   4. Right-click context menu "Import as Widget Blueprint" works in Content Browser
   5. When CommonUI mode is enabled, Button_ prefix produces UCommonButtonBase; input action binding via Button_Confirm[IA_Confirm] syntax works; _show/_hide/_hover variants generate UWidgetAnimation
-**Plans:** 5 plans
+**Plans:** 1/5 plans executed
 Plans:
-- [ ] 07-01-PLAN.md — Settings extension (4 new properties, category grouping) and Build.cs module deps
+- [x] 07-01-PLAN.md — Settings extension (4 new properties, category grouping) and Build.cs module deps
 - [ ] 07-02-PLAN.md — SPsdImportPreviewDialog Slate widget (layer tree, checkboxes, badges, output path)
 - [ ] 07-03-PLAN.md — Factory integration (preview dialog in import flow), Content Browser context menu, PSD metadata
 - [ ] 07-04-PLAN.md — CommonUI button mapper with input action binding, animation builder (_show/_hide/_hover)
@@ -164,5 +164,5 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 4. Text, Fonts & Typography | 2/3 | In Progress|  |
 | 5. Layer Effects & Blend Modes | 1/2 | In Progress|  |
 | 6. Advanced Layout | 3/3 | Complete   | 2026-04-10 |
-| 7. Editor UI, Preview & Settings | 0/5 | Not started | - |
+| 7. Editor UI, Preview & Settings | 1/5 | In Progress|  |
 | 8. Testing, Documentation & Release | 0/? | Not started | - |

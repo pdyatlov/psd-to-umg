@@ -85,7 +85,7 @@ Plans:
   5. Multi-line text enables AutoWrapText when the text box width is defined in the PSD
 **Plans:** 2/3 plans executed
 Plans:
-- [ ] 04-01-PLAN.md — Extend FPsdTextRun + populate bold/italic/box/outline from PhotoshopAPI + Typography.psd fixture + parser spec
+- [x] 04-01-PLAN.md — Extend FPsdTextRun + populate bold/italic/box/outline from PhotoshopAPI + Typography.psd fixture + parser spec
 - [x] 04-02-PLAN.md — FFontResolver (exact/case-insensitive/default/engine fallback + suffix parsing) and FTextLayerMapper bold/italic rewrite (TEXT-02, TEXT-05)
 - [x] 04-03-PLAN.md — Outline, AutoWrapText, TEXT-04 deferred no-op, E2E pipeline spec (TEXT-01, TEXT-03, TEXT-04, TEXT-06)
 

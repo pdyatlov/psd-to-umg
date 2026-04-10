@@ -1,0 +1,575 @@
+// Copyright 2018-2021 - John snow wind
+
+#include "UI/SPsdImportPreviewDialog.h"
+
+#include "Parser/PsdTypes.h"
+
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/SOverlay.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Layout/SBorder.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SScrollBox.h"
+#include "Widgets/Layout/SSpacer.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Widgets/Views/STableRow.h"
+#include "Widgets/Views/STreeView.h"
+#include "Styling/AppStyle.h"
+
+#include "DesktopPlatformModule.h"
+#include "IDesktopPlatform.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Internationalization/Text.h"
+
+#define LOCTEXT_NAMESPACE "PSD2UMG"
+
+// ---------------------------------------------------------------------------
+// Static helpers
+// ---------------------------------------------------------------------------
+
+FString SPsdImportPreviewDialog::InferWidgetTypeName(const FPsdLayer& Layer)
+{
+    const FString& Name = Layer.Name;
+
+    // Name-prefix heuristics (same conventions as mapper priority system)
+    if (Name.StartsWith(TEXT("Button_"), ESearchCase::IgnoreCase) ||
+        Name.StartsWith(TEXT("Btn_"), ESearchCase::IgnoreCase))
+    {
+        return TEXT("Button");
+    }
+    if (Name.StartsWith(TEXT("Progress_"), ESearchCase::IgnoreCase))
+    {
+        return TEXT("ProgressBar");
+    }
+    if (Name.StartsWith(TEXT("List_"), ESearchCase::IgnoreCase))
+    {
+        return TEXT("ListView");
+    }
+    if (Name.StartsWith(TEXT("Tile_"), ESearchCase::IgnoreCase))
+    {
+        return TEXT("TileView");
+    }
+
+    switch (Layer.Type)
+    {
+    case EPsdLayerType::Text:
+        return TEXT("TextBlock");
+    case EPsdLayerType::Group:
+        return TEXT("CanvasPanel");
+    case EPsdLayerType::Image:
+    case EPsdLayerType::SmartObject:
+        return TEXT("Image");
+    default:
+        return TEXT("Unknown");
+    }
+}
+
+FLinearColor SPsdImportPreviewDialog::BadgeColorForType(const FString& WidgetTypeName)
+{
+    if (WidgetTypeName.Contains(TEXT("Button")))
+    {
+        return FLinearColor(0.2f, 0.5f, 0.9f, 1.f);   // blue
+    }
+    if (WidgetTypeName.Contains(TEXT("Image")))
+    {
+        return FLinearColor(0.3f, 0.65f, 0.3f, 1.f);  // green
+    }
+    if (WidgetTypeName.Contains(TEXT("TextBlock")))
+    {
+        return FLinearColor(0.8f, 0.6f, 0.1f, 1.f);   // amber
+    }
+    if (WidgetTypeName.Contains(TEXT("CanvasPanel")))
+    {
+        return FLinearColor(0.5f, 0.5f, 0.5f, 1.f);   // grey
+    }
+    return FLinearColor(0.4f, 0.4f, 0.6f, 1.f);        // slate-blue (fallback)
+}
+
+void SPsdImportPreviewDialog::BuildTreeRecursive(
+    const TArray<FPsdLayer>& Layers,
+    TArray<TSharedPtr<FPsdLayerTreeItem>>& OutItems,
+    int32 Depth,
+    TWeakPtr<FPsdLayerTreeItem> Parent)
+{
+    for (const FPsdLayer& Layer : Layers)
+    {
+        TSharedPtr<FPsdLayerTreeItem> Item = MakeShared<FPsdLayerTreeItem>();
+        Item->LayerName = Layer.Name;
+        Item->WidgetTypeName = InferWidgetTypeName(Layer);
+        Item->BadgeColor = BadgeColorForType(Item->WidgetTypeName);
+        Item->bChecked = true;
+        Item->ChangeAnnotation = EPsdChangeAnnotation::None;
+        Item->Depth = Depth;
+        Item->Parent = Parent;
+
+        if (Layer.Children.Num() > 0)
+        {
+            BuildTreeRecursive(Layer.Children, Item->Children, Depth + 1, Item);
+        }
+
+        OutItems.Add(Item);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// BuildTreeFromDocument
+// ---------------------------------------------------------------------------
+
+TArray<TSharedPtr<FPsdLayerTreeItem>> SPsdImportPreviewDialog::BuildTreeFromDocument(
+    const FPsdDocument& Doc)
+{
+    TArray<TSharedPtr<FPsdLayerTreeItem>> Result;
+    BuildTreeRecursive(Doc.RootLayers, Result, 0, TWeakPtr<FPsdLayerTreeItem>());
+    return Result;
+}
+
+// ---------------------------------------------------------------------------
+// Construct
+// ---------------------------------------------------------------------------
+
+void SPsdImportPreviewDialog::Construct(const FArguments& InArgs)
+{
+    RootItems    = InArgs._RootItems;
+    bIsReimport  = InArgs._bIsReimport;
+    OnCancelled  = InArgs._OnCancelled;
+    OnConfirmed  = InArgs._OnConfirmed;
+
+    // Build tree view
+    SAssignNew(TreeView, STreeView<TSharedPtr<FPsdLayerTreeItem>>)
+        .TreeItemsSource(&RootItems)
+        .OnGenerateRow(this, &SPsdImportPreviewDialog::OnGenerateRow)
+        .OnGetChildren(this, &SPsdImportPreviewDialog::OnGetChildren)
+        .SelectionMode(ESelectionMode::None);
+
+    // Expand all items by default
+    ExpandAll(RootItems);
+
+    // Build output path box
+    SAssignNew(OutputPathBox, SEditableTextBox)
+        .Text(FText::FromString(InArgs._InitialOutputPath))
+        .Font(FAppStyle::GetFontStyle(TEXT("NormalFont")));
+
+    const FString ImportLabel = bIsReimport
+        ? TEXT("Apply Reimport")
+        : TEXT("Import");
+
+    ChildSlot
+    [
+        SNew(SVerticalBox)
+
+        // ---------------------------------------------------------------
+        // Slot A — Layer Tree
+        // ---------------------------------------------------------------
+        + SVerticalBox::Slot()
+        .FillHeight(1.f)
+        .Padding(8.f)
+        [
+            SNew(SBorder)
+            .BorderImage(FAppStyle::GetBrush(TEXT("ToolPanel.GroupBorder")))
+            .Padding(4.f)
+            [
+                SNew(SScrollBox)
+                + SScrollBox::Slot()
+                [
+                    TreeView.ToSharedRef()
+                ]
+            ]
+        ]
+
+        // ---------------------------------------------------------------
+        // Slot B — Output Path Row
+        // ---------------------------------------------------------------
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        .Padding(FMargin(8.f, 4.f))
+        [
+            SNew(SVerticalBox)
+
+            // Path row
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            [
+                SNew(SHorizontalBox)
+
+                // "Output Path:" label — fixed 88px
+                + SHorizontalBox::Slot()
+                .AutoWidth()
+                [
+                    SNew(SBox)
+                    .WidthOverride(88.f)
+                    .VAlign(VAlign_Center)
+                    [
+                        SNew(STextBlock)
+                        .Text(LOCTEXT("OutputPathLabel", "Output Path:"))
+                        .Font(FAppStyle::GetFontStyle(TEXT("NormalFont")))
+                    ]
+                ]
+
+                // Editable path field — fills remaining space
+                + SHorizontalBox::Slot()
+                .FillWidth(1.f)
+                .Padding(FMargin(4.f, 0.f))
+                [
+                    OutputPathBox.ToSharedRef()
+                ]
+
+                // Browse button — 28x28
+                + SHorizontalBox::Slot()
+                .AutoWidth()
+                [
+                    SNew(SBox)
+                    .WidthOverride(28.f)
+                    .HeightOverride(28.f)
+                    [
+                        SNew(SButton)
+                        .ButtonStyle(FAppStyle::Get(), TEXT("SimpleButton"))
+                        .OnClicked(this, &SPsdImportPreviewDialog::OnBrowseClicked)
+                        .ToolTipText(LOCTEXT("BrowseTip", "Browse for output folder"))
+                        [
+                            SNew(SImage)
+                            .Image(FAppStyle::GetBrush(TEXT("Icons.FolderOpen")))
+                        ]
+                    ]
+                ]
+            ]
+
+            // Validation error text (conditionally visible)
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            .Padding(FMargin(88.f + 4.f, 2.f, 0.f, 0.f))
+            [
+                SNew(STextBlock)
+                .Text(LOCTEXT("PathError", "Path must start with /Game/ -- enter a valid content path."))
+                .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
+                .ColorAndOpacity(FLinearColor(0.9f, 0.2f, 0.2f, 1.f))
+                .Visibility(this, &SPsdImportPreviewDialog::GetPathErrorVisibility)
+            ]
+        ]
+
+        // ---------------------------------------------------------------
+        // Slot C — Button Bar
+        // ---------------------------------------------------------------
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        [
+            SNew(SBorder)
+            .BorderImage(FAppStyle::GetBrush(TEXT("ToolPanel.GroupBorder")))
+            .Padding(FMargin(8.f, 4.f))
+            [
+                SNew(SHorizontalBox)
+
+                // Fill spacer (pushes buttons to right)
+                + SHorizontalBox::Slot()
+                .FillWidth(1.f)
+                [
+                    SNew(SSpacer)
+                ]
+
+                // Cancel button
+                + SHorizontalBox::Slot()
+                .AutoWidth()
+                .Padding(FMargin(4.f, 0.f))
+                [
+                    SNew(SButton)
+                    .Text(LOCTEXT("CancelBtn", "Cancel"))
+                    .TextStyle(FAppStyle::Get(), TEXT("NormalText"))
+                    .OnClicked(this, &SPsdImportPreviewDialog::OnCancelClicked)
+                ]
+
+                // Import / Apply Reimport button
+                + SHorizontalBox::Slot()
+                .AutoWidth()
+                .Padding(FMargin(4.f, 0.f))
+                [
+                    SNew(SButton)
+                    .Text(FText::FromString(ImportLabel))
+                    .TextStyle(FAppStyle::Get(), TEXT("NormalText"))
+                    .ButtonStyle(FAppStyle::Get(), TEXT("PrimaryButton"))
+                    .OnClicked(this, &SPsdImportPreviewDialog::OnImportClicked)
+                ]
+            ]
+        ]
+    ];
+}
+
+// ---------------------------------------------------------------------------
+// STreeView delegates
+// ---------------------------------------------------------------------------
+
+TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
+    TSharedPtr<FPsdLayerTreeItem> Item,
+    const TSharedRef<STableViewBase>& OwnerTable)
+{
+    check(Item.IsValid());
+
+    const float IndentPx = static_cast<float>(Item->Depth) * 8.f;
+
+    // Change annotation text and color
+    FText AnnotationText = FText::GetEmpty();
+    FSlateColor AnnotationColor = FSlateColor::UseForeground();
+
+    if (bIsReimport)
+    {
+        switch (Item->ChangeAnnotation)
+        {
+        case EPsdChangeAnnotation::New:
+            AnnotationText = LOCTEXT("AnnotNew", "[new]");
+            AnnotationColor = FLinearColor(0.3f, 0.75f, 0.3f, 1.f);
+            break;
+        case EPsdChangeAnnotation::Changed:
+            AnnotationText = LOCTEXT("AnnotChanged", "[changed]");
+            AnnotationColor = FLinearColor(0.9f, 0.65f, 0.1f, 1.f);
+            break;
+        case EPsdChangeAnnotation::Unchanged:
+            AnnotationText = LOCTEXT("AnnotUnchanged", "[unchanged]");
+            AnnotationColor = FSlateColor(FLinearColor(
+                FAppStyle::GetSlateColor(TEXT("DefaultForeground")).GetSpecifiedColor().R,
+                FAppStyle::GetSlateColor(TEXT("DefaultForeground")).GetSpecifiedColor().G,
+                FAppStyle::GetSlateColor(TEXT("DefaultForeground")).GetSpecifiedColor().B,
+                0.5f));
+            break;
+        default:
+            break;
+        }
+    }
+
+    return SNew(STableRow<TSharedPtr<FPsdLayerTreeItem>>, OwnerTable)
+    [
+        SNew(SHorizontalBox)
+
+        // Col 1: Checkbox
+        + SHorizontalBox::Slot()
+        .AutoWidth()
+        .Padding(FMargin(4.f, 0.f))
+        .VAlign(VAlign_Center)
+        [
+            SNew(SCheckBox)
+            .IsChecked(this, &SPsdImportPreviewDialog::GetCheckState, Item)
+            .OnCheckStateChanged(this, &SPsdImportPreviewDialog::OnCheckStateChanged, Item)
+        ]
+
+        // Col 2: Indent spacer
+        + SHorizontalBox::Slot()
+        .AutoWidth()
+        [
+            SNew(SSpacer)
+            .Size(FVector2D(IndentPx, 1.f))
+        ]
+
+        // Col 3: Layer name
+        + SHorizontalBox::Slot()
+        .FillWidth(1.f)
+        .VAlign(VAlign_Center)
+        [
+            SNew(STextBlock)
+            .Text(FText::FromString(Item->LayerName))
+            .Font(FAppStyle::GetFontStyle(TEXT("NormalFont")))
+        ]
+
+        // Col 4: Widget type badge — fixed 120px
+        + SHorizontalBox::Slot()
+        .AutoWidth()
+        .HAlign(HAlign_Right)
+        .VAlign(VAlign_Center)
+        .Padding(FMargin(4.f, 0.f))
+        [
+            SNew(SBox)
+            .WidthOverride(120.f)
+            .HAlign(HAlign_Fill)
+            [
+                SNew(SBorder)
+                .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
+                .BorderBackgroundColor(Item->BadgeColor)
+                .Padding(FMargin(4.f, 2.f))
+                .HAlign(HAlign_Center)
+                [
+                    SNew(STextBlock)
+                    .Text(FText::FromString(Item->WidgetTypeName))
+                    .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
+                    .ColorAndOpacity(FLinearColor::White)
+                ]
+            ]
+        ]
+
+        // Col 5: Change annotation — visible only in reimport mode
+        + SHorizontalBox::Slot()
+        .AutoWidth()
+        .HAlign(HAlign_Right)
+        .VAlign(VAlign_Center)
+        .Padding(FMargin(4.f, 0.f))
+        [
+            SNew(SBox)
+            .WidthOverride(80.f)
+            .Visibility(bIsReimport ? EVisibility::Visible : EVisibility::Collapsed)
+            [
+                SNew(STextBlock)
+                .Text(AnnotationText)
+                .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
+                .ColorAndOpacity(AnnotationColor)
+            ]
+        ]
+    ];
+}
+
+void SPsdImportPreviewDialog::OnGetChildren(
+    TSharedPtr<FPsdLayerTreeItem> Item,
+    TArray<TSharedPtr<FPsdLayerTreeItem>>& OutChildren)
+{
+    if (Item.IsValid())
+    {
+        OutChildren = Item->Children;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Checkbox cascade
+// ---------------------------------------------------------------------------
+
+void SPsdImportPreviewDialog::SetChildrenChecked(
+    TSharedPtr<FPsdLayerTreeItem> Item, bool bCheckedState)
+{
+    if (!Item.IsValid()) return;
+
+    for (TSharedPtr<FPsdLayerTreeItem>& Child : Item->Children)
+    {
+        if (Child.IsValid())
+        {
+            Child->bChecked = bCheckedState;
+            SetChildrenChecked(Child, bCheckedState);
+        }
+    }
+}
+
+void SPsdImportPreviewDialog::OnCheckStateChanged(
+    TSharedPtr<FPsdLayerTreeItem> Item, ECheckBoxState NewState)
+{
+    if (!Item.IsValid()) return;
+
+    const bool bNewChecked = (NewState == ECheckBoxState::Checked);
+    Item->bChecked = bNewChecked;
+    SetChildrenChecked(Item, bNewChecked);
+
+    // Refresh the tree view to update indeterminate parent states
+    if (TreeView.IsValid())
+    {
+        TreeView->RequestTreeRefresh();
+    }
+}
+
+ECheckBoxState SPsdImportPreviewDialog::GetCheckState(TSharedPtr<FPsdLayerTreeItem> Item) const
+{
+    if (!Item.IsValid()) return ECheckBoxState::Unchecked;
+
+    if (Item->Children.Num() == 0)
+    {
+        return Item->bChecked ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+    }
+
+    // Determine mixed state for parent nodes
+    bool bAnyChecked = false;
+    bool bAnyUnchecked = false;
+    for (const TSharedPtr<FPsdLayerTreeItem>& Child : Item->Children)
+    {
+        if (Child.IsValid())
+        {
+            if (Child->bChecked) bAnyChecked = true;
+            else                 bAnyUnchecked = true;
+        }
+    }
+
+    if (bAnyChecked && bAnyUnchecked) return ECheckBoxState::Undetermined;
+    if (bAnyChecked)                  return ECheckBoxState::Checked;
+    return ECheckBoxState::Unchecked;
+}
+
+// ---------------------------------------------------------------------------
+// Button handlers
+// ---------------------------------------------------------------------------
+
+bool SPsdImportPreviewDialog::IsOutputPathValid() const
+{
+    if (!OutputPathBox.IsValid()) return false;
+    const FString Path = OutputPathBox->GetText().ToString();
+    return Path.StartsWith(TEXT("/Game/"));
+}
+
+EVisibility SPsdImportPreviewDialog::GetPathErrorVisibility() const
+{
+    // Only show error after user has typed something that is clearly wrong.
+    // If the box is empty we treat it as neutral (no error shown yet).
+    if (!OutputPathBox.IsValid()) return EVisibility::Collapsed;
+    const FString Path = OutputPathBox->GetText().ToString();
+    if (Path.IsEmpty()) return EVisibility::Collapsed;
+    return IsOutputPathValid() ? EVisibility::Collapsed : EVisibility::Visible;
+}
+
+FReply SPsdImportPreviewDialog::OnImportClicked()
+{
+    if (!IsOutputPathValid())
+    {
+        // Trigger error label by forcing a redraw (error visibility is attribute-bound)
+        if (TreeView.IsValid())
+        {
+            TreeView->RequestTreeRefresh();
+        }
+        return FReply::Handled();
+    }
+
+    const FString OutputPath = OutputPathBox.IsValid()
+        ? OutputPathBox->GetText().ToString()
+        : FString();
+
+    OnConfirmed.ExecuteIfBound(OutputPath, RootItems);
+    return FReply::Handled();
+}
+
+FReply SPsdImportPreviewDialog::OnCancelClicked()
+{
+    OnCancelled.ExecuteIfBound();
+    return FReply::Handled();
+}
+
+FReply SPsdImportPreviewDialog::OnBrowseClicked()
+{
+    IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+    if (!DesktopPlatform) return FReply::Handled();
+
+    const void* ParentWindowHandle = FSlateApplication::Get()
+        .FindBestParentWindowHandleForDialogs(AsShared());
+
+    FString SelectedFolder;
+    const bool bOpened = DesktopPlatform->OpenDirectoryDialog(
+        ParentWindowHandle,
+        TEXT("Select Output Folder"),
+        OutputPathBox.IsValid() ? OutputPathBox->GetText().ToString() : FString(),
+        SelectedFolder);
+
+    if (bOpened && !SelectedFolder.IsEmpty() && OutputPathBox.IsValid())
+    {
+        OutputPathBox->SetText(FText::FromString(SelectedFolder));
+    }
+
+    return FReply::Handled();
+}
+
+// ---------------------------------------------------------------------------
+// Tree expansion
+// ---------------------------------------------------------------------------
+
+void SPsdImportPreviewDialog::ExpandAll(const TArray<TSharedPtr<FPsdLayerTreeItem>>& Items)
+{
+    if (!TreeView.IsValid()) return;
+
+    for (const TSharedPtr<FPsdLayerTreeItem>& Item : Items)
+    {
+        if (Item.IsValid() && Item->Children.Num() > 0)
+        {
+            TreeView->SetItemExpansion(Item, true);
+            ExpandAll(Item->Children);
+        }
+    }
+}
+
+#undef LOCTEXT_NAMESPACE

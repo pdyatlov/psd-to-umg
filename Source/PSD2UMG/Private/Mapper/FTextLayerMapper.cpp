@@ -78,6 +78,12 @@ UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc
         // No custom font but style flags present — apply typeface to engine default.
         FontInfo.TypefaceFontName = Resolved.TypefaceName;
     }
+    else
+    {
+        // No custom font, no style flags — explicitly reset to "Regular" to avoid
+        // inheriting a non-Regular typeface from the CDO or blueprint compilation defaults.
+        FontInfo.TypefaceFontName = FName(TEXT("Regular"));
+    }
 
     FontInfo.Size = FMath::RoundToInt(UmgSize);
     TextWidget->SetFont(FontInfo);

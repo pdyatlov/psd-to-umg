@@ -16,6 +16,7 @@ enum class EPsdLayerType : uint8
 	Image,
 	Text,
 	Group,
+	SmartObject,
 	Unknown
 };
 
@@ -104,6 +105,10 @@ struct PSD2UMG_API FPsdLayer
 
 	// Text-layer payload
 	FPsdTextRun Text;
+
+	// Smart Object payload (Phase 6)
+	FString SmartObjectFilePath;  // linked file path (empty for embedded)
+	bool bIsSmartObject = false;  // redundant with Type but useful for quick checks
 };
 
 /**

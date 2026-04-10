@@ -112,8 +112,9 @@ namespace PSD2UMG::Parser::Internal
 	}
 
 	/** Extract RGBA pixels from an ImageLayer into OutLayer. */
+	template<typename TLayer>
 	static void ExtractImagePixels(
-		const std::shared_ptr<ImageLayer<PsdPixelType>>& Image,
+		const std::shared_ptr<TLayer>& Image,
 		FPsdLayer& OutLayer,
 		FPsdParseDiagnostics& OutDiag)
 	{
@@ -515,6 +516,26 @@ namespace PSD2UMG::Parser::Internal
 				FPsdLayer& ChildOut = OutLayer.Children.AddDefaulted_GetRef();
 				ConvertLayerRecursive(Child, ChildOut, OutDiag);
 			}
+			return;
+		}
+
+		// SmartObjectLayer MUST be checked before ImageLayer because SmartObjectLayer
+		// inherits from Layer<T> directly and dynamic_pointer_cast<ImageLayer> would fail,
+		// but we want the explicit SmartObject type to win when the layer is detected.
+		if (auto SmartObj = std::dynamic_pointer_cast<SmartObjectLayer<PsdPixelType>>(InLayer))
+		{
+			OutLayer.Type = EPsdLayerType::SmartObject;
+			OutLayer.bIsSmartObject = true;
+			// Extract composited preview pixels as fallback image data
+			ExtractImagePixels(SmartObj, OutLayer, OutDiag);
+			// Extract linked file path if available
+			const std::filesystem::path LinkedPath = SmartObj->filepath();
+			if (!LinkedPath.empty())
+			{
+				OutLayer.SmartObjectFilePath = UTF8_TO_TCHAR(LinkedPath.string().c_str());
+			}
+			UE_LOG(LogPSD2UMG, Log, TEXT("Layer '%s' detected as SmartObject; LinkedFile='%s'"),
+				*OutLayer.Name, *OutLayer.SmartObjectFilePath);
 			return;
 		}
 

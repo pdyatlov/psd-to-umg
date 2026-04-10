@@ -27,6 +27,10 @@ public:
     UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG")
     bool bFlattenComplexEffects = true;
 
+    /** Maximum recursion depth for Smart Object import. At depth limit, Smart Objects rasterize as images. Default: 2 per D-05. */
+    UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG")
+    int32 MaxSmartObjectDepth = 2;
+
     /* Source UI Texture Directory */
     UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG")
     FDirectoryPath TextureSrcDir;

@@ -292,8 +292,13 @@ namespace PSD2UMG::Parser::Internal
 			}
 
 			// Phase 4 -- outline (stroke).
-			// Stroke color byte order assumed ARGB, same as fill color (Phase 2-03).
-			// If empirical verification shows RGBA instead, swap the indexing here.
+			// TEXT-03 partial delivery: PhotoshopAPI's style_run_stroke_flag reads
+			// character-level stroke attributes from the TySh descriptor. Photoshop
+			// Layer Style strokes (fx → Stroke) are stored in the lfx2 descriptor
+			// which PhotoshopAPI v0.9 does not expose. The wiring below is correct
+			// and will activate if the PSD has character-level strokes, but standard
+			// Layer Style strokes will not be detected. Full layer-effects parsing
+			// belongs to Phase 5 scope.
 			bool bStroke = false;
 			if (auto SF = Text->style_run_stroke_flag(0); SF.has_value())
 			{

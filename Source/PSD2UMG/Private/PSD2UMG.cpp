@@ -2,6 +2,7 @@
 
 #include "PSD2UMG.h"
 #include "PSD2UMGLog.h"
+#include "Reimport/FPsdReimportHandler.h"
 
 #include "HAL/IConsoleManager.h"
 #include "ToolMenus.h"
@@ -48,11 +49,16 @@ void FPSD2UMGModule::StartupModule()
             PsdContentBrowserExtensions::RegisterMenus();
         }));
 
+    // Register reimport handler — FReimportHandler constructor auto-registers with FReimportManager
+    ReimportHandler = MakeUnique<FPsdReimportHandler>();
+
     UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG module loaded"));
 }
 
 void FPSD2UMGModule::ShutdownModule()
 {
+    // Destructor auto-unregisters from FReimportManager
+    ReimportHandler.Reset();
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -9,6 +9,8 @@
 #include "Styling/AppStyle.h"
 #include "UObject/MetaData.h"
 #include "Misc/Paths.h"
+#include "Factories/ReimportFeedbackContext.h"
+#include "ObjectTools.h"
 
 #include "PSD2UMGLog.h"
 
@@ -126,9 +128,12 @@ namespace PsdContentBrowserExtensions
                                 {
                                     continue;
                                 }
-                                UE_LOG(LogPSD2UMG, Log,
-                                    TEXT("PSD2UMG: Reimport requested for %s -- handler not yet registered"),
-                                    *AssetData.AssetName.ToString());
+                                UObject* Obj = AssetData.GetAsset();
+                                if (Obj)
+                                {
+                                    // Trigger reimport via FReimportManager — dispatches to FPsdReimportHandler
+                                    FReimportManager::Instance()->Reimport(Obj, /*bAskForNewFileIfMissing=*/false);
+                                }
                             }
                         }));
                 }

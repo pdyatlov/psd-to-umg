@@ -98,9 +98,9 @@ Plans:
   2. Color Overlay effect sets the brush tint color on image widgets
   3. Drop Shadow produces a visible offset duplicate behind the main widget
   4. When bFlattenComplexEffects is true, layers with unsupported effects (inner shadow, gradient overlay) are rasterized as a single PNG and imported as UImage
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
-- [ ] 05-01-PLAN.md — Parser: FPsdLayerEffects struct, lrFX block parsing, bFlattenComplexEffects setting
+- [x] 05-01-PLAN.md — Parser: FPsdLayerEffects struct, lrFX block parsing, bFlattenComplexEffects setting
 - [ ] 05-02-PLAN.md — Generator: apply opacity, visibility, color overlay, drop shadow, flatten; update tests
 
 ### Phase 6: Advanced Layout
@@ -152,7 +152,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 2. C++ PSD Parser | 5/5 | Complete | 2026-04-08 |
 | 3. Layer Mapping & WBP Generation | 4/4 | Complete   | 2026-04-09 |
 | 4. Text, Fonts & Typography | 2/3 | In Progress|  |
-| 5. Layer Effects & Blend Modes | 0/2 | Not started | - |
+| 5. Layer Effects & Blend Modes | 1/2 | In Progress|  |
 | 6. Advanced Layout | 0/? | Not started | - |
 | 7. Editor UI, Preview & Settings | 0/? | Not started | - |
 | 8. Testing, Documentation & Release | 0/? | Not started | - |

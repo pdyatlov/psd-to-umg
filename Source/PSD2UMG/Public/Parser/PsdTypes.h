@@ -34,6 +34,26 @@ struct PSD2UMG_API FPsdTextRun
 	float SizePx = 0.f;
 	FLinearColor Color = FLinearColor::White;
 	TEnumAsByte<ETextJustify::Type> Alignment = ETextJustify::Left;
+
+	// Phase 4 additions -- weight / style flags
+	bool bBold = false;
+	bool bItalic = false;
+
+	// Phase 4 additions -- layout
+	bool bHasExplicitWidth = false;
+	float BoxWidthPx = 0.f;
+
+	// Phase 4 additions -- outline (best-effort; zero when not present)
+	FLinearColor OutlineColor = FLinearColor::Transparent;
+	float OutlineSize = 0.f;
+
+	// TEXT-04 fields intentionally omitted -- PhotoshopAPI v0.9 does not
+	// expose drop shadow data (verified in 04-RESEARCH.md against vendored
+	// headers). CONTEXT.md D-10 listed these as advisory only. Revisit in
+	// Phase 4.1 gap closure if PhotoshopAPI adds support or if we implement
+	// manual TySh descriptor parsing.
+	// FVector2D ShadowOffset;
+	// FLinearColor ShadowColor;
 };
 
 /**

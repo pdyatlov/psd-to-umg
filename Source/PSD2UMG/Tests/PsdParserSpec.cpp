@@ -168,4 +168,120 @@ void FPsdParserSpec::Define()
     });
 }
 
+// ---------------------------------------------------------------------------
+// Typography fixture spec -- Phase 4 bold/italic/outline/box-width fields.
+// ---------------------------------------------------------------------------
+
+BEGIN_DEFINE_SPEC(FPsdParserTypographySpec, "PSD2UMG.Parser.Typography", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FString FixturePath;
+    FPsdDocument Doc;
+    FPsdParseDiagnostics Diag;
+    bool bParsed = false;
+
+    static const FPsdLayer* FindLayerByName(const TArray<FPsdLayer>& Layers, const FString& Name)
+    {
+        for (const FPsdLayer& L : Layers)
+        {
+            if (L.Name.Equals(Name, ESearchCase::CaseSensitive))
+            {
+                return &L;
+            }
+        }
+        return nullptr;
+    }
+
+    static bool ColorsNearlyEqual(const FLinearColor& A, const FLinearColor& B, float Tol = 0.05f)
+    {
+        return FMath::IsNearlyEqual(A.R, B.R, Tol)
+            && FMath::IsNearlyEqual(A.G, B.G, Tol)
+            && FMath::IsNearlyEqual(A.B, B.B, Tol);
+    }
+
+END_DEFINE_SPEC(FPsdParserTypographySpec)
+
+void FPsdParserTypographySpec::Define()
+{
+    BeforeEach([this]()
+    {
+        Doc = FPsdDocument();
+        Diag = FPsdParseDiagnostics();
+        bParsed = false;
+
+        TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"));
+        if (!Plugin.IsValid())
+        {
+            AddError(TEXT("PSD2UMG plugin not found via IPluginManager"));
+            return;
+        }
+
+        FixturePath = FPaths::Combine(
+            Plugin->GetBaseDir(),
+            TEXT("Source/PSD2UMG/Tests/Fixtures/Typography.psd"));
+
+        if (!FPaths::FileExists(FixturePath))
+        {
+            AddError(FString::Printf(TEXT("Typography fixture PSD missing: %s"), *FixturePath));
+            return;
+        }
+
+        bParsed = PSD2UMG::Parser::ParseFile(FixturePath, Doc, Diag);
+    });
+
+    Describe("Typography fixture", [this]()
+    {
+        It("loads successfully with 5 root layers", [this]()
+        {
+            TestTrue(TEXT("bParsed"), bParsed);
+            TestFalse(TEXT("Diag.HasErrors()"), Diag.HasErrors());
+            TestEqual(TEXT("RootLayers.Num"), Doc.RootLayers.Num(), 5);
+        });
+
+        It("text_regular has bBold=false, bItalic=false, bHasExplicitWidth=false", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_regular"));
+            if (!TestNotNull(TEXT("text_regular"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Text);
+            TestFalse(TEXT("bBold"), L->Text.bBold);
+            TestFalse(TEXT("bItalic"), L->Text.bItalic);
+            TestFalse(TEXT("bHasExplicitWidth"), L->Text.bHasExplicitWidth);
+        });
+
+        It("text_bold has bBold=true", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_bold"));
+            if (!TestNotNull(TEXT("text_bold"), L)) return;
+            TestTrue(TEXT("bBold"), L->Text.bBold);
+            TestFalse(TEXT("bItalic"), L->Text.bItalic);
+        });
+
+        It("text_italic has bItalic=true", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_italic"));
+            if (!TestNotNull(TEXT("text_italic"), L)) return;
+            TestFalse(TEXT("bBold"), L->Text.bBold);
+            TestTrue(TEXT("bItalic"), L->Text.bItalic);
+        });
+
+        It("text_stroked has OutlineSize > 0 and OutlineColor approximately red", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_stroked"));
+            if (!TestNotNull(TEXT("text_stroked"), L)) return;
+            TestTrue(TEXT("OutlineSize > 0.5"), L->Text.OutlineSize > 0.5f);
+            // Red = R near 1.0, G/B near 0.0
+            const FLinearColor ExpectedRed(1.f, 0.f, 0.f, 1.f);
+            TestTrue(TEXT("OutlineColor ~= red"),
+                ColorsNearlyEqual(L->Text.OutlineColor, ExpectedRed, 0.1f));
+        });
+
+        It("text_paragraph has bHasExplicitWidth=true and BoxWidthPx > 100", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_paragraph"));
+            if (!TestNotNull(TEXT("text_paragraph"), L)) return;
+            TestTrue(TEXT("bHasExplicitWidth"), L->Text.bHasExplicitWidth);
+            TestTrue(TEXT("BoxWidthPx > 100"), L->Text.BoxWidthPx > 100.f);
+        });
+    });
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

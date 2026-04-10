@@ -77,7 +77,7 @@ void FTextPipelineSpec::Define()
             if (UTextBlock* T = FindText(Tree, TEXT("text_regular")))
             {
                 TestEqual(TEXT("regular size 18"), (int32)T->GetFont().Size, 18);
-                TestFalse(TEXT("regular no wrap"), T->AutoWrapText);
+                TestFalse(TEXT("regular no wrap"), T->GetAutoWrapText());
             }
 
             // text_stroked — TEXT-03.
@@ -90,7 +90,7 @@ void FTextPipelineSpec::Define()
             // text_paragraph — TEXT-06.
             if (UTextBlock* T = FindText(Tree, TEXT("text_paragraph")))
             {
-                TestTrue(TEXT("paragraph wraps"), T->AutoWrapText);
+                TestTrue(TEXT("paragraph wraps"), T->GetAutoWrapText());
             }
         });
 

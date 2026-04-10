@@ -4,6 +4,13 @@
 #include "PSD2UMGLog.h"
 
 #include "HAL/IConsoleManager.h"
+#include "ToolMenus.h"
+
+// Forward-declare the registration function from FPsdContentBrowserExtensions.cpp
+namespace PsdContentBrowserExtensions
+{
+    void RegisterMenus();
+}
 
 #define LOCTEXT_NAMESPACE "FPSD2UMGModule"
 
@@ -33,6 +40,13 @@ void FPSD2UMGModule::StartupModule()
         UE_LOG(LogPSD2UMG, Warning,
             TEXT("Could not find CVar 'Interchange.FeatureFlags.Import.PSD'. UE may have moved or renamed the Interchange PSD feature flag; .psd files may still be intercepted by Interchange instead of UPsdImportFactory."));
     }
+
+    // Register Content Browser context menu entries for PSD textures and WBPs
+    UToolMenus::RegisterStartupCallback(
+        FSimpleMulticastDelegate::FDelegate::CreateLambda([]()
+        {
+            PsdContentBrowserExtensions::RegisterMenus();
+        }));
 
     UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG module loaded"));
 }

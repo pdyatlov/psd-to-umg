@@ -101,7 +101,7 @@ Plans:
 **Plans:** 1/2 plans executed
 Plans:
 - [x] 05-01-PLAN.md — Parser: FPsdLayerEffects struct, lrFX block parsing, bFlattenComplexEffects setting
-- [ ] 05-02-PLAN.md — Generator: apply opacity, visibility, color overlay, drop shadow, flatten; update tests
+- [x] 05-02-PLAN.md — Generator: apply opacity, visibility, color overlay, drop shadow, flatten; update tests
 
 ### Phase 6: Advanced Layout
 **Goal**: Production layout features -- 9-slice borders, intelligent anchor detection, Smart Object recursive import, and variant switchers

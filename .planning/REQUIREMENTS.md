@@ -64,7 +64,7 @@
 ### Layer Effects
 
 - [x] **FX-01**: Layer opacity applied via SetRenderOpacity
-- [ ] **FX-02**: Layer visibility applied (visible/collapsed)
+- [x] **FX-02**: Layer visibility applied (visible/collapsed)
 - [x] **FX-03**: Color Overlay effect → brush tint color
 - [x] **FX-04**: Drop Shadow → approximate UImage offset duplicate behind main widget
 - [x] **FX-05**: Complex effects (inner shadow, gradient overlay, etc.) fall back to rasterized PNG when bFlattenComplexEffects = true
@@ -184,7 +184,7 @@
 | TEXT-05 | Phase 4 | Pending |
 | TEXT-06 | Phase 4 | Complete |
 | FX-01 | Phase 5 | Complete |
-| FX-02 | Phase 5 | Pending |
+| FX-02 | Phase 5 | Complete |
 | FX-03 | Phase 5 | Complete |
 | FX-04 | Phase 5 | Complete |
 | FX-05 | Phase 5 | Complete |

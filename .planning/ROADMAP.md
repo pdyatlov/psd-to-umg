@@ -114,7 +114,7 @@ Plans:
   4. _variants suffix groups produce UWidgetSwitcher with one child per variant slot
 **Plans:** 3 plans
 Plans:
-- [ ] 06-01-PLAN.md — 9-slice image mapper (_9s/_9slice suffix, margin syntax) and _variants suffix mapper
+- [x] 06-01-PLAN.md — 9-slice image mapper (_9s/_9slice suffix, margin syntax) and _variants suffix mapper
 - [ ] 06-02-PLAN.md — Smart Object parser detection, recursive child WBP import, rasterize fallback
 - [ ] 06-03-PLAN.md — Anchor heuristic: auto-detect horizontal rows and vertical columns for HBox/VBox wrap
 **UI hint**: yes

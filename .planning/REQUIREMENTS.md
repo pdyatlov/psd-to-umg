@@ -71,12 +71,12 @@
 
 ### Advanced Layout
 
-- [ ] **LAYOUT-01**: _9s / _9slice suffix → Box draw mode with configurable margins
-- [ ] **LAYOUT-02**: Margin syntax in layer name: MyButton_9s[16,16,16,16]
+- [x] **LAYOUT-01**: _9s / _9slice suffix → Box draw mode with configurable margins
+- [x] **LAYOUT-02**: Margin syntax in layer name: MyButton_9s[16,16,16,16]
 - [ ] **LAYOUT-03**: Improved anchor heuristics: horizontal row detection → HorizontalBox suggestion, vertical stack → VerticalBox suggestion
 - [ ] **LAYOUT-04**: Smart Object layers extracted and imported as child Widget Blueprints (referenced via UUserWidget)
 - [ ] **LAYOUT-05**: Smart Object fallback: rasterize as image if extraction fails
-- [ ] **LAYOUT-06**: _variants suffix groups → UWidgetSwitcher with one child per variant slot
+- [x] **LAYOUT-06**: _variants suffix groups → UWidgetSwitcher with one child per variant slot
 
 ### Editor UI & Workflow
 
@@ -188,12 +188,12 @@
 | FX-03 | Phase 5 | Complete |
 | FX-04 | Phase 5 | Complete |
 | FX-05 | Phase 5 | Complete |
-| LAYOUT-01 | Phase 6 | Pending |
-| LAYOUT-02 | Phase 6 | Pending |
+| LAYOUT-01 | Phase 6 | Complete |
+| LAYOUT-02 | Phase 6 | Complete |
 | LAYOUT-03 | Phase 6 | Pending |
 | LAYOUT-04 | Phase 6 | Pending |
 | LAYOUT-05 | Phase 6 | Pending |
-| LAYOUT-06 | Phase 6 | Pending |
+| LAYOUT-06 | Phase 6 | Complete |
 | EDITOR-01 | Phase 7 | Pending |
 | EDITOR-02 | Phase 7 | Pending |
 | EDITOR-03 | Phase 7 | Pending |

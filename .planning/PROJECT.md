@@ -55,12 +55,12 @@ A designer drops a PSD into Unreal Editor and gets a correctly structured, immed
 - [ ] Font mapping system (C++ version)
 - [ ] Multi-line text with auto-wrap
 
-**Phase 4 — Layer Effects & Blend Modes**
-- [ ] Layer opacity applied via SetRenderOpacity
-- [ ] Color Overlay → brush tint color
-- [ ] Drop Shadow → approximate UImage offset duplicate
-- [ ] Flatten fallback for complex effects (rasterize layer+effects as single PNG)
-- [ ] User-configurable: bFlattenComplexEffects setting
+**Phase 4 — Layer Effects & Blend Modes** — Validated in Phase 5
+- [x] Layer opacity applied via SetRenderOpacity
+- [x] Color Overlay → brush tint color
+- [x] Drop Shadow → approximate UImage offset duplicate
+- [x] Flatten fallback for complex effects (rasterize layer+effects as single PNG)
+- [x] User-configurable: bFlattenComplexEffects setting
 
 **Phase 5 — 9-Slice, Anchors, Smart Objects**
 - [ ] `_9s` / `_9slice` suffix → Box draw mode with configurable margins
@@ -155,4 +155,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-07 after initialization*
+*Last updated: 2026-04-10 after Phase 5 completion*

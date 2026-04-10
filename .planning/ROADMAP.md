@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Layer Mapping & Widget Blueprint Generation** - Map PSD layers to UMG widgets, generate valid Widget Blueprints with textures and anchors (completed 2026-04-09)
 - [ ] **Phase 4: Text, Fonts & Typography** - Full text layer support with DPI conversion, font mapping, outline, shadow
 - [ ] **Phase 5: Layer Effects & Blend Modes** - Opacity, color overlay, drop shadow, flatten fallback for complex effects
-- [ ] **Phase 6: Advanced Layout** - 9-slice, improved anchors, Smart Object recursive import, variant switchers
+- [x] **Phase 6: Advanced Layout** - 9-slice, improved anchors, Smart Object recursive import, variant switchers (completed 2026-04-10)
 - [ ] **Phase 7: Editor UI, Preview & Settings** - Plugin settings, import preview dialog, reimport, context menu, CommonUI mode, animations
 - [ ] **Phase 8: Testing, Documentation & Release** - Unit/integration tests, test PSDs, docs, CI/CD, example project
 
@@ -112,11 +112,11 @@ Plans:
   2. Improved anchor heuristics detect horizontal rows and vertical stacks, suggesting HBox/VBox layout
   3. Smart Object layers are extracted and recursively imported as child Widget Blueprints referenced via UUserWidget; extraction failure falls back to rasterized image
   4. _variants suffix groups produce UWidgetSwitcher with one child per variant slot
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 06-01-PLAN.md — 9-slice image mapper (_9s/_9slice suffix, margin syntax) and _variants suffix mapper
 - [x] 06-02-PLAN.md — Smart Object parser detection, recursive child WBP import, rasterize fallback
-- [ ] 06-03-PLAN.md — Anchor heuristic: auto-detect horizontal rows and vertical columns for HBox/VBox wrap
+- [x] 06-03-PLAN.md — Anchor heuristic: auto-detect horizontal rows and vertical columns for HBox/VBox wrap
 **UI hint**: yes
 
 ### Phase 7: Editor UI, Preview & Settings
@@ -157,6 +157,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 3. Layer Mapping & WBP Generation | 4/4 | Complete   | 2026-04-09 |
 | 4. Text, Fonts & Typography | 2/3 | In Progress|  |
 | 5. Layer Effects & Blend Modes | 1/2 | In Progress|  |
-| 6. Advanced Layout | 2/3 | In Progress|  |
+| 6. Advanced Layout | 3/3 | Complete   | 2026-04-10 |
 | 7. Editor UI, Preview & Settings | 0/? | Not started | - |
 | 8. Testing, Documentation & Release | 0/? | Not started | - |

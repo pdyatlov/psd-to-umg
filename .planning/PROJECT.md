@@ -62,12 +62,12 @@ A designer drops a PSD into Unreal Editor and gets a correctly structured, immed
 - [x] Flatten fallback for complex effects (rasterize layer+effects as single PNG)
 - [x] User-configurable: bFlattenComplexEffects setting
 
-**Phase 5 — 9-Slice, Anchors, Smart Objects**
-- [ ] `_9s` / `_9slice` suffix → Box draw mode with configurable margins
-- [ ] Improved anchor heuristics (row/column detection, edge proximity)
-- [ ] Anchor override suffixes (_anchor-tl, _anchor-c, _stretch-h, _fill, etc.)
-- [ ] Smart Object layers → recursive import as child Widget Blueprints
-- [ ] `_variants` suffix groups → UWidgetSwitcher
+**Phase 5 — 9-Slice, Anchors, Smart Objects** — Validated in Phase 6
+- [x] `_9s` / `_9slice` suffix → Box draw mode with configurable margins
+- [x] Improved anchor heuristics (row/column detection, edge proximity)
+- [ ] Anchor override suffixes (_anchor-tl, _anchor-c, _stretch-h, _fill, etc.) — already implemented in Phase 3
+- [x] Smart Object layers → recursive import as child Widget Blueprints
+- [x] `_variants` suffix groups → UWidgetSwitcher
 
 **Phase 6 — Editor UI & Workflow**
 - [ ] Plugin settings in Project Settings → Plugins → PSD2UMG
@@ -155,4 +155,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after Phase 5 completion*
+*Last updated: 2026-04-10 after Phase 6 completion*

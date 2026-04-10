@@ -124,6 +124,16 @@ static void PopulateCanvas(
                     static_cast<float>(Layer.Bounds.Height()));
             }
 
+            // TEXT-06 — paragraph text layers: override slot width with BoxWidthPx
+            // so AutoWrapText has a well-defined wrap boundary.
+            if (Layer.Type == EPsdLayerType::Text
+                && Layer.Text.bHasExplicitWidth
+                && Layer.Text.BoxWidthPx > 0.f
+                && !AnchorResult.bStretchH)
+            {
+                Data.Offsets.Right = Layer.Text.BoxWidthPx;
+            }
+
             Slot->SetLayout(Data);
             // ZOrder: PSD index 0 = topmost. UMG higher = on top. Invert.
             Slot->SetZOrder(TotalLayers - 1 - i);

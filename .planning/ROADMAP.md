@@ -112,10 +112,10 @@ Plans:
   2. Improved anchor heuristics detect horizontal rows and vertical stacks, suggesting HBox/VBox layout
   3. Smart Object layers are extracted and recursively imported as child Widget Blueprints referenced via UUserWidget; extraction failure falls back to rasterized image
   4. _variants suffix groups produce UWidgetSwitcher with one child per variant slot
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 Plans:
 - [x] 06-01-PLAN.md — 9-slice image mapper (_9s/_9slice suffix, margin syntax) and _variants suffix mapper
-- [ ] 06-02-PLAN.md — Smart Object parser detection, recursive child WBP import, rasterize fallback
+- [x] 06-02-PLAN.md — Smart Object parser detection, recursive child WBP import, rasterize fallback
 - [ ] 06-03-PLAN.md — Anchor heuristic: auto-detect horizontal rows and vertical columns for HBox/VBox wrap
 **UI hint**: yes
 
@@ -157,6 +157,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 3. Layer Mapping & WBP Generation | 4/4 | Complete   | 2026-04-09 |
 | 4. Text, Fonts & Typography | 2/3 | In Progress|  |
 | 5. Layer Effects & Blend Modes | 1/2 | In Progress|  |
-| 6. Advanced Layout | 0/3 | Not started | - |
+| 6. Advanced Layout | 2/3 | In Progress|  |
 | 7. Editor UI, Preview & Settings | 0/? | Not started | - |
 | 8. Testing, Documentation & Release | 0/? | Not started | - |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-04-10T10:48:30.126Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-04-10T10:53:46.055Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 19
-  completed_plans: 17
+  completed_plans: 18
   percent: 36
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 06 (advanced-layout) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-04-10
 
@@ -65,6 +65,7 @@ Progress: [████░░░░░░] 36%
 | Phase 04 P01 | 3m | 2 tasks | 4 files |
 | Phase 05-layer-effects-blend-modes P02 | 10m | 2 tasks | 2 files |
 | Phase 06-advanced-layout P01 | 10 | 2 tasks | 5 files |
+| Phase 06-advanced-layout P02 | 10m | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,7 @@ Recent decisions affecting current work:
 - [Phase 04]: Stroke color ARGB assumed (same as fill color); TEXT-04 shadow fields deferred
 - [Phase 05-layer-effects-blend-modes]: Invisible layers created as Collapsed (not skipped) to preserve layer count and allow runtime show/hide
 - [Phase 06-advanced-layout]: F9SliceImageLayerMapper at priority 150; FVariantsSuffixMapper at 200; default 9-slice margin 16px; bracket [L,T,R,B] stripped in TryParseSuffix
+- [Phase 06-advanced-layout]: ExtractImagePixels templated for SmartObjectLayer; thread_local depth+path tracking in FSmartObjectImporter; FSmartObjectLayerMapper at priority 150
 
 ### Pending Todos
 
@@ -97,6 +99,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T10:48:30.122Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-04-10T10:53:46.051Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None

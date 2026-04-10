@@ -23,6 +23,10 @@ public:
     UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG")
     bool bEnabled;
 
+    /** When true, layers with complex effects (inner shadow, gradient, pattern, bevel) are rasterized as a single image. Per D-13. */
+    UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG")
+    bool bFlattenComplexEffects = true;
+
     /* Source UI Texture Directory */
     UPROPERTY(EditAnywhere, config, BlueprintReadWrite, Category = "PSD2UMG")
     FDirectoryPath TextureSrcDir;

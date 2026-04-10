@@ -57,6 +57,26 @@ struct PSD2UMG_API FPsdTextRun
 };
 
 /**
+ * Layer effects data extracted from the lrFX tagged block in PSD files.
+ * Phase 5: color overlay, drop shadow, and complex-effect presence.
+ */
+USTRUCT()
+struct PSD2UMG_API FPsdLayerEffects
+{
+	GENERATED_BODY()
+
+	bool bHasColorOverlay = false;
+	FLinearColor ColorOverlayColor = FLinearColor::White;
+
+	bool bHasDropShadow = false;
+	FLinearColor DropShadowColor = FLinearColor(0.f, 0.f, 0.f, 0.5f);
+	FVector2D DropShadowOffset = FVector2D::ZeroVector;
+
+	// True if any of: inner shadow, gradient overlay, pattern overlay, bevel/emboss (per D-09)
+	bool bHasComplexEffects = false;
+};
+
+/**
  * A single PSD layer in canvas space. Image layers carry RGBA pixels;
  * text layers carry a single FPsdTextRun; group layers carry Children.
  * Mutually exclusive payloads are simply left default-constructed.
@@ -71,6 +91,9 @@ struct PSD2UMG_API FPsdLayer
 	FIntRect Bounds;
 	float Opacity = 1.f;
 	bool bVisible = true;
+
+	// Phase 5: layer effects extracted from lrFX tagged block
+	FPsdLayerEffects Effects;
 
 	TArray<FPsdLayer> Children;
 

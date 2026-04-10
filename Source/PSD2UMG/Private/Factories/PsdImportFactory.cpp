@@ -8,6 +8,10 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "UObject/Package.h"
+#include "UObject/MetaData.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
+#include "Editor.h"
 
 #include "PSD2UMGLog.h"
 #include "Generator/FWidgetBlueprintGenerator.h"
@@ -15,6 +19,8 @@
 #include "Parser/PsdParser.h"
 #include "Parser/PsdTypes.h"
 #include "PSD2UMGSetting.h"
+#include "UI/SPsdImportPreviewDialog.h"
+#include "UI/PsdLayerTreeItem.h"
 
 #define LOCTEXT_NAMESPACE "UPsdImportFactory"
 
@@ -150,14 +156,88 @@ UObject* UPsdImportFactory::FactoryCreateBinary(
 		if (WbpDir.IsEmpty()) { WbpDir = TEXT("/Game/UI/Widgets"); }
 		FString WbpAssetName = FString::Printf(TEXT("WBP_%s"), *PsdName);
 
-		UWidgetBlueprint* WBP = FWidgetBlueprintGenerator::Generate(Doc, WbpDir, WbpAssetName);
-		if (WBP)
+		UWidgetBlueprint* WBP = nullptr;
+
+		if (Settings->bShowPreviewDialog && IsInGameThread())
 		{
-			UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG: generated Widget Blueprint %s/%s"), *WbpDir, *WbpAssetName);
+			// Build tree items for the dialog
+			TArray<TSharedPtr<FPsdLayerTreeItem>> RootItems =
+				SPsdImportPreviewDialog::BuildTreeFromDocument(Doc);
+
+			bool bConfirmed = false;
+			FString UserOutputPath = WbpDir;
+
+			// Create the dialog and host window
+			TSharedPtr<SWindow> DialogWindow = SNew(SWindow)
+				.Title(NSLOCTEXT("PSD2UMG", "ImportDialogTitle", "PSD Import Preview"))
+				.SizingRule(ESizingRule::UserSized)
+				.ClientSize(FVector2D(600.f, 640.f))
+				.MinWidth(480.f)
+				.MinHeight(520.f)
+				.SupportsMaximize(false)
+				.SupportsMinimize(false);
+
+			TSharedRef<SPsdImportPreviewDialog> DialogContent =
+				SNew(SPsdImportPreviewDialog)
+				.RootItems(RootItems)
+				.InitialOutputPath(WbpDir)
+				.bIsReimport(false)
+				.OnCancelled(FSimpleDelegate::CreateLambda([&bConfirmed]()
+				{
+					bConfirmed = false;
+				}))
+				.OnConfirmed(FOnImportConfirmed::CreateLambda(
+					[&bConfirmed, &UserOutputPath](const FString& OutPath, const TArray<TSharedPtr<FPsdLayerTreeItem>>& /*Items*/)
+					{
+						bConfirmed = true;
+						UserOutputPath = OutPath;
+					}));
+
+			DialogWindow->SetContent(DialogContent);
+
+			GEditor->EditorAddModalWindow(DialogWindow.ToSharedRef());
+
+			if (bConfirmed)
+			{
+				// Resolve final output dir and asset name from user path
+				FString FinalDir = UserOutputPath;
+				if (FinalDir.IsEmpty()) { FinalDir = WbpDir; }
+
+				WBP = FWidgetBlueprintGenerator::Generate(Doc, FinalDir, WbpAssetName);
+				if (WBP)
+				{
+					UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG: generated Widget Blueprint %s/%s"), *FinalDir, *WbpAssetName);
+				}
+				else
+				{
+					UE_LOG(LogPSD2UMG, Warning, TEXT("PSD2UMG: Widget Blueprint generation failed for %s"), *InName.ToString());
+				}
+			}
+			else
+			{
+				UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG: import cancelled by user for %s"), *InName.ToString());
+			}
 		}
 		else
 		{
-			UE_LOG(LogPSD2UMG, Warning, TEXT("PSD2UMG: Widget Blueprint generation failed for %s"), *InName.ToString());
+			// bShowPreviewDialog is false or not on game thread — direct generation
+			WBP = FWidgetBlueprintGenerator::Generate(Doc, WbpDir, WbpAssetName);
+			if (WBP)
+			{
+				UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG: generated Widget Blueprint %s/%s"), *WbpDir, *WbpAssetName);
+			}
+			else
+			{
+				UE_LOG(LogPSD2UMG, Warning, TEXT("PSD2UMG: Widget Blueprint generation failed for %s"), *InName.ToString());
+			}
+		}
+
+		// Store PSD source path as metadata on the WBP package
+		if (WBP)
+		{
+			UMetaData* MetaData = WBP->GetOutermost()->GetMetaData();
+			MetaData->SetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"), *TempPath);
+			MetaData->SetValue(WBP, TEXT("PSD2UMG.SourcePsdName"), *InName.ToString());
 		}
 	}
 

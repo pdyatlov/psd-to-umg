@@ -29,6 +29,7 @@ void FLayerMappingRegistry::RegisterDefaults()
 
     // Suffix mappers (priority 150 — above type, below prefix)
     Mappers.Add(MakeUnique<F9SliceImageLayerMapper>());
+    Mappers.Add(MakeUnique<FSmartObjectLayerMapper>());
 
     // Suffix mappers (priority 200 — same tier as prefix mappers)
     Mappers.Add(MakeUnique<FVariantsSuffixMapper>());

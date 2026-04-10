@@ -2,6 +2,7 @@
 #include "Generator/FWidgetBlueprintGenerator.h"
 
 #include "Generator/FAnchorCalculator.h"
+#include "Generator/FSmartObjectImporter.h"
 #include "Mapper/FLayerMappingRegistry.h"
 #include "Parser/PsdTypes.h"
 #include "PSD2UMGLog.h"
@@ -294,6 +295,9 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     WBP->WidgetTree->RootWidget = RootCanvas;
 
     // Step 4: Populate widget tree recursively
+    // Set the thread-local package path so FSmartObjectLayerMapper can obtain
+    // the parent WBP location without interface changes (per plan 06-02 depth strategy).
+    FSmartObjectImporter::SetCurrentPackagePath(WbpPackagePath);
     FLayerMappingRegistry Registry;
     PopulateCanvas(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize);
 

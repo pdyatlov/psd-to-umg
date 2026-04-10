@@ -153,3 +153,13 @@ public:
     bool CanMap(const FPsdLayer& Layer) const override;
     UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
 };
+
+// --- Smart Object mapper (priority 150) ---
+// Defined in FSmartObjectLayerMapper.cpp
+class FSmartObjectLayerMapper : public IPsdLayerMapper
+{
+public:
+    int32 GetPriority() const override;
+    bool CanMap(const FPsdLayer& Layer) const override;
+    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
+};

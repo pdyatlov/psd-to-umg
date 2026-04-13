@@ -273,6 +273,7 @@ namespace PSD2UMG::Parser::Internal
 			}
 
 			// Phase 4 -- weight / style flags (first run).
+			// Check Faux Bold/Italic flags from Photoshop character panel.
 			if (auto Bold = Text->style_run_faux_bold(0); Bold.has_value())
 			{
 				OutLayer.Text.bBold = *Bold;
@@ -280,6 +281,22 @@ namespace PSD2UMG::Parser::Internal
 			if (auto Italic = Text->style_run_faux_italic(0); Italic.has_value())
 			{
 				OutLayer.Text.bItalic = *Italic;
+			}
+			// Also detect bold/italic from the PostScript font name itself
+			// (e.g. "Arial-BoldMT", "Arial-ItalicMT") — covers real bold/italic
+			// fonts where Faux flags are not set.
+			if (!OutLayer.Text.bBold || !OutLayer.Text.bItalic)
+			{
+				const FString& FN = OutLayer.Text.FontName;
+				if (!OutLayer.Text.bBold)
+				{
+					OutLayer.Text.bBold = FN.Contains(TEXT("Bold"), ESearchCase::IgnoreCase);
+				}
+				if (!OutLayer.Text.bItalic)
+				{
+					OutLayer.Text.bItalic = FN.Contains(TEXT("Italic"), ESearchCase::IgnoreCase)
+						|| FN.Contains(TEXT("Oblique"), ESearchCase::IgnoreCase);
+				}
 			}
 
 			// Phase 4 -- box / point distinction.

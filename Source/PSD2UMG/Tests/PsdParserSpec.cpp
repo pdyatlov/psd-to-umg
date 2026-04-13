@@ -284,4 +284,221 @@ void FPsdParserTypographySpec::Define()
     });
 }
 
+// ---------------------------------------------------------------------------
+// SimpleHUD fixture spec -- Phase 8 HUD layers validation.
+// ---------------------------------------------------------------------------
+
+BEGIN_DEFINE_SPEC(FPsdParserSimpleHUDSpec, "PSD2UMG.Parser.SimpleHUD", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FString FixturePath;
+    FPsdDocument Doc;
+    FPsdParseDiagnostics Diag;
+    bool bParsed = false;
+
+    static const FPsdLayer* FindLayerByName(const TArray<FPsdLayer>& Layers, const FString& Name)
+    {
+        for (const FPsdLayer& L : Layers)
+        {
+            if (L.Name.Equals(Name, ESearchCase::CaseSensitive))
+            {
+                return &L;
+            }
+        }
+        return nullptr;
+    }
+
+END_DEFINE_SPEC(FPsdParserSimpleHUDSpec)
+
+void FPsdParserSimpleHUDSpec::Define()
+{
+    BeforeEach([this]()
+    {
+        Doc = FPsdDocument();
+        Diag = FPsdParseDiagnostics();
+        bParsed = false;
+
+        TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"));
+        if (!Plugin.IsValid())
+        {
+            AddError(TEXT("PSD2UMG plugin not found via IPluginManager"));
+            return;
+        }
+
+        FixturePath = FPaths::Combine(
+            Plugin->GetBaseDir(),
+            TEXT("Source/PSD2UMG/Tests/Fixtures/SimpleHUD.psd"));
+
+        if (!FPaths::FileExists(FixturePath))
+        {
+            AddError(FString::Printf(TEXT("Fixture not found: %s"), *FixturePath));
+            return;
+        }
+
+        bParsed = PSD2UMG::Parser::ParseFile(FixturePath, Doc, Diag);
+    });
+
+    Describe("SimpleHUD fixture", [this]()
+    {
+        It("should parse successfully", [this]()
+        {
+            TestTrue(TEXT("ParseFile succeeded"), bParsed);
+        });
+
+        It("should have 1920x1080 canvas", [this]()
+        {
+            if (!bParsed) return;
+            TestEqual(TEXT("Canvas width"), Doc.CanvasSize.X, 1920);
+            TestEqual(TEXT("Canvas height"), Doc.CanvasSize.Y, 1080);
+        });
+
+        It("should have 4 root layers", [this]()
+        {
+            if (!bParsed) return;
+            TestEqual(TEXT("Root layer count"), Doc.RootLayers.Num(), 4);
+        });
+
+        It("should contain Progress_Health group", [this]()
+        {
+            if (!bParsed) return;
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Progress_Health"));
+            TestNotNull(TEXT("Progress_Health found"), L);
+            if (L) TestEqual(TEXT("Progress_Health is Group"), (int32)L->Type, (int32)EPsdLayerType::Group);
+        });
+
+        It("should contain Button_Start group", [this]()
+        {
+            if (!bParsed) return;
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Button_Start"));
+            TestNotNull(TEXT("Button_Start found"), L);
+            if (L) TestEqual(TEXT("Button_Start is Group"), (int32)L->Type, (int32)EPsdLayerType::Group);
+        });
+
+        It("should contain Score text layer with correct content", [this]()
+        {
+            if (!bParsed) return;
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Score"));
+            TestNotNull(TEXT("Score found"), L);
+            if (L)
+            {
+                TestEqual(TEXT("Score is Text"), (int32)L->Type, (int32)EPsdLayerType::Text);
+                TestEqual(TEXT("Score content"), L->Text.Content, FString(TEXT("00000")));
+            }
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Effects fixture spec -- Phase 8 layer effects (overlay, shadow, inner shadow, opacity).
+// ---------------------------------------------------------------------------
+
+BEGIN_DEFINE_SPEC(FPsdParserEffectsSpec, "PSD2UMG.Parser.Effects", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FString FixturePath;
+    FPsdDocument Doc;
+    FPsdParseDiagnostics Diag;
+    bool bParsed = false;
+
+    static const FPsdLayer* FindLayerByName(const TArray<FPsdLayer>& Layers, const FString& Name)
+    {
+        for (const FPsdLayer& L : Layers)
+        {
+            if (L.Name.Equals(Name, ESearchCase::CaseSensitive))
+            {
+                return &L;
+            }
+        }
+        return nullptr;
+    }
+
+END_DEFINE_SPEC(FPsdParserEffectsSpec)
+
+void FPsdParserEffectsSpec::Define()
+{
+    BeforeEach([this]()
+    {
+        Doc = FPsdDocument();
+        Diag = FPsdParseDiagnostics();
+        bParsed = false;
+
+        TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"));
+        if (!Plugin.IsValid())
+        {
+            AddError(TEXT("PSD2UMG plugin not found via IPluginManager"));
+            return;
+        }
+
+        FixturePath = FPaths::Combine(
+            Plugin->GetBaseDir(),
+            TEXT("Source/PSD2UMG/Tests/Fixtures/Effects.psd"));
+
+        if (!FPaths::FileExists(FixturePath))
+        {
+            AddError(FString::Printf(TEXT("Fixture not found: %s"), *FixturePath));
+            return;
+        }
+
+        bParsed = PSD2UMG::Parser::ParseFile(FixturePath, Doc, Diag);
+    });
+
+    Describe("Effects fixture", [this]()
+    {
+        It("should parse successfully", [this]()
+        {
+            TestTrue(TEXT("ParseFile succeeded"), bParsed);
+        });
+
+        It("should have 512x512 canvas", [this]()
+        {
+            if (!bParsed) return;
+            TestEqual(TEXT("Canvas width"), Doc.CanvasSize.X, 512);
+            TestEqual(TEXT("Canvas height"), Doc.CanvasSize.Y, 512);
+        });
+
+        It("should detect color overlay on Overlay_Red", [this]()
+        {
+            if (!bParsed) return;
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Overlay_Red"));
+            TestNotNull(TEXT("Overlay_Red found"), L);
+            if (L)
+            {
+                TestTrue(TEXT("bHasColorOverlay"), L->Effects.bHasColorOverlay);
+            }
+        });
+
+        It("should detect drop shadow on Shadow_Box", [this]()
+        {
+            if (!bParsed) return;
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Shadow_Box"));
+            TestNotNull(TEXT("Shadow_Box found"), L);
+            if (L)
+            {
+                TestTrue(TEXT("bHasDropShadow"), L->Effects.bHasDropShadow);
+            }
+        });
+
+        It("should detect complex effects on Complex_Inner", [this]()
+        {
+            if (!bParsed) return;
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Complex_Inner"));
+            TestNotNull(TEXT("Complex_Inner found"), L);
+            if (L)
+            {
+                TestTrue(TEXT("bHasComplexEffects"), L->Effects.bHasComplexEffects);
+            }
+        });
+
+        It("should read 50% opacity on Opacity50", [this]()
+        {
+            if (!bParsed) return;
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Opacity50"));
+            TestNotNull(TEXT("Opacity50 found"), L);
+            if (L)
+            {
+                TestTrue(TEXT("Opacity near 0.5"),
+                    FMath::IsNearlyEqual(L->Opacity, 0.5f, 0.05f));
+            }
+        });
+    });
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

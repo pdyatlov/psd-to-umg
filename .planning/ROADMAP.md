@@ -139,17 +139,21 @@ Plans:
 **UI hint**: yes
 
 ### Phase 8: Testing, Documentation & Release
-**Goal**: The plugin is tested, documented, and ready for public open-source release with CI and example projects
+**Goal**: The plugin is tested, documented, and ready for internal release with comprehensive test coverage and lean documentation
 **Depends on**: Phase 7
 **Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, DOC-01, DOC-02, DOC-03, DOC-04
 **Success Criteria** (what must be TRUE):
-  1. Unit tests pass for FPsdParser, FLayerMappingRegistry, FAnchorCalculator, and DPI conversion (no UE dependency required)
-  2. Integration tests pass for the full PSD-to-WBP pipeline and reimport flow using FAutomationTestBase
-  3. Five test PSD files exist in TestData/ covering SimpleHUD, ComplexMenu, MobileUI, Typography, and Effects scenarios
-  4. README.md, CONVENTIONS.md, and CHANGELOG.md are complete; example project with 3-4 pre-imported demonstrations works out of the box
-  5. GitHub Actions CI compiles on Win64 and runs unit tests on push
+  1. Unit-like tests pass for anchor heuristics, prefix/suffix parsing, DPI conversion, empty PSD, and reimport DetectChange via FAutomationTestBase
+  2. Integration tests pass for the full PSD-to-WBP pipeline using new fixture PSDs (SimpleHUD, ComplexMenu, Effects)
+  3. Five test PSD files exist in Source/PSD2UMG/Tests/Fixtures/ (MultiLayer, Typography, SimpleHUD, ComplexMenu, Effects)
+  4. README.md is complete with installation, layer naming cheat sheet, settings reference, and test instructions
+  5. CI/CD deferred to post-v1 (D-04); CONVENTIONS.md, CHANGELOG.md, example project deferred (D-06, D-08)
 
-**Plans**: TBD
+**Plans:** 1/3 plans executed
+Plans:
+- [x] 08-01-PLAN.md — Expand FWidgetBlueprintGenSpec with in-memory unit + integration tests (anchors, prefixes, suffixes, DetectChange)
+- [ ] 08-02-PLAN.md — Create 3 PSD fixtures (human-authored) + parser spec expansion for SimpleHUD and Effects
+- [ ] 08-03-PLAN.md — README.md with installation, layer naming cheat sheet, settings, test instructions
 
 ## Progress
 
@@ -165,4 +169,4 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 5. Layer Effects & Blend Modes | 1/2 | In Progress|  |
 | 6. Advanced Layout | 3/3 | Complete   | 2026-04-10 |
 | 7. Editor UI, Preview & Settings | 5/5 | Complete   | 2026-04-10 |
-| 8. Testing, Documentation & Release | 0/? | Not started | - |
+| 8. Testing, Documentation & Release | 1/3 | In Progress|  |

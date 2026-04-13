@@ -1,146 +1,195 @@
-# AutoPSDUIDoc
+# PSD2UMG
 
-![](Images/01.png)
+![UE 5.7](https://img.shields.io/badge/UE-5.7-blue) ![Win64](https://img.shields.io/badge/platform-Win64-lightgrey) ![MIT License](https://img.shields.io/badge/license-MIT-green)
 
-## Description
+Unreal Engine 5.7 editor plugin that imports `.psd` files and converts them into UMG Widget Blueprints. Drop a PSD, get a working UI.
 
-AutoPSDUI is a plugin for automatically building WBP when importing PSD into the UE4 editor and it supports many widget types well.
+---
 
-## Features
+## Quick Start
 
-The  following widget types and  properties supported by AutoPSDUI:
+1. Copy the `PSD2UMG/` folder into your project's `Plugins/` directory.
+2. Right-click your `.uproject` file and select **Generate Visual Studio project files**.
+3. Open the UE editor; enable **PSD2UMG** in **Edit > Plugins** if it is not auto-enabled.
+4. Drag a `.psd` file into the Content Browser — a Widget Blueprint is created automatically.
 
-* Canvas Panel
+---
 
-* TextBlock
-  * text content;
-  * text color;
-  * text font;
-  * outline;
-  * shadow.
+## Installation
 
-*  Image
-  * Image export as .png file and import as UE4 assets;
-  * Image Brush Tink.
+**Requirements:** UE 5.7+, Win64, Visual Studio 2022+
 
-* Button
-  * Normal Image;
-  * Hovered Image;
-  * Pressed Image;
+**From source:**
 
-  * Disabled Image;
-  * All the features supported by the above image widgets are also supported in the four image paramaters of button widget;
-  * child widgets.
+1. Clone or download this repository.
+2. Copy the `PSD2UMG/` folder to `<YourProject>/Plugins/`.
+3. Add to your `.uproject` `Plugins` array:
+   ```json
+   { "Name": "PSD2UMG", "Enabled": true }
+   ```
+4. Rebuild from source (compile via Visual Studio or `UnrealBuildTool`).
 
-*  Progress Bar
-  * Background Image;
+**Optional plugins** (enabled automatically if present):
 
-  * Fill Image;
-  * All the features supported by the above image widgets are also supported in the two image paramaters of ProgressBar widget.
+- **CommonUI** — Required for `bUseCommonUI` mode (`UCommonButtonBase` generation).
+- **EnhancedInput** — Required for `Button_Name[IA_Action]` input action binding.
 
-* List View
-  * Automatically create blueprint assets (with UserObjectListEntry Interface implementation) of child entry widget blueprint.
+---
 
-* Tile View
-  * Same with List View.
+## Layer Naming Cheat Sheet
 
-## PSD Structure Design
+PSD layer names control which UMG widget class is generated. Prefixes are matched first (highest priority wins), then suffixes modify anchor and layout behavior.
 
-If you want to use this plug-in smoothly, you should follow the following rules to design your PS layer:  
+### Prefixes
 
-### Canvas Panel
+| Prefix | Widget Class | Notes |
+|--------|-------------|-------|
+| `Button_` | `UButton` | Normal/Hovered/Pressed/Disabled child layers mapped to state brushes |
+| `Progress_` | `UProgressBar` | Background and Fill child layers |
+| `HBox_` | `UHorizontalBox` | Children laid out left-to-right |
+| `VBox_` | `UVerticalBox` | Children laid out top-to-bottom |
+| `Overlay_` | `UOverlay` | Z-stacked children |
+| `ScrollBox_` | `UScrollBox` | Scrollable container |
+| `Slider_` | `USlider` | |
+| `CheckBox_` | `UCheckBox` | |
+| `Input_` | `UEditableTextBox` | |
+| `List_` | `UListView` | |
+| `Tile_` | `UTileView` | |
+| `Switcher_` | `UWidgetSwitcher` | |
 
-* PSD Layer Type: group
-* PSD Layer Name Rule: Any, but must not satisfy the group layer name rules mentioned below.
-* Child Layer: Any
-* Layer Style: No Style
+Layers without a recognized prefix are mapped by type: pixel layers become `UImage`, text layers become `UTextBlock`, group layers become `UCanvasPanel`.
 
-### TextBlock
+### Suffixes
 
-* PSD Layer Type: type
-* PSD Layer Name Rule: Any
-* Child Layer: No
-* Layer Style: 
-  * Stroke: Only Support Normal Blend Mode
-  * Drop Shadow: Only Support Multiply Blend Mode
+Suffixes are appended to any layer name (after the prefix if present). Longest suffix takes priority.
 
-### Image
+| Suffix | Effect |
+|--------|--------|
+| `_9slice` | 9-slice draw mode (Box). Optional margins: `LayerName_9slice[L,T,R,B]` |
+| `_9s` | Short form of `_9slice` |
+| `_variants` | Wrap children in `UWidgetSwitcher` (one child per variant) |
+| `_anchor-tl` | Force top-left anchor (0, 0) |
+| `_anchor-tc` | Force top-center anchor (0.5, 0) |
+| `_anchor-tr` | Force top-right anchor (1, 0) |
+| `_anchor-cl` | Force center-left anchor (0, 0.5) |
+| `_anchor-c` | Force center anchor (0.5, 0.5) |
+| `_anchor-cr` | Force center-right anchor (1, 0.5) |
+| `_anchor-bl` | Force bottom-left anchor (0, 1) |
+| `_anchor-bc` | Force bottom-center anchor (0.5, 1) |
+| `_anchor-br` | Force bottom-right anchor (1, 1) |
+| `_stretch-h` | Stretch horizontally (anchor min X=0, max X=1); vertical anchor from quadrant |
+| `_stretch-v` | Stretch vertically (anchor min Y=0, max Y=1); horizontal anchor from quadrant |
+| `_fill` | Fill entire parent (anchor 0,0 to 1,1) |
 
-* PSD Layer Type: Pixel/Shape/SmartObject
-* PSD Layer Name Rule: Any
-* Child Layer: No
-* Layer Style: 
-  * ColorOverlay: Only Support Multiply Blend Mode
+Without a suffix, anchor is inferred from layer center position within the canvas (quadrant heuristic).
 
-### Button
+### CommonUI Mode
 
-* PSD Layer Type: group
-* PSD Layer Name Rule: **Button_**  prefix
-* Child Layer: Any (Note the following four types of images)
-* Layer Style: No
-* Normal Image:
-  * Layer Type: Same with **Image**
-  * Layer Name Rule:   **_normal**   postfix
-  * Layer Style: Same with **Image**
-* Hovered Image:
-  * Layer Type: Same with **Image**
-  * Layer Name Rule: **_hovered** postfix
-  * Layer Style: Same with **Image**
-* Pressed Image:
-  * Layer Type: Same with **Image**
-  * Layer Name Rule: **_pressed** postfix
-  * Layer Style: Same with **Image**
-* Disabled Image:
-  * Layer Type: Same with **Image**
-  * Layer Name Rule: **_disabled** postfix
-  * Layer Style: Same with **Image**
+When `bUseCommonUI` is enabled in plugin settings:
 
-### Progress Bar
+| Syntax | Effect |
+|--------|--------|
+| `Button_Name` | Generates `UCommonButtonBase` instead of `UButton` |
+| `Button_Confirm[IA_Confirm]` | Generates `UCommonButtonBase` and binds to `UInputAction` asset |
+| `_show` / `_hide` child layers | Generate `UWidgetAnimation` for show/hide transitions |
+| `_hover` child layers | Generate `UWidgetAnimation` for hover state |
 
-* PSD Layer Type: group
-* PSD Layer Name Rule: **Progress_**  prefix
-* Child Layer: The following two types of images.
-* Layer Style: No
-* Background Image:
-  * Layer Type: Same with **Image**
-  * Layer Name Rule: **_background** postfix
-  * Layer Style: Same with **Image**
-* Fill Image:
-  * Layer Type: Same with **Image**
-  * Layer Name Rule: **_fill** postfix
-  * Layer Style: Same with **Image**
+---
 
-### List View
+## Plugin Settings
 
-* PSD Layer Type: group
-* PSD Layer Name Rule: **List_**  prefix
-* Child Layer: Must be one group layer with name **child**
-* Layer Style: No
-* Child(Will be constructed as a Child WBP with UserObjectListEntry  Implementation) 
-  * Layer Type: group
-  * Layer Name Rule: child
-  * Child Layer: Any
+**Project Settings > Plugins > PSD2UMG**
 
-### Tile View
+### General
 
-* PSD Layer Type: group
-* PSD Layer Name Rule: **Tile_**  prefix
-* Child Layer: Same with **List View**
-* Layer Style: No
-* Child: Same with **List View**
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `bEnabled` | `true` | Master switch — disabling skips all PSD import processing |
+| `bShowPreviewDialog` | `true` | Show layer preview dialog before every import. Disable for batch workflows |
 
-## Usage
+### Effects
 
-Just Drag *.psd* file to Content Browser and wait. The WBP will be create in the target Game Dir.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `bFlattenComplexEffects` | `true` | Rasterize layers with inner shadow, gradient, pattern, or bevel effects as a single PNG |
+| `MaxSmartObjectDepth` | `2` | Recursion depth limit for Smart Object import; deeper Smart Objects rasterize as images |
 
-After the .psd file is imported into the editor, an UTexture2D Asset will be generated by default. Right click on the asset - Reimport. It will Generate or Update the WBP.
+### Output
 
-### Setting
+| Setting | Description |
+|---------|-------------|
+| `TextureSrcDir` | Source directory for texture files on disk |
+| `TextureAssetDir` | Content Browser path for generated `Texture2D` assets |
+| `WidgetBlueprintAssetDir` | Content Browser path for generated Widget Blueprint assets |
 
-![](Images/02.png)
+### Typography
 
-* **Enabled**: If not checked, the WBP will not be generated or updated when a *.psd* file imported or reimported.
-* **Texture Src Dir**: The storage directory of source image file derived from *.psd* file when generating WBP.
-* **Texture Asset Dir**: The game directory of the image assets to be used by WBP (generated by importing the image exported by PSD)
-* **Font Map**: The font map required by WBP TextBlock widget. The key is the font name (the name in PS), and the value is the font asset.
-* **Default Font**: If no corresponding font asset is found, use the default font asset instead.
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `FontMap` | (empty) | Map of Photoshop font name to `UFont` asset. Unmapped fonts fall back to `DefaultFont` |
+| `DefaultFont` | (none) | Fallback `UFont` when the PS font name is not in `FontMap` |
+| `SourceDPI` | `72` | Photoshop document DPI for pt-to-px conversion. At 72 DPI, 1pt = 1px in UMG |
+
+### CommonUI
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `bUseCommonUI` | `false` | Generate `UCommonButtonBase` instead of `UButton` for `Button_` layers |
+| `InputActionSearchPath` | (empty) | Content path searched for `UInputAction` assets referenced by `Button_Name[IA_Action]` |
+
+---
+
+## Running Tests
+
+Tests use the Unreal Automation Framework. The plugin registers tests under `PSD2UMG.*`.
+
+**Session Frontend:**
+
+1. Open **Window > Developer Tools > Session Frontend**.
+2. Switch to the **Automation** tab.
+3. Filter by `PSD2UMG` and click **Start Tests**.
+
+**Command line (headless):**
+
+```
+UnrealEditor.exe MyProject.uproject -ExecCmds="Automation RunTests PSD2UMG;Quit" -log -nosplash -nullrhi
+```
+
+**Test filter groups:**
+
+| Filter | Coverage |
+|--------|----------|
+| `PSD2UMG.Parser.*` | PSD file parsing, layer extraction |
+| `PSD2UMG.Generator.*` | Widget Blueprint generation, anchor calculation |
+| `PSD2UMG.Typography.*` | Text properties, font mapping, DPI conversion |
+
+---
+
+## Test Fixtures
+
+Test PSDs live in `Source/PSD2UMG/Tests/Fixtures/`. They can also be dragged into the Content Browser for manual end-to-end testing.
+
+| File | Purpose |
+|------|---------|
+| `MultiLayer.psd` | Mixed layer types — images, text, groups |
+| `Typography.psd` | Text layers with varied font, size, color, alignment |
+| `SimpleHUD.psd` | Minimal HUD with buttons and health bar |
+| `ComplexMenu.psd` | Nested groups, scroll boxes, overlays |
+| `Effects.psd` | Drop shadow, color overlay, opacity, blend modes |
+
+---
+
+## Known Limitations
+
+- Win64 only — macOS support deferred.
+- UE 5.7+ required — no backward compatibility.
+- Effect fidelity is approximate: color overlay, drop shadow, and opacity are supported; complex effects (inner shadow, gradient overlay, pattern, bevel) flatten to PNG when `bFlattenComplexEffects` is enabled.
+- Text shadow is not supported (PhotoshopAPI limitation).
+- Smart Object recursive import has a depth limit (`MaxSmartObjectDepth`); deeper nesting rasterizes.
+- Editor-only plugin — no runtime module, cannot be packaged into a shipping build.
+
+---
+
+## License
+
+MIT. See [LICENSE](LICENSE).

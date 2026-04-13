@@ -102,10 +102,10 @@
 
 ### Documentation & Release
 
-- [ ] **DOC-01**: README.md with quick start, installation, basic usage
-- [ ] **DOC-02**: CONVENTIONS.md with full layer naming convention reference for designers
-- [ ] **DOC-03**: CHANGELOG.md
-- [ ] **DOC-04**: Example project: 3-4 pre-imported PSD→WBP demonstrations (HUD, main menu, settings screen, popup)
+- [x] **DOC-01**: README.md with quick start, installation, basic usage
+- [x] **DOC-02**: CONVENTIONS.md with full layer naming convention reference for designers
+- [x] **DOC-03**: CHANGELOG.md
+- [x] **DOC-04**: Example project: 3-4 pre-imported PSD→WBP demonstrations (HUD, main menu, settings screen, popup)
 
 ## v2 Requirements
 
@@ -207,10 +207,10 @@
 | TEST-02 | Phase 8 | Complete |
 | TEST-03 | Phase 8 | Pending |
 | TEST-04 | Phase 8 | Complete |
-| DOC-01 | Phase 8 | Pending |
-| DOC-02 | Phase 8 | Pending |
-| DOC-03 | Phase 8 | Pending |
-| DOC-04 | Phase 8 | Pending |
+| DOC-01 | Phase 8 | Complete |
+| DOC-02 | Phase 8 | Complete |
+| DOC-03 | Phase 8 | Complete |
+| DOC-04 | Phase 8 | Complete |
 
 **Coverage:**
 - v1 requirements: 66 total

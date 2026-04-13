@@ -149,11 +149,11 @@ Plans:
   4. README.md is complete with installation, layer naming cheat sheet, settings reference, and test instructions
   5. CI/CD deferred to post-v1 (D-04); CONVENTIONS.md, CHANGELOG.md, example project deferred (D-06, D-08)
 
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 Plans:
 - [x] 08-01-PLAN.md — Expand FWidgetBlueprintGenSpec with in-memory unit + integration tests (anchors, prefixes, suffixes, DetectChange)
 - [ ] 08-02-PLAN.md — Create 3 PSD fixtures (human-authored) + parser spec expansion for SimpleHUD and Effects
-- [ ] 08-03-PLAN.md — README.md with installation, layer naming cheat sheet, settings, test instructions
+- [x] 08-03-PLAN.md — README.md with installation, layer naming cheat sheet, settings, test instructions
 
 ## Progress
 
@@ -169,4 +169,4 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 5. Layer Effects & Blend Modes | 1/2 | In Progress|  |
 | 6. Advanced Layout | 3/3 | Complete   | 2026-04-10 |
 | 7. Editor UI, Preview & Settings | 5/5 | Complete   | 2026-04-10 |
-| 8. Testing, Documentation & Release | 1/3 | In Progress|  |
+| 8. Testing, Documentation & Release | 2/3 | In Progress|  |

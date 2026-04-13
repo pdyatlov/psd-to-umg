@@ -97,7 +97,7 @@
 
 - [x] **TEST-01**: Unit tests (no UE dependency): FPsdParser, FLayerMappingRegistry, FAnchorCalculator, DPI conversion
 - [x] **TEST-02**: Integration tests (FAutomationTestBase): full PSD→WBP pipeline, reimport
-- [ ] **TEST-03**: Test PSD files: Test_SimpleHUD.psd, Test_ComplexMenu.psd, Test_MobileUI.psd, Test_Typography.psd, Test_Effects.psd in Plugins/PSD2UMG/TestData/
+- [x] **TEST-03**: Test PSD files: Test_SimpleHUD.psd, Test_ComplexMenu.psd, Test_MobileUI.psd, Test_Typography.psd, Test_Effects.psd in Plugins/PSD2UMG/TestData/
 - [x] **TEST-04**: GitHub Actions CI: compile on Win64 + run unit tests on push
 
 ### Documentation & Release
@@ -205,7 +205,7 @@
 | CUI-04 | Phase 7 | Complete |
 | TEST-01 | Phase 8 | Complete |
 | TEST-02 | Phase 8 | Complete |
-| TEST-03 | Phase 8 | Pending |
+| TEST-03 | Phase 8 | Complete |
 | TEST-04 | Phase 8 | Complete |
 | DOC-01 | Phase 8 | Complete |
 | DOC-02 | Phase 8 | Complete |

@@ -4,6 +4,7 @@
 #include "Generator/FAnchorCalculator.h"
 #include "Generator/FSmartObjectImporter.h"
 #include "Mapper/FLayerMappingRegistry.h"
+#include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
 #include "PSD2UMGLog.h"
 #include "PSD2UMGSetting.h"
@@ -29,6 +30,24 @@
 // LAYOUT-03: Row/column alignment constants and detection helpers
 // ---------------------------------------------------------------------------
 static constexpr int32 AlignmentTolerancePx = 6;
+
+// R-05: a layer with an explicit stretch/fill anchor is placed directly on the
+// canvas; the auto-row/column heuristic must not re-parent it into an HBox/VBox.
+static bool IsExplicitStretchAnchor(const FPsdLayer& L)
+{
+    return L.ParsedTags.Anchor == EPsdAnchorTag::StretchH
+        || L.ParsedTags.Anchor == EPsdAnchorTag::StretchV
+        || L.ParsedTags.Anchor == EPsdAnchorTag::Fill;
+}
+
+static bool AnyChildHasExplicitStretch(const TArray<FPsdLayer>& Layers)
+{
+    for (const FPsdLayer& L : Layers)
+    {
+        if (IsExplicitStretchAnchor(L)) return true;
+    }
+    return false;
+}
 
 /** Returns true if all visual layers share the same vertical center (within Tolerance), forming a horizontal row. */
 static bool DetectHorizontalRow(const TArray<FPsdLayer>& Layers, int32 Tolerance)
@@ -95,11 +114,14 @@ static void PopulateCanvas(
     UCanvasPanel* Parent,
     const TArray<FPsdLayer>& Layers,
     const FPsdDocument& Doc,
-    const FIntPoint& CanvasSize)
+    const FIntPoint& CanvasSize,
+    const TSet<FString>& SkippedLayerNames = TSet<FString>())
 {
     // LAYOUT-03: Auto-detect row/column alignment (per D-09, D-11)
     // Only fires when ALL children align — conservative guard against false positives.
-    if (Layers.Num() >= 2)
+    // R-05: if any child carries an explicit @anchor:stretch-h / stretch-v / fill,
+    // the auto-grouping heuristic is suppressed entirely so the explicit anchor wins.
+    if (Layers.Num() >= 2 && !AnyChildHasExplicitStretch(Layers))
     {
         if (DetectHorizontalRow(Layers, AlignmentTolerancePx))
         {
@@ -185,6 +207,12 @@ static void PopulateCanvas(
     {
         const FPsdLayer& Layer = Layers[i];
 
+        // Skip layers the user unchecked in the preview dialog
+        if (SkippedLayerNames.Contains(Layer.Name))
+        {
+            continue;
+        }
+
         // Skip zero-size non-groups (D-14)
         if (Layer.Bounds.IsEmpty() && Layer.Type != EPsdLayerType::Group)
         {
@@ -237,11 +265,11 @@ static void PopulateCanvas(
                 AnchorResult.Anchors = FAnchors(0.f, 0.f, 1.f, 1.f);
                 AnchorResult.bStretchH = true;
                 AnchorResult.bStretchV = true;
-                AnchorResult.CleanName = LayerPtr->Name;
+                AnchorResult.CleanName = LayerPtr->ParsedTags.CleanName;
             }
             else
             {
-                AnchorResult = FAnchorCalculator::Calculate(LayerPtr->Name, LayerPtr->Bounds, CanvasSize);
+                AnchorResult = FAnchorCalculator::Calculate(*LayerPtr, LayerPtr->Bounds, CanvasSize);
             }
 
             Data.Anchors = AnchorResult.Anchors;
@@ -392,7 +420,7 @@ static void PopulateCanvas(
             UCanvasPanel* ChildCanvas = Cast<UCanvasPanel>(Widget);
             if (ChildCanvas)
             {
-                PopulateCanvas(Registry, Tree, ChildCanvas, Layer.Children, Doc, CanvasSize);
+                PopulateCanvas(Registry, Tree, ChildCanvas, Layer.Children, Doc, CanvasSize, SkippedLayerNames);
             }
         }
     }
@@ -404,7 +432,8 @@ static void PopulateCanvas(
 UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     const FPsdDocument& Doc,
     const FString& WbpPackagePath,
-    const FString& WbpAssetName)
+    const FString& WbpAssetName,
+    const TSet<FString>& SkippedLayerNames)
 {
     // Step 1: Create WBP package
     const FString FullPath = FString::Printf(TEXT("%s/%s"), *WbpPackagePath, *WbpAssetName);
@@ -415,6 +444,20 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
         return nullptr;
     }
     WbpPackage->FullyLoad();
+
+    // Step 1b: If a WBP with this name already exists in the package, delete it
+    // first. UE's CreateBlueprint asserts that no blueprint with the target name
+    // exists (Kismet2.cpp FindObject check). This happens on re-import of the
+    // same PSD or when a previous test/import left a stale asset.
+    if (UBlueprint* Existing = FindObject<UBlueprint>(WbpPackage, *WbpAssetName))
+    {
+        UE_LOG(LogPSD2UMG, Warning,
+            TEXT("FWidgetBlueprintGenerator: removing existing blueprint '%s' before regeneration"),
+            *WbpAssetName);
+        Existing->ClearFlags(RF_Standalone | RF_Public);
+        Existing->MarkAsGarbage();
+        Existing->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
+    }
 
     // Step 2: Create WBP via factory (canonical editor path — same as "New Widget Blueprint" in Content Browser)
     UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>(GetTransientPackage());
@@ -448,7 +491,7 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     // the parent WBP location without interface changes (per plan 06-02 depth strategy).
     FSmartObjectImporter::SetCurrentPackagePath(WbpPackagePath);
     FLayerMappingRegistry Registry;
-    PopulateCanvas(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize);
+    PopulateCanvas(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
 
     // Step 5: Compile AFTER full tree population (critical — compiling before population leaves empty BP)
     FKismetEditorUtilities::CompileBlueprint(WBP);
@@ -509,7 +552,7 @@ static void UpdateCanvas(
             // Update canvas slot position/size
             if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Existing->Slot))
             {
-                FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer.Name, Layer.Bounds, CanvasSize);
+                FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer, Layer.Bounds, CanvasSize);
                 FAnchorData Data;
                 Data.Anchors = AnchorResult.Anchors;
                 Data.Alignment = FVector2D(0.f, 0.f);
@@ -541,14 +584,14 @@ static void UpdateCanvas(
             {
                 if (UTextBlock* TextBlock = Cast<UTextBlock>(Existing))
                 {
-                    TextBlock->SetText(FText::FromString(Layer.Text.PlainText));
+                    TextBlock->SetText(FText::FromString(Layer.Text.Content));
                     FSlateFontInfo FontInfo = TextBlock->GetFont();
-                    if (Layer.Text.FontSizePx > 0.f)
+                    if (Layer.Text.SizePx > 0.f)
                     {
-                        FontInfo.Size = static_cast<int32>(Layer.Text.FontSizePx);
+                        FontInfo.Size = static_cast<int32>(Layer.Text.SizePx);
                     }
                     TextBlock->SetFont(FontInfo);
-                    TextBlock->SetColorAndOpacity(FSlateColor(Layer.Text.FillColor));
+                    TextBlock->SetColorAndOpacity(FSlateColor(Layer.Text.Color));
                 }
             }
 
@@ -577,7 +620,7 @@ static void UpdateCanvas(
             UCanvasPanelSlot* Slot = Parent->AddChildToCanvas(NewWidget);
             if (Slot)
             {
-                FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer.Name, Layer.Bounds, CanvasSize);
+                FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer, Layer.Bounds, CanvasSize);
                 FAnchorData Data;
                 Data.Alignment = FVector2D(0.f, 0.f);
                 Data.Anchors = AnchorResult.Anchors;
@@ -701,7 +744,7 @@ EPsdChangeAnnotation FWidgetBlueprintGenerator::DetectChange(
     {
         if (UTextBlock* TextBlock = Cast<UTextBlock>(ExistingWidget))
         {
-            if (!TextBlock->GetText().EqualTo(FText::FromString(NewLayer.Text.PlainText)))
+            if (!TextBlock->GetText().EqualTo(FText::FromString(NewLayer.Text.Content)))
             {
                 return EPsdChangeAnnotation::Changed;
             }

@@ -1,48 +1,16 @@
 // Copyright 2018-2021 - John snow wind
 #include "FAnchorCalculator.h"
 
-// ---------------------------------------------------------------------------
-// Suffix table — longest first to avoid partial matches
-// ---------------------------------------------------------------------------
-struct FSuffixEntry
-{
-    const TCHAR* Suffix;
-    float MinX, MinY, MaxX, MaxY;
-    bool bStretchH;
-    bool bStretchV;
-    bool bComputed; // true = anchors depend on quadrant, not fixed values
-};
-
-static const FSuffixEntry GSuffixes[] = {
-    // Strip-only suffixes (no anchor override; fall through to quadrant logic)
-    // _9slice must come before _9s (longest-first rule)
-    { TEXT("_9slice"),    0.f, 0.f, 0.f, 0.f, false, false, true },
-    { TEXT("_9s"),        0.f, 0.f, 0.f, 0.f, false, false, true },
-    { TEXT("_variants"),  0.f, 0.f, 0.f, 0.f, false, false, true },
-    // Fixed-anchor suffixes
-    { TEXT("_anchor-tl"),  0.f,   0.f,   0.f,   0.f,   false, false, false },
-    { TEXT("_anchor-tc"),  0.5f,  0.f,   0.5f,  0.f,   false, false, false },
-    { TEXT("_anchor-tr"),  1.f,   0.f,   1.f,   0.f,   false, false, false },
-    { TEXT("_anchor-cl"),  0.f,   0.5f,  0.f,   0.5f,  false, false, false },
-    { TEXT("_anchor-cr"),  1.f,   0.5f,  1.f,   0.5f,  false, false, false },
-    { TEXT("_anchor-bl"),  0.f,   1.f,   0.f,   1.f,   false, false, false },
-    { TEXT("_anchor-bc"),  0.5f,  1.f,   0.5f,  1.f,   false, false, false },
-    { TEXT("_anchor-br"),  1.f,   1.f,   1.f,   1.f,   false, false, false },
-    // _anchor-c must come after longer suffixes that share the prefix
-    { TEXT("_anchor-c"),   0.5f,  0.5f,  0.5f,  0.5f,  false, false, false },
-    // Stretch suffixes (anchors computed from quadrant)
-    { TEXT("_stretch-h"),  0.f,   0.f,   1.f,   0.f,   true,  false, true  },
-    { TEXT("_stretch-v"),  0.f,   0.f,   0.f,   1.f,   false, true,  true  },
-    { TEXT("_fill"),       0.f,   0.f,   1.f,   1.f,   true,  true,  false },
-};
+#include "Parser/FLayerTagParser.h"
+#include "Parser/PsdTypes.h"
 
 // ---------------------------------------------------------------------------
-// QuadrantAnchor
+// QuadrantAnchor — auto-anchor heuristic based on layer bounds within canvas.
+// Auto-stretch is disabled by default; designers opt in via @anchor:stretch-h,
+// @anchor:stretch-v, or @anchor:fill.
 // ---------------------------------------------------------------------------
 FAnchors FAnchorCalculator::QuadrantAnchor(const FIntRect& Bounds, const FIntPoint& CanvasSize, bool& bOutStretchH, bool& bOutStretchV)
 {
-    // Auto-stretch is disabled by default: layers keep their PSD position/size.
-    // Use the _stretch-h, _stretch-v, or _fill suffix to opt into stretch behavior.
     bOutStretchH = false;
     bOutStretchV = false;
 
@@ -58,96 +26,85 @@ FAnchors FAnchorCalculator::QuadrantAnchor(const FIntRect& Bounds, const FIntPoi
 }
 
 // ---------------------------------------------------------------------------
-// TryParseSuffix
+// ResolveExplicitAnchor — enum-switch replacement for the legacy GSuffixes table.
+// Returns true when Anchor != None (an explicit @anchor tag was present).
 // ---------------------------------------------------------------------------
-bool FAnchorCalculator::TryParseSuffix(const FString& Name, FAnchors& OutAnchors, bool& bOutStretchH, bool& bOutStretchV, FString& OutCleanName, const FIntRect& Bounds, const FIntPoint& CanvasSize)
+static bool ResolveExplicitAnchor(
+    EPsdAnchorTag Anchor,
+    const FIntRect& Bounds,
+    const FIntPoint& CanvasSize,
+    FAnchors& OutAnchors,
+    bool& bOutStretchH,
+    bool& bOutStretchV)
 {
-    for (const FSuffixEntry& Entry : GSuffixes)
+    bOutStretchH = false;
+    bOutStretchV = false;
+
+    switch (Anchor)
     {
-        if (Name.EndsWith(Entry.Suffix))
-        {
-            const int32 SuffixLen = FCString::Strlen(Entry.Suffix);
-            OutCleanName = Name.LeftChop(SuffixLen);
+    case EPsdAnchorTag::TL: OutAnchors = FAnchors(0.f,  0.f,  0.f,  0.f);  return true;
+    case EPsdAnchorTag::TC: OutAnchors = FAnchors(0.5f, 0.f,  0.5f, 0.f);  return true;
+    case EPsdAnchorTag::TR: OutAnchors = FAnchors(1.f,  0.f,  1.f,  0.f);  return true;
+    case EPsdAnchorTag::CL: OutAnchors = FAnchors(0.f,  0.5f, 0.f,  0.5f); return true;
+    case EPsdAnchorTag::C:  OutAnchors = FAnchors(0.5f, 0.5f, 0.5f, 0.5f); return true;
+    case EPsdAnchorTag::CR: OutAnchors = FAnchors(1.f,  0.5f, 1.f,  0.5f); return true;
+    case EPsdAnchorTag::BL: OutAnchors = FAnchors(0.f,  1.f,  0.f,  1.f);  return true;
+    case EPsdAnchorTag::BC: OutAnchors = FAnchors(0.5f, 1.f,  0.5f, 1.f);  return true;
+    case EPsdAnchorTag::BR: OutAnchors = FAnchors(1.f,  1.f,  1.f,  1.f);  return true;
 
-            // Strip optional [L,T,R,B] margin bracket from the clean name.
-            // Pattern: name ends with ']' — find the matching '[' and remove.
-            if (OutCleanName.EndsWith(TEXT("]")))
-            {
-                int32 BracketOpen = INDEX_NONE;
-                OutCleanName.FindLastChar(TEXT('['), BracketOpen);
-                if (BracketOpen != INDEX_NONE)
-                {
-                    OutCleanName = OutCleanName.Left(BracketOpen);
-                }
-            }
+    case EPsdAnchorTag::Fill:
+        OutAnchors  = FAnchors(0.f, 0.f, 1.f, 1.f);
+        bOutStretchH = true;
+        bOutStretchV = true;
+        return true;
 
-            if (Entry.bComputed)
-            {
-                // _stretch-h or _stretch-v: compute zone from quadrant but override bStretch flags
-                bool bDummyH = false, bDummyV = false;
-                FAnchors Quadrant = QuadrantAnchor(Bounds, CanvasSize, bDummyH, bDummyV);
-
-                const float W = static_cast<float>(CanvasSize.X);
-                const float H = static_cast<float>(CanvasSize.Y);
-                const float CX = (Bounds.Min.X + Bounds.Max.X) * 0.5f;
-                const float CY = (Bounds.Min.Y + Bounds.Max.Y) * 0.5f;
-                const float VZone = (H > 0.f && CY < H / 3.f) ? 0.f : (H > 0.f && CY < H * 2.f / 3.f) ? 0.5f : 1.f;
-                const float HZone = (W > 0.f && CX < W / 3.f) ? 0.f : (W > 0.f && CX < W * 2.f / 3.f) ? 0.5f : 1.f;
-
-                bOutStretchH = Entry.bStretchH;
-                bOutStretchV = Entry.bStretchV;
-
-                if (Entry.bStretchH && Entry.bStretchV)
-                {
-                    // _fill
-                    OutAnchors = FAnchors(0.f, 0.f, 1.f, 1.f);
-                }
-                else if (Entry.bStretchH)
-                {
-                    // _stretch-h: horizontal stretch, Y from vertical quadrant
-                    OutAnchors = FAnchors(0.f, VZone, 1.f, VZone);
-                }
-                else
-                {
-                    // _stretch-v: vertical stretch, X from horizontal quadrant
-                    OutAnchors = FAnchors(HZone, 0.f, HZone, 1.f);
-                }
-            }
-            else
-            {
-                OutAnchors    = FAnchors(Entry.MinX, Entry.MinY, Entry.MaxX, Entry.MaxY);
-                bOutStretchH  = false;
-                bOutStretchV  = false;
-            }
-            return true;
-        }
+    case EPsdAnchorTag::StretchH:
+    {
+        const float H = static_cast<float>(CanvasSize.Y);
+        const float CY = (Bounds.Min.Y + Bounds.Max.Y) * 0.5f;
+        const float VZone = (H > 0.f && CY < H / 3.f) ? 0.f : (H > 0.f && CY < H * 2.f / 3.f) ? 0.5f : 1.f;
+        OutAnchors = FAnchors(0.f, VZone, 1.f, VZone);
+        bOutStretchH = true;
+        return true;
     }
-    return false;
+
+    case EPsdAnchorTag::StretchV:
+    {
+        const float W = static_cast<float>(CanvasSize.X);
+        const float CX = (Bounds.Min.X + Bounds.Max.X) * 0.5f;
+        const float HZone = (W > 0.f && CX < W / 3.f) ? 0.f : (W > 0.f && CX < W * 2.f / 3.f) ? 0.5f : 1.f;
+        OutAnchors = FAnchors(HZone, 0.f, HZone, 1.f);
+        bOutStretchV = true;
+        return true;
+    }
+
+    case EPsdAnchorTag::None:
+    default:
+        return false;
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Calculate (public entry point)
 // ---------------------------------------------------------------------------
-FAnchorResult FAnchorCalculator::Calculate(const FString& LayerName, const FIntRect& Bounds, const FIntPoint& CanvasSize)
+FAnchorResult FAnchorCalculator::Calculate(const FPsdLayer& Layer, const FIntRect& Bounds, const FIntPoint& CanvasSize)
 {
     FAnchorResult Result;
+    Result.CleanName = Layer.ParsedTags.CleanName;
 
-    FAnchors     ParsedAnchors;
-    bool         bStretchH = false;
-    bool         bStretchV = false;
-    FString      CleanName;
+    FAnchors ParsedAnchors;
+    bool bStretchH = false;
+    bool bStretchV = false;
 
-    if (TryParseSuffix(LayerName, ParsedAnchors, bStretchH, bStretchV, CleanName, Bounds, CanvasSize))
+    if (ResolveExplicitAnchor(Layer.ParsedTags.Anchor, Bounds, CanvasSize, ParsedAnchors, bStretchH, bStretchV))
     {
         Result.Anchors   = ParsedAnchors;
         Result.bStretchH = bStretchH;
         Result.bStretchV = bStretchV;
-        Result.CleanName = CleanName;
     }
     else
     {
-        Result.Anchors   = QuadrantAnchor(Bounds, CanvasSize, Result.bStretchH, Result.bStretchV);
-        Result.CleanName = LayerName;
+        Result.Anchors = QuadrantAnchor(Bounds, CanvasSize, Result.bStretchH, Result.bStretchV);
     }
 
     return Result;

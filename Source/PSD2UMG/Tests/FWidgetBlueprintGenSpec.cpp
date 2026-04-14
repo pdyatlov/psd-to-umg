@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
 #include "Generator/FWidgetBlueprintGenerator.h"
 #include "PSD2UMGSetting.h"
@@ -693,6 +694,54 @@ void FWidgetBlueprintGenSpec::Define()
 
             UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_DeepNest"));
             TestNotNull(TEXT("WBP created from deep nesting"), WBP);
+        });
+
+        It("R-05: explicit @anchor:stretch-h on a child suppresses PopulateCanvas auto-row heuristic", [this]()
+        {
+            // Three image children laid out as a horizontal row (same Y center).
+            // The middle child carries @anchor:stretch-h. With the R-05 guard in place,
+            // PopulateCanvas must NOT auto-wrap them into a UHorizontalBox; all three
+            // must be placed directly on the root canvas (CanvasPanelSlot present).
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(1200, 600);
+            Doc.SourcePath = TEXT("C:/test/StretchOverride.psd");
+
+            auto MakeImg = [](const TCHAR* RawName, int32 X0, int32 Y0, int32 X1, int32 Y1)
+            {
+                FPsdLayer L;
+                L.Name = RawName;
+                L.Type = EPsdLayerType::Image;
+                L.Bounds = FIntRect(X0, Y0, X1, Y1);
+                L.PixelWidth = X1 - X0;
+                L.PixelHeight = Y1 - Y0;
+                L.RGBAPixels.SetNumZeroed(L.PixelWidth * L.PixelHeight * 4);
+                FString Diag;
+                L.ParsedTags = FLayerTagParser::Parse(L.Name, L.Type, 0, Diag);
+                return L;
+            };
+
+            Doc.RootLayers.Add(MakeImg(TEXT("Left"),                              50,  280, 250, 320));
+            Doc.RootLayers.Add(MakeImg(TEXT("Middle @anchor:stretch-h"),         300,  280, 800, 320));
+            Doc.RootLayers.Add(MakeImg(TEXT("Right"),                            850,  280, 1100, 320));
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_R05"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP || !WBP->WidgetTree) return;
+
+            UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("Root is UCanvasPanel"), Root);
+            if (!Root) return;
+
+            // R-05 invariant: no UHorizontalBox auto-wrap. All 3 images sit on Root canvas.
+            int32 ImageCount = 0;
+            int32 HBoxCount = 0;
+            WBP->WidgetTree->ForEachWidget([&](UWidget* W)
+            {
+                if (Cast<UImage>(W))           { ++ImageCount; }
+                if (Cast<UHorizontalBox>(W))   { ++HBoxCount; }
+            });
+            TestEqual(TEXT("R-05: no auto-row HBox created"), HBoxCount, 0);
+            TestEqual(TEXT("R-05: all 3 images present on canvas"), ImageCount, 3);
         });
     });
 }

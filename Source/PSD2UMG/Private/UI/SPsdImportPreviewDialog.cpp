@@ -592,64 +592,7 @@ TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
         .VAlign(VAlign_Center)
         .Padding(FMargin(6.f, 0.f))
         [
-            [&]() -> TSharedRef<SWidget>
-            {
-                const TArray<FString> RecognizedChips = ReconstructTagChips(Item->ParsedTags);
-                const TArray<FString>& UnknownChips = Item->ParsedTags.UnknownTags;
-
-                if (RecognizedChips.Num() == 0 && UnknownChips.Num() == 0)
-                {
-                    return SNew(SSpacer);
-                }
-
-                TSharedRef<SWrapBox> Wrap = SNew(SWrapBox)
-                    .UseAllottedSize(true)
-                    .InnerSlotPadding(FVector2D(3.f, 2.f));
-
-                // Neutral chips — parser-recognized tags (D-26).
-                for (const FString& Chip : RecognizedChips)
-                {
-                    Wrap->AddSlot()
-                    [
-                        SNew(SBorder)
-                        .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
-                        .BorderBackgroundColor(FLinearColor(0.20f, 0.30f, 0.50f, 0.85f))
-                        .Padding(FMargin(5.f, 1.f))
-                        [
-                            SNew(STextBlock)
-                            .Text(FText::FromString(Chip))
-                            .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
-                            .ColorAndOpacity(FLinearColor::White)
-                        ]
-                    ];
-                }
-
-                // Warning chips — unknown / invalid tags (D-27). Tooltip carries the raw token.
-                for (const FString& Unknown : UnknownChips)
-                {
-                    const FString ChipText = FString::Printf(TEXT("@%s"), *Unknown);
-                    const FText Tooltip = FText::FromString(FString::Printf(
-                        TEXT("Unknown tag '@%s' — ignored by parser."), *Unknown));
-
-                    Wrap->AddSlot()
-                    [
-                        SNew(SBorder)
-                        .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
-                        .BorderBackgroundColor(FLinearColor(0.90f, 0.55f, 0.10f, 0.90f))
-                        .Padding(FMargin(5.f, 1.f))
-                        .ToolTipText(Tooltip)
-                        [
-                            SNew(STextBlock)
-                            .Text(FText::FromString(ChipText))
-                            .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
-                            .ColorAndOpacity(FLinearColor::White)
-                            .ToolTipText(Tooltip)
-                        ]
-                    ];
-                }
-
-                return Wrap;
-            }()
+            BuildTagChipsForItem(Item)
         ]
 
         // Col 4: Widget type badge — fixed 120px
@@ -695,6 +638,70 @@ TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
             ]
         ]
     ];
+}
+
+TSharedRef<SWidget> SPsdImportPreviewDialog::BuildTagChipsForItem(const TSharedPtr<FPsdLayerTreeItem>& Item) const
+{
+    if (!Item.IsValid())
+    {
+        return SNew(SSpacer);
+    }
+
+    const TArray<FString> RecognizedChips = ReconstructTagChips(Item->ParsedTags);
+    const TArray<FString>& UnknownChips = Item->ParsedTags.UnknownTags;
+
+    if (RecognizedChips.Num() == 0 && UnknownChips.Num() == 0)
+    {
+        return SNew(SSpacer);
+    }
+
+    TSharedRef<SWrapBox> Wrap = SNew(SWrapBox)
+        .UseAllottedSize(true)
+        .InnerSlotPadding(FVector2D(3.f, 2.f));
+
+    // Neutral chips — parser-recognized tags (D-26).
+    for (const FString& Chip : RecognizedChips)
+    {
+        Wrap->AddSlot()
+        [
+            SNew(SBorder)
+            .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
+            .BorderBackgroundColor(FLinearColor(0.20f, 0.30f, 0.50f, 0.85f))
+            .Padding(FMargin(5.f, 1.f))
+            [
+                SNew(STextBlock)
+                .Text(FText::FromString(Chip))
+                .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
+                .ColorAndOpacity(FLinearColor::White)
+            ]
+        ];
+    }
+
+    // Warning chips — unknown / invalid tags (D-27). Tooltip carries the raw token.
+    for (const FString& Unknown : UnknownChips)
+    {
+        const FString ChipText = FString::Printf(TEXT("@%s"), *Unknown);
+        const FText Tooltip = FText::FromString(FString::Printf(
+            TEXT("Unknown tag '@%s' — ignored by parser."), *Unknown));
+
+        Wrap->AddSlot()
+        [
+            SNew(SBorder)
+            .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
+            .BorderBackgroundColor(FLinearColor(0.90f, 0.55f, 0.10f, 0.90f))
+            .Padding(FMargin(5.f, 1.f))
+            .ToolTipText(Tooltip)
+            [
+                SNew(STextBlock)
+                .Text(FText::FromString(ChipText))
+                .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
+                .ColorAndOpacity(FLinearColor::White)
+                .ToolTipText(Tooltip)
+            ]
+        ];
+    }
+
+    return Wrap;
 }
 
 void SPsdImportPreviewDialog::OnGetChildren(

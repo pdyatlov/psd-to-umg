@@ -92,6 +92,10 @@ private:
     // Expand all tree items recursively
     void ExpandAll(const TArray<TSharedPtr<FPsdLayerTreeItem>>& Items);
 
+    // Build the tag-chip container (recognized + unknown) for a tree row.
+    // Returns SSpacer when Item is invalid or has no chips to display.
+    TSharedRef<SWidget> BuildTagChipsForItem(const TSharedPtr<FPsdLayerTreeItem>& Item) const;
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------

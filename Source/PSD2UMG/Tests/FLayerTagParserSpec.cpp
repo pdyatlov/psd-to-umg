@@ -299,7 +299,7 @@ void FLayerTagParserSpec::Define()
     {
         It("bUseCommonUI=true: CommonUI mapper accepts @button, vanilla Button mapper still accepts (registry priority decides)", [this]()
         {
-            UPSD2UMGSettings* Settings = UPSD2UMGSettings::GetMutableDefault<UPSD2UMGSettings>();
+            UPSD2UMGSettings* Settings = GetMutableDefault<UPSD2UMGSettings>();
             const bool bPrev = Settings->bUseCommonUI;
             Settings->bUseCommonUI = true;
 
@@ -317,7 +317,7 @@ void FLayerTagParserSpec::Define()
 
         It("bUseCommonUI=false: CommonUI mapper rejects @button; vanilla Button mapper handles it", [this]()
         {
-            UPSD2UMGSettings* Settings = UPSD2UMGSettings::GetMutableDefault<UPSD2UMGSettings>();
+            UPSD2UMGSettings* Settings = GetMutableDefault<UPSD2UMGSettings>();
             const bool bPrev = Settings->bUseCommonUI;
             Settings->bUseCommonUI = false;
 

@@ -6,6 +6,7 @@
 #include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
 #include "Generator/FWidgetBlueprintGenerator.h"
+#include "TestHelpers.h"
 #include "PSD2UMGSetting.h"
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
@@ -25,8 +26,14 @@ BEGIN_DEFINE_SPEC(FWidgetBlueprintGenSpec, "PSD2UMG.Generator", EAutomationTestF
     bool bOrigFlattenComplexEffects = false;
     FString RunId;
 
-    UWidgetBlueprint* GenerateTracked(const FPsdDocument& Doc, const TCHAR* BasePath, const TCHAR* BaseName)
+    UWidgetBlueprint* GenerateTracked(const FPsdDocument& InDoc, const TCHAR* BasePath, const TCHAR* BaseName)
     {
+        // Pitfall 5: synthetic FPsdLayer constructions don't go through PsdParser::ParseFile,
+        // so their ParsedTags are default-constructed (Type=None). Tag-dispatched mappers
+        // would reject them. Populate ParsedTags here, mirroring the parser's post-pass.
+        FPsdDocument Doc = InDoc;
+        PSD2UMG::Tests::PopulateParsedTagsForDocument(Doc);
+
         FString UniqueName = FString::Printf(TEXT("%s_%s"), BaseName, *RunId);
         FString FullPath = FString(BasePath) / UniqueName;
         CreatedWBPPaths.Add(FullPath);

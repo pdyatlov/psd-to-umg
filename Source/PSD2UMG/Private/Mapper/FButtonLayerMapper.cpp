@@ -2,6 +2,7 @@
 
 #include "Mapper/AllMappers.h"
 #include "Generator/FTextureImporter.h"
+#include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
 #include "PSD2UMGLog.h"
 
@@ -15,54 +16,47 @@ int32 FButtonLayerMapper::GetPriority() const { return 200; }
 
 bool FButtonLayerMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.Type == EPsdLayerType::Group && Layer.Name.StartsWith(TEXT("Button_"));
+    return Layer.ParsedTags.Type == EPsdTagType::Button;
+}
+
+namespace
+{
+    static bool ApplyChildBrush(
+        const FPsdLayer* Child,
+        const FString& BaseTexturePath,
+        TFunctionRef<void(const FSlateBrush&)> Apply)
+    {
+        if (!Child)
+        {
+            return false;
+        }
+        UTexture2D* Tex = FTextureImporter::ImportLayer(*Child, BaseTexturePath);
+        if (!Tex)
+        {
+            return false;
+        }
+        FSlateBrush Brush;
+        Brush.SetResourceObject(Tex);
+        Brush.ImageSize = FVector2D(static_cast<float>(Child->PixelWidth), static_cast<float>(Child->PixelHeight));
+        Apply(Brush);
+        return true;
+    }
 }
 
 UWidget* FButtonLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree)
 {
-    UButton* Btn = Tree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*Layer.Name));
+    UButton* Btn = Tree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*Layer.ParsedTags.CleanName));
 
     FButtonStyle Style = FButtonStyle::GetDefault();
 
     const FString PsdName = FPaths::GetBaseFilename(Doc.SourcePath);
     const FString BaseTexturePath = FTextureImporter::BuildTexturePath(PsdName);
 
-    for (const FPsdLayer& Child : Layer.Children)
-    {
-        if (Child.Type != EPsdLayerType::Image)
-        {
-            continue;
-        }
-
-        UTexture2D* Tex = FTextureImporter::ImportLayer(Child, BaseTexturePath);
-        if (!Tex)
-        {
-            continue;
-        }
-
-        FSlateBrush Brush;
-        Brush.SetResourceObject(Tex);
-        Brush.ImageSize = FVector2D(static_cast<float>(Child.PixelWidth), static_cast<float>(Child.PixelHeight));
-
-        const FString ChildNameLower = Child.Name.ToLower();
-        if (ChildNameLower.EndsWith(TEXT("_hovered")) || ChildNameLower.EndsWith(TEXT("_hover")))
-        {
-            Style.SetHovered(Brush);
-        }
-        else if (ChildNameLower.EndsWith(TEXT("_pressed")) || ChildNameLower.EndsWith(TEXT("_press")))
-        {
-            Style.SetPressed(Brush);
-        }
-        else if (ChildNameLower.EndsWith(TEXT("_disabled")))
-        {
-            Style.SetDisabled(Brush);
-        }
-        else
-        {
-            // _Normal, _Bg, or first image child fallback
-            Style.SetNormal(Brush);
-        }
-    }
+    // D-12/D-13: explicit @state child match first; Normal falls back to first untagged Image.
+    ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Normal),   BaseTexturePath, [&](const FSlateBrush& B){ Style.SetNormal(B); });
+    ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Hover),    BaseTexturePath, [&](const FSlateBrush& B){ Style.SetHovered(B); });
+    ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Pressed),  BaseTexturePath, [&](const FSlateBrush& B){ Style.SetPressed(B); });
+    ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Disabled), BaseTexturePath, [&](const FSlateBrush& B){ Style.SetDisabled(B); });
 
     Btn->SetStyle(Style);
     return Btn;

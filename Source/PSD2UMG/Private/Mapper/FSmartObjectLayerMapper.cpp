@@ -16,7 +16,10 @@ int32 FSmartObjectLayerMapper::GetPriority() const { return 150; }
 
 bool FSmartObjectLayerMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.Type == EPsdLayerType::SmartObject;
+    // Native PSD smart-object layers always dispatch here; @smartobject lets a
+    // designer force the smart-object path on a non-smartobject group too.
+    return Layer.Type == EPsdLayerType::SmartObject
+        || Layer.ParsedTags.Type == EPsdTagType::SmartObject;
 }
 
 UWidget* FSmartObjectLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree)
@@ -24,14 +27,16 @@ UWidget* FSmartObjectLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument
     // --- Attempt recursive import as a child Widget Blueprint ---
     const FString& ParentPackagePath = FSmartObjectImporter::GetCurrentPackagePath();
 
-    UWidgetBlueprint* ChildWBP = FSmartObjectImporter::ImportAsChildWBP(Layer, ParentPackagePath, 0);
+    UWidgetBlueprint* ChildWBP = FSmartObjectImporter::ImportAsChildWBP(
+        Layer, ParentPackagePath, 0, Layer.ParsedTags.SmartObjectTypeName);
 
     if (ChildWBP && ChildWBP->GeneratedClass)
     {
         // Create a UUserWidget referencing the child WBP's generated class
+        TSubclassOf<UUserWidget> UserWidgetClass = *ChildWBP->GeneratedClass;
         UUserWidget* UserWidget = Tree->ConstructWidget<UUserWidget>(
-            ChildWBP->GeneratedClass,
-            FName(*Layer.Name));
+            UserWidgetClass,
+            FName(*Layer.ParsedTags.CleanName));
 
         if (UserWidget)
         {
@@ -69,7 +74,7 @@ UWidget* FSmartObjectLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument
         return nullptr;
     }
 
-    UImage* Img = Tree->ConstructWidget<UImage>(UImage::StaticClass(), FName(*Layer.Name));
+    UImage* Img = Tree->ConstructWidget<UImage>(UImage::StaticClass(), FName(*Layer.ParsedTags.CleanName));
     Img->SetBrushFromTexture(Tex, /*bMatchSize=*/true);
     FSlateBrush Brush = Img->GetBrush();
     Brush.DrawAs = ESlateBrushDrawType::Image;

@@ -14,12 +14,11 @@ int32 FVariantsSuffixMapper::GetPriority() const { return 200; }
 
 bool FVariantsSuffixMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.Type == EPsdLayerType::Group
-        && Layer.Name.EndsWith(TEXT("_variants"));
+    return Layer.ParsedTags.bIsVariants;
 }
 
 UWidget* FVariantsSuffixMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
 {
-    UE_LOG(LogPSD2UMG, Log, TEXT("FVariantsSuffixMapper: Creating UWidgetSwitcher for '%s' (%d children)"), *Layer.Name, Layer.Children.Num());
-    return Tree->ConstructWidget<UWidgetSwitcher>(UWidgetSwitcher::StaticClass(), FName(*Layer.Name));
+    UE_LOG(LogPSD2UMG, Log, TEXT("FVariantsSuffixMapper: Creating UWidgetSwitcher for '%s' (%d children)"), *Layer.ParsedTags.CleanName, Layer.Children.Num());
+    return Tree->ConstructWidget<UWidgetSwitcher>(UWidgetSwitcher::StaticClass(), FName(*Layer.ParsedTags.CleanName));
 }

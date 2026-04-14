@@ -35,7 +35,8 @@ const FString& FSmartObjectImporter::GetCurrentPackagePath()
 UWidgetBlueprint* FSmartObjectImporter::ImportAsChildWBP(
     const FPsdLayer& SmartObjLayer,
     const FString& ParentWbpPackagePath,
-    int32 /*CurrentDepth*/)
+    int32 /*CurrentDepth*/,
+    const TOptional<FString>& ExplicitTypeName)
 {
     const UPSD2UMGSettings* Settings = UPSD2UMGSettings::Get();
     if (!Settings)
@@ -85,13 +86,26 @@ UWidgetBlueprint* FSmartObjectImporter::ImportAsChildWBP(
     if (!bParsed)
     {
         UE_LOG(LogPSD2UMG, Warning,
-            TEXT("FSmartObjectImporter: Failed to parse Smart Object '%s' from '%s'; falling back to rasterized image. Errors: %d"),
-            *SmartObjLayer.Name, *ResolvedPath, InnerDiag.Errors.Num());
+            TEXT("FSmartObjectImporter: Failed to parse Smart Object '%s' from '%s'; falling back to rasterized image."),
+            *SmartObjLayer.Name, *ResolvedPath);
         return nullptr;
     }
 
-    // Child WBP goes into the same asset directory as the parent, named after the layer
-    const FString ChildAssetName = FString::Printf(TEXT("WBP_SO_%s"), *SmartObjLayer.Name);
+    // Child WBP goes into the same asset directory as the parent, named after either
+    // the explicit @smartobject:TypeName tag value (D-11) or, falling back, the layer name.
+    FString TypeNameSource;
+    if (ExplicitTypeName.IsSet() && !ExplicitTypeName.GetValue().IsEmpty())
+    {
+        TypeNameSource = ExplicitTypeName.GetValue();
+        UE_LOG(LogPSD2UMG, Log,
+            TEXT("FSmartObjectLayerMapper: Using explicit SmartObject type name '%s' from @smartobject tag (layer='%s')"),
+            *TypeNameSource, *SmartObjLayer.Name);
+    }
+    else
+    {
+        TypeNameSource = SmartObjLayer.Name;
+    }
+    const FString ChildAssetName = FString::Printf(TEXT("WBP_SO_%s"), *TypeNameSource);
     // Sanitise name: replace spaces with underscores
     const FString SafeAssetName = ChildAssetName.Replace(TEXT(" "), TEXT("_"));
 

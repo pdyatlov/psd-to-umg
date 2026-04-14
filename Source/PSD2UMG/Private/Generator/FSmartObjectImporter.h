@@ -1,6 +1,7 @@
 // Copyright 2018-2021 - John snow wind
 #pragma once
 #include "CoreMinimal.h"
+#include "Misc/Optional.h"
 
 struct FPsdLayer;
 class UWidgetBlueprint;
@@ -23,7 +24,8 @@ public:
     static UWidgetBlueprint* ImportAsChildWBP(
         const FPsdLayer& SmartObjLayer,
         const FString& ParentWbpPackagePath,
-        int32 CurrentDepth);
+        int32 CurrentDepth,
+        const TOptional<FString>& ExplicitTypeName = {});
 
     /** Called by FWidgetBlueprintGenerator::Generate() before mapping layers so
      *  mappers can obtain the current WBP package path without interface changes. */

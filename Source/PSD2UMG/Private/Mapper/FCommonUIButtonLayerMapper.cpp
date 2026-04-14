@@ -1,7 +1,7 @@
 // Copyright 2018-2021 - John snow wind
 
-#include "Mapper/AllMappers.h"
 #include "Mapper/FCommonUIButtonLayerMapper.h"
+#include "Mapper/AllMappers.h"
 #include "Generator/FTextureImporter.h"
 #include "Parser/PsdTypes.h"
 #include "PSD2UMGSetting.h"
@@ -28,7 +28,7 @@ bool FCommonUIButtonLayerMapper::CanMap(const FPsdLayer& Layer) const
     {
         return false;
     }
-    return Layer.Type == EPsdLayerType::Group && Layer.Name.StartsWith(TEXT("Button_"), ESearchCase::IgnoreCase);
+    return Layer.ParsedTags.Type == EPsdTagType::Button;
 }
 
 UWidget* FCommonUIButtonLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree)
@@ -40,70 +40,23 @@ UWidget* FCommonUIButtonLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocum
         return nullptr;
     }
 
-    const FString CleanName = Layer.Name;
+    const FString& CleanName = Layer.ParsedTags.CleanName;
     UCommonButtonBase* Btn = Tree->ConstructWidget<UCommonButtonBase>(UCommonButtonBase::StaticClass(), FName(*CleanName));
     if (!Btn)
     {
         return nullptr;
     }
 
-    // Apply child state brushes (same pattern as FButtonLayerMapper)
-    FButtonStyle Style = FButtonStyle::GetDefault();
-    const FString PsdName = FPaths::GetBaseFilename(Doc.SourcePath);
-    const FString BaseTexturePath = FTextureImporter::BuildTexturePath(PsdName);
+    // CommonUI buttons use a UCommonButtonStyle asset — per-state FButtonStyle brushes
+    // don't apply. Child image layers are imported as textures but style assignment
+    // is left to the designer via the UCommonButtonStyle asset in the Blueprint.
 
-    for (const FPsdLayer& Child : Layer.Children)
+    // Bind input action via @ia:IA_Confirm tag (replaces the legacy [IA_X] bracket syntax).
+    if (Layer.ParsedTags.InputAction.IsSet())
     {
-        if (Child.Type != EPsdLayerType::Image)
-        {
-            continue;
-        }
-
-        UTexture2D* Tex = FTextureImporter::ImportLayer(Child, BaseTexturePath);
-        if (!Tex)
-        {
-            continue;
-        }
-
-        FSlateBrush Brush;
-        Brush.SetResourceObject(Tex);
-        Brush.ImageSize = FVector2D(static_cast<float>(Child.PixelWidth), static_cast<float>(Child.PixelHeight));
-
-        const FString ChildNameLower = Child.Name.ToLower();
-        if (ChildNameLower.EndsWith(TEXT("_hovered")) || ChildNameLower.EndsWith(TEXT("_hover")))
-        {
-            Style.SetHovered(Brush);
-        }
-        else if (ChildNameLower.EndsWith(TEXT("_pressed")) || ChildNameLower.EndsWith(TEXT("_press")))
-        {
-            Style.SetPressed(Brush);
-        }
-        else if (ChildNameLower.EndsWith(TEXT("_disabled")))
-        {
-            Style.SetDisabled(Brush);
-        }
-        else
-        {
-            // _Normal, _Bg, or first image child fallback
-            Style.SetNormal(Brush);
-        }
-    }
-
-    Btn->SetStyle(Style);
-
-    // Parse input action from layer name bracket syntax: Button_Confirm[IA_Confirm]
-    const FString& LayerName = Layer.Name;
-    int32 BracketOpen = INDEX_NONE;
-    int32 BracketClose = INDEX_NONE;
-    LayerName.FindChar(TEXT('['), BracketOpen);
-    LayerName.FindChar(TEXT(']'), BracketClose);
-
-    if (BracketOpen != INDEX_NONE && BracketClose != INDEX_NONE && BracketClose > BracketOpen + 1)
-    {
-        const FString IAName = LayerName.Mid(BracketOpen + 1, BracketClose - BracketOpen - 1);
+        const FString& IAName = Layer.ParsedTags.InputAction.GetValue();
         const FString SearchPath = UPSD2UMGSettings::Get()->InputActionSearchPath.Path;
 
-        // Search asset registry for a UInputAction asset with the given name
         FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
         IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
 

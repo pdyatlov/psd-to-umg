@@ -2,6 +2,7 @@
 
 #include "Mapper/AllMappers.h"
 #include "Generator/FTextureImporter.h"
+#include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
 #include "PSD2UMGLog.h"
 
@@ -15,45 +16,57 @@ int32 FProgressLayerMapper::GetPriority() const { return 200; }
 
 bool FProgressLayerMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.Type == EPsdLayerType::Group && Layer.Name.StartsWith(TEXT("Progress_"));
+    return Layer.ParsedTags.Type == EPsdTagType::Progress;
+}
+
+namespace
+{
+    static bool BrushFromChild(
+        const FPsdLayer* Child,
+        const FString& BaseTexturePath,
+        FSlateBrush& OutBrush)
+    {
+        if (!Child)
+        {
+            return false;
+        }
+        UTexture2D* Tex = FTextureImporter::ImportLayer(*Child, BaseTexturePath);
+        if (!Tex)
+        {
+            return false;
+        }
+        OutBrush.SetResourceObject(Tex);
+        OutBrush.ImageSize = FVector2D(static_cast<float>(Child->PixelWidth), static_cast<float>(Child->PixelHeight));
+        return true;
+    }
 }
 
 UWidget* FProgressLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree)
 {
-    UProgressBar* Bar = Tree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), FName(*Layer.Name));
+    UProgressBar* Bar = Tree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), FName(*Layer.ParsedTags.CleanName));
 
     FProgressBarStyle Style = FProgressBarStyle::GetDefault();
 
     const FString PsdName = FPaths::GetBaseFilename(Doc.SourcePath);
     const FString BaseTexturePath = FTextureImporter::BuildTexturePath(PsdName);
 
-    for (const FPsdLayer& Child : Layer.Children)
+    // D-12: child with @state:fill -> FillImage; @state:bg (or first untagged Image) -> BackgroundImage.
+    FSlateBrush FillBrush;
+    if (BrushFromChild(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Fill), BaseTexturePath, FillBrush))
     {
-        if (Child.Type != EPsdLayerType::Image)
-        {
-            continue;
-        }
+        Style.FillImage = FillBrush;
+    }
 
-        UTexture2D* Tex = FTextureImporter::ImportLayer(Child, BaseTexturePath);
-        if (!Tex)
-        {
-            continue;
-        }
-
-        FSlateBrush Brush;
-        Brush.SetResourceObject(Tex);
-        Brush.ImageSize = FVector2D(static_cast<float>(Child.PixelWidth), static_cast<float>(Child.PixelHeight));
-
-        const FString ChildNameLower = Child.Name.ToLower();
-        if (ChildNameLower.EndsWith(TEXT("_fill")) || ChildNameLower.EndsWith(TEXT("_foreground")))
-        {
-            Style.FillImage = Brush;
-        }
-        else
-        {
-            // _BG, _Background, or first child fallback
-            Style.BackgroundImage = Brush;
-        }
+    FSlateBrush BgBrush;
+    const FPsdLayer* BgChild = FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Bg);
+    if (!BgChild)
+    {
+        // Fall back to the first untagged Image child as background.
+        BgChild = FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Normal);
+    }
+    if (BrushFromChild(BgChild, BaseTexturePath, BgBrush))
+    {
+        Style.BackgroundImage = BgBrush;
     }
 
     Bar->SetWidgetStyle(Style);

@@ -4,8 +4,10 @@
 
 #include "Misc/AutomationTest.h"
 
+#include "Mapper/AllMappers.h"
 #include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
+#include "PSD2UMGSetting.h"
 
 /**
  * Pure unit tests for FLayerTagParser (Phase 9 Wave 0).
@@ -289,6 +291,44 @@ void FLayerTagParserSpec::Define()
 
             const FPsdLayer* Found = FLayerTagParser::FindChildByState(Children, EPsdStateTag::Pressed);
             TestNull(TEXT("Found"), Found);
+        });
+    });
+
+    Describe("R-06 -- CommonUI priority gate", [this]()
+    {
+        It("bUseCommonUI=true: CommonUI mapper accepts @button, vanilla Button mapper still accepts (registry priority decides)", [this]()
+        {
+            UPSD2UMGSettings* Settings = UPSD2UMGSettings::GetMutableDefault<UPSD2UMGSettings>();
+            const bool bPrev = Settings->bUseCommonUI;
+            Settings->bUseCommonUI = true;
+
+            FPsdLayer L; L.Type = EPsdLayerType::Group; L.Name = TEXT("Confirm @button");
+            { FString D; L.ParsedTags = FLayerTagParser::Parse(L.Name, L.Type, 0, D); }
+
+            FCommonUIButtonLayerMapper CommonUI;
+            FButtonLayerMapper Vanilla;
+            TestTrue(TEXT("CommonUI accepts when bUseCommonUI=true"), CommonUI.CanMap(L));
+            TestTrue(TEXT("Vanilla also accepts; registry priority (210 > 200) selects CommonUI"), Vanilla.CanMap(L));
+            TestTrue(TEXT("CommonUI priority wins"), CommonUI.GetPriority() > Vanilla.GetPriority());
+
+            Settings->bUseCommonUI = bPrev;
+        });
+
+        It("bUseCommonUI=false: CommonUI mapper rejects @button; vanilla Button mapper handles it", [this]()
+        {
+            UPSD2UMGSettings* Settings = UPSD2UMGSettings::GetMutableDefault<UPSD2UMGSettings>();
+            const bool bPrev = Settings->bUseCommonUI;
+            Settings->bUseCommonUI = false;
+
+            FPsdLayer L; L.Type = EPsdLayerType::Group; L.Name = TEXT("Confirm @button");
+            { FString D; L.ParsedTags = FLayerTagParser::Parse(L.Name, L.Type, 0, D); }
+
+            FCommonUIButtonLayerMapper CommonUI;
+            FButtonLayerMapper Vanilla;
+            TestFalse(TEXT("CommonUI rejects when bUseCommonUI=false"), CommonUI.CanMap(L));
+            TestTrue(TEXT("Vanilla still accepts"), Vanilla.CanMap(L));
+
+            Settings->bUseCommonUI = bPrev;
         });
     });
 }

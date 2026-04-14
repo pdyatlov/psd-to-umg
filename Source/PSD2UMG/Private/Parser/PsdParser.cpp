@@ -160,7 +160,12 @@ namespace PSD2UMG::Parser::Internal
 		}
 		catch (const std::exception& e)
 		{
-			OutDiag.AddError(OutLayer.Name,
+			// Vector smart objects (.ai, unsupported LayerType) and layers with
+			// broken linked files throw here. These are not fatal — the layer
+			// simply has no pixel data and downstream code falls back to bounds-
+			// only placement or rasterized preview. Keeping this at Warning
+			// allows the import to proceed and the WBP to be generated.
+			OutDiag.AddWarning(OutLayer.Name,
 				FString::Printf(TEXT("Failed to extract image pixels: %s"), UTF8_TO_TCHAR(e.what())));
 		}
 	}
@@ -574,6 +579,37 @@ namespace PSD2UMG::Parser::Internal
 		OutDiag.AddWarning(OutLayer.Name,
 			TEXT("Unknown layer kind; skipped (no image/text/group dispatch)."));
 	}
+	/**
+	 * Phase 9: walk the parsed tree and populate FPsdLayer::ParsedTags via
+	 * FLayerTagParser. Done as a post-pass so that the Type-dependent default
+	 * inference (D-02) sees the final EPsdLayerType set by ConvertLayerRecursive.
+	 *
+	 * LayerIndex is the child's index within its parent (used for D-21 fallback).
+	 */
+	void PopulateParsedTagsRecursive(
+		FPsdLayer& Layer,
+		int32 LayerIndex,
+		const FString& ParentPath,
+		FPsdParseDiagnostics& OutDiag)
+	{
+		FString Diag;
+		Layer.ParsedTags = FLayerTagParser::Parse(Layer.Name, Layer.Type, LayerIndex, Diag);
+
+		const FString FullPath = ParentPath.IsEmpty()
+			? Layer.Name
+			: FString::Printf(TEXT("%s/%s"), *ParentPath, *Layer.Name);
+
+		if (!Diag.IsEmpty())
+		{
+			UE_LOG(LogPSD2UMG, Warning, TEXT("Layer '%s': %s"), *FullPath, *Diag);
+			OutDiag.AddWarning(Layer.Name, Diag);
+		}
+
+		for (int32 i = 0; i < Layer.Children.Num(); ++i)
+		{
+			PopulateParsedTagsRecursive(Layer.Children[i], i, FullPath, OutDiag);
+		}
+	}
 } // namespace PSD2UMG::Parser::Internal
 
 namespace PSD2UMG::Parser
@@ -604,6 +640,12 @@ namespace PSD2UMG::Parser
 			{
 				FPsdLayer& ChildOut = OutDoc.RootLayers.AddDefaulted_GetRef();
 				Internal::ConvertLayerRecursive(Child, ChildOut, OutDiag);
+			}
+
+			// Phase 9: populate FPsdLayer::ParsedTags after Type is known (post-pass).
+			for (int32 i = 0; i < OutDoc.RootLayers.Num(); ++i)
+			{
+				Internal::PopulateParsedTagsRecursive(OutDoc.RootLayers[i], i, FString(), OutDiag);
 			}
 		}
 		catch (const std::exception& e)

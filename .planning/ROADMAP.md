@@ -170,3 +170,16 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 | 6. Advanced Layout | 3/3 | Complete   | 2026-04-10 |
 | 7. Editor UI, Preview & Settings | 5/5 | Complete   | 2026-04-10 |
 | 8. Testing, Documentation & Release | 3/3 | Complete    | 2026-04-13 |
+
+### Phase 9: Unified layer naming convention (tag-based)
+
+**Goal:** Replace all ad-hoc prefix/suffix/bracket PSD-layer-name parsing with a single `@`-tag grammar parsed by a central `FLayerTagParser` and consumed by every mapper, the anchor calculator, the animation builder, the SmartObject importer, and the preview dialog. Hard cutover — no backwards compatibility. Retag Phase 8 fixture PSDs, ship a formal grammar spec and migration guide, rewrite README naming section.
+**Requirements**: TAG-01, TAG-02, TAG-03, TAG-04, TAG-05, TAG-06, TAG-07, TAG-08
+**Depends on:** Phase 8
+**Plans:** 4 plans
+
+Plans:
+- [x] 09-01-PLAN.md — FLayerTagParser + FParsedLayerTags + grammar spec + parser unit tests (Wave 1)
+- [ ] 09-02-PLAN.md — Rewrite all mappers/AnchorCalculator/AnimationBuilder/PreviewDialog to consume ParsedTags; resolve reimport identity-key strategy (Wave 2)
+- [ ] 09-03-PLAN.md — Retag 5 fixture PSDs + update spec assertions; bring automation suite back to green (Wave 3)
+- [ ] 09-04-PLAN.md — Ship Migration-PrefixToTag.md + rewrite README naming section (Wave 4)

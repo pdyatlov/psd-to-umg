@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-04-13T11:07:55.867Z"
-last_activity: 2026-04-13
+status: executing
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-04-14T12:32:29.218Z"
+last_activity: 2026-04-14
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 8
-  total_plans: 27
-  completed_plans: 27
+  total_plans: 31
+  completed_plans: 28
   percent: 36
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 08 — testing-documentation-release
+**Current focus:** Phase 09 — unified-layer-naming-convention-tag-based
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-13
+Phase: 09 (unified-layer-naming-convention-tag-based) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-04-14
 
 Progress: [████░░░░░░] 36%
 
@@ -74,6 +74,7 @@ Progress: [████░░░░░░] 36%
 | Phase 07 P05 | 15m | 2 tasks | 7 files |
 | Phase 08-testing-documentation-release P01 | 5m | 1 tasks | 1 files |
 | Phase 08 P03 | 5m | 1 tasks | 1 files |
+| Phase 09-unified-layer-naming-convention-tag-based P01 | 25m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,12 @@ Recent decisions affecting current work:
 - [Phase 07]: FReimportManager auto-registers on FReimportHandler construction; module stores TUniquePtr for lifetime
 - [Phase 07]: Orphan widgets (deleted PSD layers) kept in WidgetTree per D-07 — Update() never removes them
 - [Phase 08]: DOC-03 (CHANGELOG) skipped per D-06; DOC-02 merged inline into README Layer Naming section; fixture PSDs replace example project per D-08
+- [Phase 09-unified-layer-naming-convention-tag-based]: FLayerTagParser implemented as pure function with OutDiagnostics out-param; ParsedTags populated as post-pass after ConvertLayerRecursive so D-02 default-type sees final EPsdLayerType
+- [Phase 09-unified-layer-naming-convention-tag-based]: @9s shorthand defaults to {16,16,16,16, bExplicit=false} matching F9SliceImageLayerMapper historical default (D-07)
+
+### Roadmap Evolution
+
+- Phase 9 added: Unified layer naming convention (tag-based)
 
 ### Pending Todos
 
@@ -115,6 +122,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-13T11:05:35.019Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-04-14T12:32:29.211Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None

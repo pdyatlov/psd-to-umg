@@ -665,7 +665,7 @@ TSharedRef<SWidget> SPsdImportPreviewDialog::BuildTagChipsForItem(const TSharedP
         Wrap->AddSlot()
         [
             SNew(SBorder)
-            .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
+            .BorderImage(FAppStyle::GetBrush(TEXT("WhiteBrush")))
             .BorderBackgroundColor(FLinearColor(0.15f, 0.45f, 0.95f, 0.85f))
             .Padding(FMargin(5.f, 1.f))
             [
@@ -687,8 +687,8 @@ TSharedRef<SWidget> SPsdImportPreviewDialog::BuildTagChipsForItem(const TSharedP
         Wrap->AddSlot()
         [
             SNew(SBorder)
-            .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
-            .BorderBackgroundColor(FLinearColor(0.90f, 0.55f, 0.10f, 0.90f))
+            .BorderImage(FAppStyle::GetBrush(TEXT("WhiteBrush")))
+            .BorderBackgroundColor(FLinearColor(0.85f, 0.15f, 0.15f, 0.90f))
             .Padding(FMargin(5.f, 1.f))
             .ToolTipText(Tooltip)
             [

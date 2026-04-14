@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 09-03-PLAN.md (fixture PSD retag + spec alignment)
-last_updated: "2026-04-14T15:30:43.979Z"
+status: verifying
+stopped_at: Completed 09-04-PLAN.md (migration guide + README rewrite) — Phase 9 complete
+last_updated: "2026-04-14T15:36:19.376Z"
 last_activity: 2026-04-14
 progress:
   total_phases: 9
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 31
-  completed_plans: 30
+  completed_plans: 31
   percent: 97
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 09 (unified-layer-naming-convention-tag-based) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-14
 
 Progress: [██████████] 97%
@@ -77,6 +77,7 @@ Progress: [██████████] 97%
 | Phase 09-unified-layer-naming-convention-tag-based P01 | 25m | 2 tasks | 6 files |
 | Phase 09-unified-layer-naming-convention-tag-based P02 | 35m | 4 tasks | 21 files |
 | Phase 09-unified-layer-naming-convention-tag-based P03 | 3h | 4 tasks | 6 files |
+| Phase 09-unified-layer-naming-convention-tag-based P04 | 5m | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,8 @@ Recent decisions affecting current work:
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-02] FProgressLayerMapper falls back from FindChildByState(Bg) to FindChildByState(Normal) so single-untagged-image progress bars still produce a background brush.
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-03] Effects.psd and Typography.psd retained pre-Phase-9 names — their  separators are descriptive, not legacy dispatch prefixes; grammar has no matching @-tag so no rename needed
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-03] @9s tag attaches to the pixel layer, not its containing group (F9SliceImageLayerMapper consumes per-image)
+- [Phase 09-unified-layer-naming-convention-tag-based]: [09-04] Migration guide documents delete-and-reimport as the supported path for pre-Phase-9 WBPs (option-a ParsedTags.CleanName identity from Plan 02 surfaced as designer-facing guidance)
+- [Phase 09-unified-layer-naming-convention-tag-based]: [09-04] Button_NN retained in README as Phase-9 parser auto-name (D-21), not legacy dispatch; benign grep hit
 
 ### Roadmap Evolution
 
@@ -129,6 +132,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T15:30:20.585Z
-Stopped at: Completed 09-03-PLAN.md (fixture PSD retag + spec alignment)
+Last session: 2026-04-14T15:36:19.371Z
+Stopped at: Completed 09-04-PLAN.md (migration guide + README rewrite) — Phase 9 complete
 Resume file: None

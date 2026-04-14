@@ -2,6 +2,7 @@
 
 #include "UI/SPsdImportPreviewDialog.h"
 
+#include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
 
 #include "Widgets/SBoxPanel.h"
@@ -11,8 +12,10 @@
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSpacer.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Views/STableRow.h"
 #include "Widgets/Views/STreeView.h"
@@ -31,38 +34,40 @@
 
 FString SPsdImportPreviewDialog::InferWidgetTypeName(const FPsdLayer& Layer)
 {
-    const FString& Name = Layer.Name;
-
-    // Name-prefix heuristics (same conventions as mapper priority system)
-    if (Name.StartsWith(TEXT("Button_"), ESearchCase::IgnoreCase) ||
-        Name.StartsWith(TEXT("Btn_"), ESearchCase::IgnoreCase))
+    // Tag-based dispatch (Phase 9 D-15 hard cutover — no legacy prefix fallback).
+    if (Layer.ParsedTags.bIsVariants)
     {
-        return TEXT("Button");
-    }
-    if (Name.StartsWith(TEXT("Progress_"), ESearchCase::IgnoreCase))
-    {
-        return TEXT("ProgressBar");
-    }
-    if (Name.StartsWith(TEXT("List_"), ESearchCase::IgnoreCase))
-    {
-        return TEXT("ListView");
-    }
-    if (Name.StartsWith(TEXT("Tile_"), ESearchCase::IgnoreCase))
-    {
-        return TEXT("TileView");
+        return TEXT("WidgetSwitcher");
     }
 
-    switch (Layer.Type)
+    switch (Layer.ParsedTags.Type)
     {
-    case EPsdLayerType::Text:
-        return TEXT("TextBlock");
-    case EPsdLayerType::Group:
-        return TEXT("CanvasPanel");
-    case EPsdLayerType::Image:
-    case EPsdLayerType::SmartObject:
-        return TEXT("Image");
+    case EPsdTagType::Button:      return TEXT("Button");
+    case EPsdTagType::Progress:    return TEXT("ProgressBar");
+    case EPsdTagType::List:        return TEXT("ListView");
+    case EPsdTagType::Tile:        return TEXT("TileView");
+    case EPsdTagType::HBox:        return TEXT("HorizontalBox");
+    case EPsdTagType::VBox:        return TEXT("VerticalBox");
+    case EPsdTagType::Overlay:     return TEXT("Overlay");
+    case EPsdTagType::ScrollBox:   return TEXT("ScrollBox");
+    case EPsdTagType::Slider:      return TEXT("Slider");
+    case EPsdTagType::CheckBox:    return TEXT("CheckBox");
+    case EPsdTagType::Input:       return TEXT("EditableTextBox");
+    case EPsdTagType::SmartObject: return TEXT("UserWidget");
+    case EPsdTagType::Canvas:      return TEXT("CanvasPanel");
+    case EPsdTagType::Image:       return TEXT("Image");
+    case EPsdTagType::Text:        return TEXT("TextBlock");
+    case EPsdTagType::None:
     default:
-        return TEXT("Unknown");
+        // Fallback when no tag yielded a Type (e.g. Unknown PSD layer kind).
+        switch (Layer.Type)
+        {
+        case EPsdLayerType::Text:        return TEXT("TextBlock");
+        case EPsdLayerType::Group:       return TEXT("CanvasPanel");
+        case EPsdLayerType::Image:       return TEXT("Image");
+        case EPsdLayerType::SmartObject: return TEXT("Image");
+        default:                         return TEXT("Unknown");
+        }
     }
 }
 
@@ -132,9 +137,52 @@ TArray<TSharedPtr<FPsdLayerTreeItem>> SPsdImportPreviewDialog::BuildTreeFromDocu
 void SPsdImportPreviewDialog::Construct(const FArguments& InArgs)
 {
     RootItems    = InArgs._RootItems;
+    Diagnostics  = InArgs._Diagnostics;
     bIsReimport  = InArgs._bIsReimport;
     OnCancelled  = InArgs._OnCancelled;
     OnConfirmed  = InArgs._OnConfirmed;
+
+    // Build diagnostics list (warnings + errors) for the expandable section
+    int32 WarningCount = 0;
+    int32 ErrorCount = 0;
+    for (const FPsdDiagnostic& D : Diagnostics)
+    {
+        if (D.Severity == EPsdDiagnosticSeverity::Warning) { ++WarningCount; }
+        else if (D.Severity == EPsdDiagnosticSeverity::Error) { ++ErrorCount; }
+    }
+    const bool bHasDiagnostics = (WarningCount + ErrorCount) > 0;
+
+    TSharedRef<SVerticalBox> DiagList = SNew(SVerticalBox);
+    if (bHasDiagnostics)
+    {
+        for (const FPsdDiagnostic& D : Diagnostics)
+        {
+            if (D.Severity == EPsdDiagnosticSeverity::Info) { continue; }
+
+            const bool bIsError = (D.Severity == EPsdDiagnosticSeverity::Error);
+            const FLinearColor Color = bIsError
+                ? FLinearColor(0.95f, 0.35f, 0.25f, 1.f)
+                : FLinearColor(0.95f, 0.80f, 0.25f, 1.f);
+            const FString Prefix = bIsError ? TEXT("[ERROR] ") : TEXT("[WARN]  ");
+            const FString Line = D.LayerName.IsEmpty()
+                ? FString::Printf(TEXT("%s%s"), *Prefix, *D.Message)
+                : FString::Printf(TEXT("%s%s: %s"), *Prefix, *D.LayerName, *D.Message);
+
+            DiagList->AddSlot()
+                .AutoHeight()
+                .Padding(FMargin(4.f, 1.f))
+                [
+                    SNew(STextBlock)
+                    .Text(FText::FromString(Line))
+                    .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
+                    .ColorAndOpacity(Color)
+                    .AutoWrapText(true)
+                ];
+        }
+    }
+
+    const FText DiagHeader = FText::FromString(FString::Printf(
+        TEXT("Diagnostics — %d warnings, %d errors"), WarningCount, ErrorCount));
 
     // Build tree view
     SAssignNew(TreeView, STreeView<TSharedPtr<FPsdLayerTreeItem>>)
@@ -174,6 +222,31 @@ void SPsdImportPreviewDialog::Construct(const FArguments& InArgs)
                 + SScrollBox::Slot()
                 [
                     TreeView.ToSharedRef()
+                ]
+            ]
+        ]
+
+        // ---------------------------------------------------------------
+        // Slot A2 — Diagnostics (collapsible, only if any warnings/errors)
+        // ---------------------------------------------------------------
+        + SVerticalBox::Slot()
+        .AutoHeight()
+        .Padding(FMargin(8.f, 0.f, 8.f, 4.f))
+        [
+            SNew(SExpandableArea)
+            .Visibility(bHasDiagnostics ? EVisibility::Visible : EVisibility::Collapsed)
+            .InitiallyCollapsed(ErrorCount == 0)  // auto-open when there are errors
+            .AreaTitle(DiagHeader)
+            .BodyContent()
+            [
+                SNew(SBox)
+                .MaxDesiredHeight(160.f)
+                [
+                    SNew(SScrollBox)
+                    + SScrollBox::Slot()
+                    [
+                        DiagList
+                    ]
                 ]
             ]
         ]
@@ -443,7 +516,7 @@ void SPsdImportPreviewDialog::SetChildrenChecked(
 }
 
 void SPsdImportPreviewDialog::OnCheckStateChanged(
-    TSharedPtr<FPsdLayerTreeItem> Item, ECheckBoxState NewState)
+    ECheckBoxState NewState, TSharedPtr<FPsdLayerTreeItem> Item)
 {
     if (!Item.IsValid()) return;
 

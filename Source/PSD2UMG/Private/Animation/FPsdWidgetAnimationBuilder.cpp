@@ -3,7 +3,7 @@
 #include "Animation/FPsdWidgetAnimationBuilder.h"
 
 #include "Animation/WidgetAnimation.h"
-#include "Blueprint/WidgetBlueprint.h"
+#include "WidgetBlueprint.h"
 
 #include "MovieScene.h"
 #include "Tracks/MovieSceneFloatTrack.h"
@@ -72,7 +72,7 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateOpacityFade(
         RF_Transactional | RF_Public);
 
     UMovieScene* Scene = CreateMovieScene(WBP, DurationSec);
-    Anim->SetMovieScene(Scene);
+    Anim->MovieScene = Scene;
 
     const FGuid ObjectGuid = Scene->AddPossessable(TargetWidgetName.ToString(), UObject::StaticClass());
 
@@ -109,7 +109,7 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateScaleAnim(
         RF_Transactional | RF_Public);
 
     UMovieScene* Scene = CreateMovieScene(WBP, DurationSec);
-    Anim->SetMovieScene(Scene);
+    Anim->MovieScene = Scene;
 
     const FGuid ObjectGuid = Scene->AddPossessable(TargetWidgetName.ToString(), UObject::StaticClass());
 
@@ -135,26 +135,28 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateScaleAnim(
 void FPsdWidgetAnimationBuilder::ProcessAnimationVariants(
     UWidgetBlueprint* WBP,
     const FName& WidgetName,
-    const FString& LayerName)
+    const FString& AnimNamePrefix,
+    EPsdAnimTag AnimTag)
 {
     if (!WBP)
     {
         return;
     }
 
-    const FString LayerLower = LayerName.ToLower();
-
-    if (LayerLower.EndsWith(TEXT("_show")))
+    switch (AnimTag)
     {
-        CreateOpacityFade(WBP, LayerName + TEXT("_Show"), WidgetName, 0.0f, 1.0f, 0.3f);
-    }
-    if (LayerLower.EndsWith(TEXT("_hide")))
-    {
-        CreateOpacityFade(WBP, LayerName + TEXT("_Hide"), WidgetName, 1.0f, 0.0f, 0.3f);
-    }
-    if (LayerLower.EndsWith(TEXT("_hover")))
-    {
-        CreateScaleAnim(WBP, LayerName + TEXT("_Hover"), WidgetName,
+    case EPsdAnimTag::Show:
+        CreateOpacityFade(WBP, AnimNamePrefix + TEXT("_Show"), WidgetName, 0.0f, 1.0f, 0.3f);
+        break;
+    case EPsdAnimTag::Hide:
+        CreateOpacityFade(WBP, AnimNamePrefix + TEXT("_Hide"), WidgetName, 1.0f, 0.0f, 0.3f);
+        break;
+    case EPsdAnimTag::Hover:
+        CreateScaleAnim(WBP, AnimNamePrefix + TEXT("_Hover"), WidgetName,
             FVector2D(1.0f, 1.0f), FVector2D(1.05f, 1.05f), 0.15f);
+        break;
+    case EPsdAnimTag::None:
+    default:
+        break;
     }
 }

@@ -1,6 +1,7 @@
 // Copyright 2018-2021 - John snow wind
 #pragma once
 #include "CoreMinimal.h"
+#include "Parser/FLayerTagParser.h"
 
 class UWidgetBlueprint;
 class UWidgetAnimation;
@@ -24,11 +25,12 @@ public:
         const FName& TargetWidgetName,
         FVector2D FromScale, FVector2D ToScale, float DurationSec);
 
-    // Detect animation variants in layer name suffixes and create animations.
-    // Checks for _show, _hide, _hover suffixes; creates appropriate animations.
-    // Call after widget tree is built.
+    // Create the animation matching a parsed @anim tag (Show / Hide / Hover).
+    // AnimNamePrefix is used to build a unique animation asset name.
+    // Pass EPsdAnimTag::None for a no-op.
     static void ProcessAnimationVariants(
         UWidgetBlueprint* WBP,
         const FName& WidgetName,
-        const FString& LayerName);
+        const FString& AnimNamePrefix,
+        EPsdAnimTag AnimTag);
 };

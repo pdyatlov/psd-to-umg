@@ -12,12 +12,8 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
-#include "Components/VerticalBox.h"
-#include "Components/VerticalBoxSlot.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "UObject/UObjectGlobals.h"
 #include "WidgetBlueprintFactory.h"
@@ -25,85 +21,6 @@
 #include "EditorAssetLibrary.h"
 #include "Engine/Blueprint.h"
 #include "WidgetBlueprint.h"
-
-// ---------------------------------------------------------------------------
-// LAYOUT-03: Row/column alignment constants and detection helpers
-// ---------------------------------------------------------------------------
-static constexpr int32 AlignmentTolerancePx = 6;
-
-// R-05: a layer with an explicit stretch/fill anchor is placed directly on the
-// canvas; the auto-row/column heuristic must not re-parent it into an HBox/VBox.
-static bool IsExplicitStretchAnchor(const FPsdLayer& L)
-{
-    return L.ParsedTags.Anchor == EPsdAnchorTag::StretchH
-        || L.ParsedTags.Anchor == EPsdAnchorTag::StretchV
-        || L.ParsedTags.Anchor == EPsdAnchorTag::Fill;
-}
-
-static bool AnyChildHasExplicitStretch(const TArray<FPsdLayer>& Layers)
-{
-    for (const FPsdLayer& L : Layers)
-    {
-        if (IsExplicitStretchAnchor(L)) return true;
-    }
-    return false;
-}
-
-/** Returns true if all visual layers share the same vertical center (within Tolerance), forming a horizontal row. */
-static bool DetectHorizontalRow(const TArray<FPsdLayer>& Layers, int32 Tolerance)
-{
-    if (Layers.Num() < 2) return false;
-
-    // Collect visual layers (skip zero-size non-groups and Unknown types)
-    TArray<const FPsdLayer*> Visual;
-    for (const FPsdLayer& L : Layers)
-    {
-        if (L.Type == EPsdLayerType::Unknown) continue;
-        if (L.Bounds.IsEmpty() && L.Type != EPsdLayerType::Group) continue;
-        Visual.Add(&L);
-    }
-    if (Visual.Num() < 2) return false;
-
-    // Compute vertical center of first visual layer
-    const float RefCenterY = (static_cast<float>(Visual[0]->Bounds.Min.Y) + static_cast<float>(Visual[0]->Bounds.Max.Y)) * 0.5f;
-
-    for (int32 i = 1; i < Visual.Num(); ++i)
-    {
-        const float CenterY = (static_cast<float>(Visual[i]->Bounds.Min.Y) + static_cast<float>(Visual[i]->Bounds.Max.Y)) * 0.5f;
-        if (FMath::Abs(CenterY - RefCenterY) > static_cast<float>(Tolerance))
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-/** Returns true if all visual layers share the same horizontal center (within Tolerance), forming a vertical column. */
-static bool DetectVerticalColumn(const TArray<FPsdLayer>& Layers, int32 Tolerance)
-{
-    if (Layers.Num() < 2) return false;
-
-    TArray<const FPsdLayer*> Visual;
-    for (const FPsdLayer& L : Layers)
-    {
-        if (L.Type == EPsdLayerType::Unknown) continue;
-        if (L.Bounds.IsEmpty() && L.Type != EPsdLayerType::Group) continue;
-        Visual.Add(&L);
-    }
-    if (Visual.Num() < 2) return false;
-
-    const float RefCenterX = (static_cast<float>(Visual[0]->Bounds.Min.X) + static_cast<float>(Visual[0]->Bounds.Max.X)) * 0.5f;
-
-    for (int32 i = 1; i < Visual.Num(); ++i)
-    {
-        const float CenterX = (static_cast<float>(Visual[i]->Bounds.Min.X) + static_cast<float>(Visual[i]->Bounds.Max.X)) * 0.5f;
-        if (FMath::Abs(CenterX - RefCenterX) > static_cast<float>(Tolerance))
-        {
-            return false;
-        }
-    }
-    return true;
-}
 
 // ---------------------------------------------------------------------------
 // Internal helper: recursively populate a canvas panel from a layer array
@@ -117,91 +34,6 @@ static void PopulateCanvas(
     const FIntPoint& CanvasSize,
     const TSet<FString>& SkippedLayerNames = TSet<FString>())
 {
-    // LAYOUT-03: Auto-detect row/column alignment (per D-09, D-11)
-    // Only fires when ALL children align — conservative guard against false positives.
-    // R-05: if any child carries an explicit @anchor:stretch-h / stretch-v / fill,
-    // the auto-grouping heuristic is suppressed entirely so the explicit anchor wins.
-    if (Layers.Num() >= 2 && !AnyChildHasExplicitStretch(Layers))
-    {
-        if (DetectHorizontalRow(Layers, AlignmentTolerancePx))
-        {
-            UE_LOG(LogPSD2UMG, Log, TEXT("PopulateCanvas: detected horizontal row (%d layers) — wrapping in UHorizontalBox"), Layers.Num());
-
-            UHorizontalBox* HBox = Tree->ConstructWidget<UHorizontalBox>();
-            UCanvasPanelSlot* HBoxSlot = Parent->AddChildToCanvas(HBox);
-            if (HBoxSlot)
-            {
-                // Fill entire parent canvas so children share the same coordinate origin
-                FAnchorData HBoxData;
-                HBoxData.Anchors = FAnchors(0.f, 0.f, 1.f, 1.f);
-                HBoxData.Offsets = FMargin(0.f, 0.f, 0.f, 0.f);
-                HBoxData.Alignment = FVector2D(0.f, 0.f);
-                HBoxSlot->SetLayout(HBoxData);
-            }
-
-            // Sort layers left-to-right by X min
-            TArray<FPsdLayer> Sorted = Layers;
-            Sorted.Sort([](const FPsdLayer& A, const FPsdLayer& B)
-            {
-                return A.Bounds.Min.X < B.Bounds.Min.X;
-            });
-
-            for (const FPsdLayer& Layer : Sorted)
-            {
-                UWidget* Child = Registry.MapLayer(Layer, Doc, Tree);
-                if (Child)
-                {
-                    UHorizontalBoxSlot* ChildSlot = HBox->AddChildToHorizontalBox(Child);
-                    if (ChildSlot)
-                    {
-                        ChildSlot->SetPadding(FMargin(0.f));
-                        ChildSlot->SetHorizontalAlignment(HAlign_Fill);
-                        ChildSlot->SetVerticalAlignment(VAlign_Fill);
-                    }
-                }
-            }
-            return; // Skip normal CanvasPanel loop
-        }
-        else if (DetectVerticalColumn(Layers, AlignmentTolerancePx))
-        {
-            UE_LOG(LogPSD2UMG, Log, TEXT("PopulateCanvas: detected vertical column (%d layers) — wrapping in UVerticalBox"), Layers.Num());
-
-            UVerticalBox* VBox = Tree->ConstructWidget<UVerticalBox>();
-            UCanvasPanelSlot* VBoxSlot = Parent->AddChildToCanvas(VBox);
-            if (VBoxSlot)
-            {
-                FAnchorData VBoxData;
-                VBoxData.Anchors = FAnchors(0.f, 0.f, 1.f, 1.f);
-                VBoxData.Offsets = FMargin(0.f, 0.f, 0.f, 0.f);
-                VBoxData.Alignment = FVector2D(0.f, 0.f);
-                VBoxSlot->SetLayout(VBoxData);
-            }
-
-            // Sort layers top-to-bottom by Y min
-            TArray<FPsdLayer> Sorted = Layers;
-            Sorted.Sort([](const FPsdLayer& A, const FPsdLayer& B)
-            {
-                return A.Bounds.Min.Y < B.Bounds.Min.Y;
-            });
-
-            for (const FPsdLayer& Layer : Sorted)
-            {
-                UWidget* Child = Registry.MapLayer(Layer, Doc, Tree);
-                if (Child)
-                {
-                    UVerticalBoxSlot* ChildSlot = VBox->AddChildToVerticalBox(Child);
-                    if (ChildSlot)
-                    {
-                        ChildSlot->SetPadding(FMargin(0.f));
-                        ChildSlot->SetHorizontalAlignment(HAlign_Fill);
-                        ChildSlot->SetVerticalAlignment(VAlign_Fill);
-                    }
-                }
-            }
-            return; // Skip normal CanvasPanel loop
-        }
-    }
-
     const int32 TotalLayers = Layers.Num();
     for (int32 i = 0; i < TotalLayers; ++i)
     {

@@ -703,12 +703,11 @@ void FWidgetBlueprintGenSpec::Define()
             TestNotNull(TEXT("WBP created from deep nesting"), WBP);
         });
 
-        It("R-05: explicit @anchor:stretch-h on a child suppresses PopulateCanvas auto-row heuristic", [this]()
+        It("R-05: untagged group with horizontally-aligned children stays CanvasPanel (no auto-HBox)", [this]()
         {
-            // Three image children laid out as a horizontal row (same Y center).
-            // The middle child carries @anchor:stretch-h. With the R-05 guard in place,
-            // PopulateCanvas must NOT auto-wrap them into a UHorizontalBox; all three
-            // must be placed directly on the root canvas (CanvasPanelSlot present).
+            // Per Phase 9 DESIGN: auto-detection heuristics removed — HBox/VBox only via
+            // explicit @hbox/@vbox tags. Three horizontally-aligned images without any
+            // widget-type tag must remain as direct CanvasPanel children.
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(1200, 600);
             Doc.SourcePath = TEXT("C:/test/StretchOverride.psd");
@@ -727,9 +726,9 @@ void FWidgetBlueprintGenSpec::Define()
                 return L;
             };
 
-            Doc.RootLayers.Add(MakeImg(TEXT("Left"),                              50,  280, 250, 320));
-            Doc.RootLayers.Add(MakeImg(TEXT("Middle @anchor:stretch-h"),         300,  280, 800, 320));
-            Doc.RootLayers.Add(MakeImg(TEXT("Right"),                            850,  280, 1100, 320));
+            Doc.RootLayers.Add(MakeImg(TEXT("Left"),   50,  280, 250,  320));
+            Doc.RootLayers.Add(MakeImg(TEXT("Middle"), 300, 280, 800,  320));
+            Doc.RootLayers.Add(MakeImg(TEXT("Right"),  850, 280, 1100, 320));
 
             UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_R05"));
             TestNotNull(TEXT("WBP created"), WBP);
@@ -739,7 +738,7 @@ void FWidgetBlueprintGenSpec::Define()
             TestNotNull(TEXT("Root is UCanvasPanel"), Root);
             if (!Root) return;
 
-            // R-05 invariant: no UHorizontalBox auto-wrap. All 3 images sit on Root canvas.
+            // R-05 invariant: no auto-HBox. All 3 images sit directly on Root canvas.
             int32 ImageCount = 0;
             int32 HBoxCount = 0;
             WBP->WidgetTree->ForEachWidget([&](UWidget* W)
@@ -747,7 +746,7 @@ void FWidgetBlueprintGenSpec::Define()
                 if (Cast<UImage>(W))           { ++ImageCount; }
                 if (Cast<UHorizontalBox>(W))   { ++HBoxCount; }
             });
-            TestEqual(TEXT("R-05: no auto-row HBox created"), HBoxCount, 0);
+            TestEqual(TEXT("R-05: no HBox without explicit @hbox tag"), HBoxCount, 0);
             TestEqual(TEXT("R-05: all 3 images present on canvas"), ImageCount, 3);
         });
     });

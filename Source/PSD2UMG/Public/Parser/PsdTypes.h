@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Framework/Text/TextLayout.h"
+#include "Parser/FLayerTagParser.h"
 #include "PsdTypes.generated.h"
 
 /**
@@ -97,6 +98,10 @@ struct PSD2UMG_API FPsdLayer
 	FPsdLayerEffects Effects;
 
 	TArray<FPsdLayer> Children;
+
+	// Phase 9: parsed tag grammar (populated once by PsdParser::ParseFile via FLayerTagParser::Parse).
+	// All downstream consumers read from this, not Layer.Name.
+	FParsedLayerTags ParsedTags;
 
 	// Image-layer payload
 	TArray<uint8> RGBAPixels;

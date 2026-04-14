@@ -357,20 +357,20 @@ void FPsdParserSimpleHUDSpec::Define()
             TestEqual(TEXT("Root layer count"), Doc.RootLayers.Num(), 5);
         });
 
-        It("should contain Progress_Health group", [this]()
+        It("should contain 'Health @progress' group", [this]()
         {
             if (!bParsed) return;
-            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Progress_Health"));
-            TestNotNull(TEXT("Progress_Health found"), L);
-            if (L) TestEqual(TEXT("Progress_Health is Group"), (int32)L->Type, (int32)EPsdLayerType::Group);
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Health @progress"));
+            TestNotNull(TEXT("Health @progress found"), L);
+            if (L) TestEqual(TEXT("Health @progress is Group"), (int32)L->Type, (int32)EPsdLayerType::Group);
         });
 
-        It("should contain Button_Start group", [this]()
+        It("should contain 'Start @button' group", [this]()
         {
             if (!bParsed) return;
-            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Button_Start"));
-            TestNotNull(TEXT("Button_Start found"), L);
-            if (L) TestEqual(TEXT("Button_Start is Group"), (int32)L->Type, (int32)EPsdLayerType::Group);
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("Start @button"));
+            TestNotNull(TEXT("Start @button found"), L);
+            if (L) TestEqual(TEXT("Start @button is Group"), (int32)L->Type, (int32)EPsdLayerType::Group);
         });
 
         It("should contain Score text layer with correct content", [this]()

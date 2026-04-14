@@ -385,13 +385,13 @@ void FWidgetBlueprintGenSpec::Define()
             }
         });
 
-        It("should handle Button_ prefix with no name suffix without crashing", [this]()
+        It("should handle bare '@button' tag with empty clean-name without crashing (D-21 fallback)", [this]()
         {
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(800, 600);
-            Doc.SourcePath = TEXT("C:/test/MalformedName.psd");
+            Doc.SourcePath = TEXT("C:/test/BareButtonTag.psd");
             FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
-            Layer.Name = TEXT("Button_");
+            Layer.Name = TEXT("@button");
             Layer.Type = EPsdLayerType::Group;
             Layer.Bounds = FIntRect(0, 0, 200, 100);
             Layer.bVisible = true;
@@ -406,13 +406,13 @@ void FWidgetBlueprintGenSpec::Define()
             TestNotNull(TEXT("WBP created despite malformed name"), WBP);
         });
 
-        It("should create UProgressBar from Progress_ prefix group", [this]()
+        It("should create UProgressBar from '@progress' tag group", [this]()
         {
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(800, 600);
             Doc.SourcePath = TEXT("C:/test/ProgressBar.psd");
             FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
-            Layer.Name = TEXT("Progress_Health");
+            Layer.Name = TEXT("Health @progress");
             Layer.Type = EPsdLayerType::Group;
             Layer.Bounds = FIntRect(100, 100, 500, 140);
             Layer.bVisible = true;
@@ -427,13 +427,13 @@ void FWidgetBlueprintGenSpec::Define()
             TestTrue(TEXT("Child is UProgressBar"), Child != nullptr && Child->IsA(UProgressBar::StaticClass()));
         });
 
-        It("should create UHorizontalBox from HBox_ prefix group", [this]()
+        It("should create UHorizontalBox from '@hbox' tag group", [this]()
         {
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(800, 600);
             Doc.SourcePath = TEXT("C:/test/HBox.psd");
             FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
-            Layer.Name = TEXT("HBox_Row");
+            Layer.Name = TEXT("Row @hbox");
             Layer.Type = EPsdLayerType::Group;
             Layer.Bounds = FIntRect(0, 0, 800, 100);
             Layer.bVisible = true;
@@ -448,13 +448,13 @@ void FWidgetBlueprintGenSpec::Define()
             TestTrue(TEXT("Child is UHorizontalBox"), Child != nullptr && Child->IsA(UHorizontalBox::StaticClass()));
         });
 
-        It("should create UWidgetSwitcher from _variants suffix group", [this]()
+        It("should create UWidgetSwitcher from '@variants' tag group", [this]()
         {
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(800, 600);
             Doc.SourcePath = TEXT("C:/test/Variants.psd");
             FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
-            Layer.Name = TEXT("Menu_variants");
+            Layer.Name = TEXT("Menu @variants");
             Layer.Type = EPsdLayerType::Group;
             Layer.Bounds = FIntRect(0, 0, 400, 300);
             Layer.bVisible = true;
@@ -475,13 +475,13 @@ void FWidgetBlueprintGenSpec::Define()
             TestTrue(TEXT("Child is UWidgetSwitcher"), Child != nullptr && Child->IsA(UWidgetSwitcher::StaticClass()));
         });
 
-        It("should force fill anchors when _fill suffix is used", [this]()
+        It("should force fill anchors when '@anchor:fill' tag is used", [this]()
         {
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(1920, 1080);
-            Doc.SourcePath = TEXT("C:/test/FillSuffix.psd");
+            Doc.SourcePath = TEXT("C:/test/AnchorFill.psd");
             FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
-            Layer.Name = TEXT("Background_fill");
+            Layer.Name = TEXT("Background @anchor:fill");
             Layer.Type = EPsdLayerType::Image;
             Layer.Bounds = FIntRect(100, 100, 500, 400);
             Layer.bVisible = true;
@@ -503,13 +503,13 @@ void FWidgetBlueprintGenSpec::Define()
             }
         });
 
-        It("should force top-left anchor when _anchor-tl suffix is used", [this]()
+        It("should force top-left anchor when '@anchor:tl' tag is used", [this]()
         {
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(1920, 1080);
             Doc.SourcePath = TEXT("C:/test/AnchorTL.psd");
             FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
-            Layer.Name = TEXT("Icon_anchor-tl");
+            Layer.Name = TEXT("Icon @anchor:tl");
             Layer.Type = EPsdLayerType::Image;
             Layer.Bounds = FIntRect(1500, 800, 1600, 900);
             Layer.bVisible = true;
@@ -647,13 +647,13 @@ void FWidgetBlueprintGenSpec::Define()
                 static_cast<uint8>(Result), static_cast<uint8>(EPsdChangeAnnotation::Changed));
         });
 
-        It("should create Box draw mode image for _9s suffix", [this]()
+        It("should create Box draw mode image for '@9s' tag", [this]()
         {
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(800, 600);
             Doc.SourcePath = TEXT("C:/test/9Slice.psd");
             FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
-            Layer.Name = TEXT("Panel_9s");
+            Layer.Name = TEXT("Panel @9s");
             Layer.Type = EPsdLayerType::Group;
             Layer.Bounds = FIntRect(0, 0, 400, 300);
             Layer.bVisible = true;

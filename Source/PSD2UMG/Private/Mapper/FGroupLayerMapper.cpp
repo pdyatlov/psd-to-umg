@@ -10,12 +10,12 @@ int32 FGroupLayerMapper::GetPriority() const { return 50; }
 
 bool FGroupLayerMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.Type == EPsdLayerType::Group;
+    return Layer.ParsedTags.Type == EPsdTagType::Canvas;
 }
 
 UWidget* FGroupLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
 {
-    UCanvasPanel* Canvas = Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), FName(*Layer.Name));
+    UCanvasPanel* Canvas = Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), FName(*Layer.ParsedTags.CleanName));
     // Children are recursed by the generator, not the mapper
     return Canvas;
 }

@@ -16,12 +16,12 @@ int32 FTextLayerMapper::GetPriority() const { return 100; }
 
 bool FTextLayerMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.Type == EPsdLayerType::Text;
+    return Layer.ParsedTags.Type == EPsdTagType::Text;
 }
 
 UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
 {
-    UTextBlock* TextWidget = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), FName(*Layer.Name));
+    UTextBlock* TextWidget = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), FName(*Layer.ParsedTags.CleanName));
 
     // Content.
     TextWidget->SetText(FText::FromString(Layer.Text.Content));

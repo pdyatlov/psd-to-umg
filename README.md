@@ -32,67 +32,69 @@ Unreal Engine 5.7 editor plugin that imports `.psd` files and converts them into
 **Optional plugins** (enabled automatically if present):
 
 - **CommonUI** — Required for `bUseCommonUI` mode (`UCommonButtonBase` generation).
-- **EnhancedInput** — Required for `Button_Name[IA_Action]` input action binding.
+- **EnhancedInput** — Required for `@ia:IA_Action` input action binding on `@button` layers.
 
 ---
 
-## Layer Naming Cheat Sheet
+## Layer Naming
 
-PSD layer names control which UMG widget class is generated. Prefixes are matched first (highest priority wins), then suffixes modify anchor and layout behavior.
+PSD layer names drive widget generation via `@`-tags. Format:
 
-### Prefixes
+```
+WidgetName @tag @tag:value @tag:v1,v2,...
+```
 
-| Prefix | Widget Class | Notes |
-|--------|-------------|-------|
-| `Button_` | `UButton` | Normal/Hovered/Pressed/Disabled child layers mapped to state brushes |
-| `Progress_` | `UProgressBar` | Background and Fill child layers |
-| `HBox_` | `UHorizontalBox` | Children laid out left-to-right |
-| `VBox_` | `UVerticalBox` | Children laid out top-to-bottom |
-| `Overlay_` | `UOverlay` | Z-stacked children |
-| `ScrollBox_` | `UScrollBox` | Scrollable container |
-| `Slider_` | `USlider` | |
-| `CheckBox_` | `UCheckBox` | |
-| `Input_` | `UEditableTextBox` | |
-| `List_` | `UListView` | |
-| `Tile_` | `UTileView` | |
-| `Switcher_` | `UWidgetSwitcher` | |
+The widget name is whatever text appears before the first `@`. Everything after is parsed as tags.
 
-Layers without a recognized prefix are mapped by type: pixel layers become `UImage`, text layers become `UTextBlock`, group layers become `UCanvasPanel`.
+### Type tags (one per layer)
 
-### Suffixes
+| Tag | Widget |
+|-----|--------|
+| `@button` | `UButton` (or `UCommonButtonBase` in CommonUI mode) |
+| `@image` | `UImage` |
+| `@text` | `UTextBlock` |
+| `@progress` | `UProgressBar` |
+| `@hbox` / `@vbox` | `UHorizontalBox` / `UVerticalBox` |
+| `@overlay` | `UOverlay` |
+| `@scrollbox` | `UScrollBox` |
+| `@slider` | `USlider` |
+| `@checkbox` | `UCheckBox` |
+| `@input` | `UEditableTextBox` |
+| `@list` / `@tile` | `UListView` / `UTileView` |
+| `@variants` | `UWidgetSwitcher` |
+| `@smartobject[:TypeName]` | child `UUserWidget` |
+| `@canvas` | `UCanvasPanel` (default for groups) |
 
-Suffixes are appended to any layer name (after the prefix if present). Longest suffix takes priority.
+Default types: group layers → `@canvas`, pixel layers → `@image`, text layers → `@text`.
 
-| Suffix | Effect |
-|--------|--------|
-| `_9slice` | 9-slice draw mode (Box). Optional margins: `LayerName_9slice[L,T,R,B]` |
-| `_9s` | Short form of `_9slice` |
-| `_variants` | Wrap children in `UWidgetSwitcher` (one child per variant) |
-| `_anchor-tl` | Force top-left anchor (0, 0) |
-| `_anchor-tc` | Force top-center anchor (0.5, 0) |
-| `_anchor-tr` | Force top-right anchor (1, 0) |
-| `_anchor-cl` | Force center-left anchor (0, 0.5) |
-| `_anchor-c` | Force center anchor (0.5, 0.5) |
-| `_anchor-cr` | Force center-right anchor (1, 0.5) |
-| `_anchor-bl` | Force bottom-left anchor (0, 1) |
-| `_anchor-bc` | Force bottom-center anchor (0.5, 1) |
-| `_anchor-br` | Force bottom-right anchor (1, 1) |
-| `_stretch-h` | Stretch horizontally (anchor min X=0, max X=1); vertical anchor from quadrant |
-| `_stretch-v` | Stretch vertically (anchor min Y=0, max Y=1); horizontal anchor from quadrant |
-| `_fill` | Fill entire parent (anchor 0,0 to 1,1) |
+### Modifier tags
 
-Without a suffix, anchor is inferred from layer center position within the canvas (quadrant heuristic).
+| Tag | Effect |
+|-----|--------|
+| `@anchor:tl` / `tc` / `tr` / `cl` / `c` / `cr` / `bl` / `bc` / `br` | Explicit anchor corner/center |
+| `@anchor:stretch-h` / `stretch-v` / `fill` | Stretch modes |
+| `@9s` / `@9s:L,T,R,B` | 9-slice (default 16px on all sides if no margins) |
+| `@ia:IA_ActionName` | Bind CommonUI input action |
+| `@state:hover` / `pressed` / `disabled` / `normal` / `fill` / `bg` | State-brush child |
+| `@anim:show` / `hide` / `hover` | Animation variant (inside CommonUI button) |
 
-### CommonUI Mode
+### Rules
 
-When `bUseCommonUI` is enabled in plugin settings:
+- Tags are case-insensitive. Values that reference asset names (`@ia:IA_Confirm`) preserve case.
+- Tags are order-free. Conflicting tags: last wins + warning logged.
+- Unknown tags: warning + ignored.
+- Empty widget name (`@button` alone): auto-named `Button_NN`.
 
-| Syntax | Effect |
-|--------|--------|
-| `Button_Name` | Generates `UCommonButtonBase` instead of `UButton` |
-| `Button_Confirm[IA_Confirm]` | Generates `UCommonButtonBase` and binds to `UInputAction` asset |
-| `_show` / `_hide` child layers | Generate `UWidgetAnimation` for show/hide transitions |
-| `_hover` child layers | Generate `UWidgetAnimation` for hover state |
+### Examples
+
+- `PlayButton @button @anchor:tl`
+- `Health @progress`  (with children `Fill @state:fill` and `Bg @state:bg`)
+- `Confirm @button @ia:IA_Confirm`
+- `Panel @9s:16,16,16,16`
+- `Menu @variants`  (children are variant pages)
+
+Formal grammar: [Docs/LayerTagGrammar.md](Docs/LayerTagGrammar.md).
+Migration from pre-Phase-9 syntax: [Docs/Migration-PrefixToTag.md](Docs/Migration-PrefixToTag.md).
 
 ---
 
@@ -134,8 +136,8 @@ When `bUseCommonUI` is enabled in plugin settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `bUseCommonUI` | `false` | Generate `UCommonButtonBase` instead of `UButton` for `Button_` layers |
-| `InputActionSearchPath` | (empty) | Content path searched for `UInputAction` assets referenced by `Button_Name[IA_Action]` |
+| `bUseCommonUI` | `false` | Generate `UCommonButtonBase` instead of `UButton` for `@button` layers |
+| `InputActionSearchPath` | (empty) | Content path searched for `UInputAction` assets referenced by `@ia:IA_Action` tags |
 
 ---
 

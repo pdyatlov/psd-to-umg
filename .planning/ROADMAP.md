@@ -180,6 +180,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7 > 8
 
 Plans:
 - [x] 09-01-PLAN.md — FLayerTagParser + FParsedLayerTags + grammar spec + parser unit tests (Wave 1)
-- [ ] 09-02-PLAN.md — Rewrite all mappers/AnchorCalculator/AnimationBuilder/PreviewDialog to consume ParsedTags; resolve reimport identity-key strategy (Wave 2)
+- [x] 09-02-PLAN.md — Rewrite all mappers/AnchorCalculator/AnimationBuilder/PreviewDialog to consume ParsedTags; resolve reimport identity-key strategy (Wave 2)
 - [ ] 09-03-PLAN.md — Retag 5 fixture PSDs + update spec assertions; bring automation suite back to green (Wave 3)
 - [ ] 09-04-PLAN.md — Ship Migration-PrefixToTag.md + rewrite README naming section (Wave 4)

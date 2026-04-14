@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-04-14T12:32:29.218Z"
+stopped_at: Completed 09-02-PLAN.md (Tasks 2-5; Tasks 6/6a deferred per executor scope)
+last_updated: "2026-04-14T12:51:15.543Z"
 last_activity: 2026-04-14
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 31
-  completed_plans: 28
+  completed_plans: 29
   percent: 36
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 09 (unified-layer-naming-convention-tag-based) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-14
 
@@ -75,6 +75,7 @@ Progress: [████░░░░░░] 36%
 | Phase 08-testing-documentation-release P01 | 5m | 1 tasks | 1 files |
 | Phase 08 P03 | 5m | 1 tasks | 1 files |
 | Phase 09-unified-layer-naming-convention-tag-based P01 | 25m | 2 tasks | 6 files |
+| Phase 09-unified-layer-naming-convention-tag-based P02 | 35m | 4 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -105,6 +106,9 @@ Recent decisions affecting current work:
 - [Phase 08]: DOC-03 (CHANGELOG) skipped per D-06; DOC-02 merged inline into README Layer Naming section; fixture PSDs replace example project per D-08
 - [Phase 09-unified-layer-naming-convention-tag-based]: FLayerTagParser implemented as pure function with OutDiagnostics out-param; ParsedTags populated as post-pass after ConvertLayerRecursive so D-02 default-type sees final EPsdLayerType
 - [Phase 09-unified-layer-naming-convention-tag-based]: @9s shorthand defaults to {16,16,16,16, bExplicit=false} matching F9SliceImageLayerMapper historical default (D-07)
+- [Phase 09-unified-layer-naming-convention-tag-based]: [09-02 Task 1] Reimport identity-key strategy: option-a — match by ParsedTags.CleanName. Accepts one-time orphaning of pre-Phase-9 WBPs (D-15 hard cutover). Migration guide (Plan 09-04) must document delete-and-reimport for legacy assets.
+- [Phase 09-unified-layer-naming-convention-tag-based]: [09-02] FSwitcherLayerMapper retained at priority 199 dispatching on bIsVariants (parallel to FVariantsSuffixMapper at 200); the grammar has no @switcher tag so this avoids dead-coding the legacy class without behavioural drift.
+- [Phase 09-unified-layer-naming-convention-tag-based]: [09-02] FProgressLayerMapper falls back from FindChildByState(Bg) to FindChildByState(Normal) so single-untagged-image progress bars still produce a background brush.
 
 ### Roadmap Evolution
 
@@ -122,6 +126,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T12:32:29.211Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-04-14T12:51:15.538Z
+Stopped at: Completed 09-02-PLAN.md (Tasks 2-5; Tasks 6/6a deferred per executor scope)
 Resume file: None

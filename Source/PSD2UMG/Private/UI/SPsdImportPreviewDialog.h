@@ -5,6 +5,7 @@
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/Views/STreeView.h"
 #include "UI/PsdLayerTreeItem.h"
+#include "Parser/PsdDiagnostics.h"
 
 struct FPsdDocument;
 struct FPsdLayer;
@@ -40,6 +41,8 @@ public:
         SLATE_ARGUMENT(FString, InitialOutputPath)
         /** Controls button label and change-annotation column visibility. */
         SLATE_ARGUMENT(bool, bIsReimport)
+        /** Parser diagnostics to display in a collapsible section. */
+        SLATE_ARGUMENT(TArray<FPsdDiagnostic>, Diagnostics)
         /** Fired when the user clicks Cancel or closes the window. */
         SLATE_EVENT(FSimpleDelegate, OnCancelled)
         /** Fired when the user confirms import; carries output path and tree state. */
@@ -57,6 +60,14 @@ public:
      */
     static TArray<TSharedPtr<FPsdLayerTreeItem>> BuildTreeFromDocument(const FPsdDocument& Doc);
 
+    /**
+     * Reconstruct the canonical @-tag strings from a parsed tag state. Used by the preview
+     * dialog row renderer to display chips (D-26) and as a round-trip oracle for unit tests.
+     * Emits tags in stable order: Type, Anchor, Anim, State, InputAction, NineSlice, Variants,
+     * SmartObject. Each string is prefixed with '@' (e.g. "@button", "@anchor:tl", "@9s:16,16,16,16").
+     */
+    static TArray<FString> ReconstructTagChips(const FParsedLayerTags& Tags);
+
 private:
     // STreeView delegates
     TSharedRef<ITableRow> OnGenerateRow(TSharedPtr<FPsdLayerTreeItem> Item,
@@ -65,7 +76,7 @@ private:
                        TArray<TSharedPtr<FPsdLayerTreeItem>>& OutChildren);
 
     // Checkbox cascade
-    void OnCheckStateChanged(TSharedPtr<FPsdLayerTreeItem> Item, ECheckBoxState NewState);
+    void OnCheckStateChanged(ECheckBoxState NewState, TSharedPtr<FPsdLayerTreeItem> Item);
     ECheckBoxState GetCheckState(TSharedPtr<FPsdLayerTreeItem> Item) const;
     void SetChildrenChecked(TSharedPtr<FPsdLayerTreeItem> Item, bool bChecked);
 
@@ -98,6 +109,7 @@ private:
     TSharedPtr<SEditableTextBox> OutputPathBox;
 
     TArray<TSharedPtr<FPsdLayerTreeItem>> RootItems;
+    TArray<FPsdDiagnostic> Diagnostics;
     bool bIsReimport = false;
 
     FSimpleDelegate OnCancelled;

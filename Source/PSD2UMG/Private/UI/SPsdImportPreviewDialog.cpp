@@ -15,6 +15,7 @@
 #include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SSpacer.h"
+#include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Views/STableRow.h"
@@ -31,6 +32,149 @@
 // ---------------------------------------------------------------------------
 // Static helpers
 // ---------------------------------------------------------------------------
+
+namespace
+{
+    const TCHAR* TagTypeToken(EPsdTagType Type)
+    {
+        switch (Type)
+        {
+        case EPsdTagType::Button:      return TEXT("button");
+        case EPsdTagType::Image:       return TEXT("image");
+        case EPsdTagType::Text:        return TEXT("text");
+        case EPsdTagType::Progress:    return TEXT("progress");
+        case EPsdTagType::HBox:        return TEXT("hbox");
+        case EPsdTagType::VBox:        return TEXT("vbox");
+        case EPsdTagType::Overlay:     return TEXT("overlay");
+        case EPsdTagType::ScrollBox:   return TEXT("scrollbox");
+        case EPsdTagType::Slider:      return TEXT("slider");
+        case EPsdTagType::CheckBox:    return TEXT("checkbox");
+        case EPsdTagType::Input:       return TEXT("input");
+        case EPsdTagType::List:        return TEXT("list");
+        case EPsdTagType::Tile:        return TEXT("tile");
+        case EPsdTagType::SmartObject: return TEXT("smartobject");
+        case EPsdTagType::Canvas:      return TEXT("canvas");
+        case EPsdTagType::None:
+        default:                       return nullptr;
+        }
+    }
+
+    const TCHAR* AnchorTagToken(EPsdAnchorTag Anchor)
+    {
+        switch (Anchor)
+        {
+        case EPsdAnchorTag::TL:       return TEXT("tl");
+        case EPsdAnchorTag::TC:       return TEXT("tc");
+        case EPsdAnchorTag::TR:       return TEXT("tr");
+        case EPsdAnchorTag::CL:       return TEXT("cl");
+        case EPsdAnchorTag::C:        return TEXT("c");
+        case EPsdAnchorTag::CR:       return TEXT("cr");
+        case EPsdAnchorTag::BL:       return TEXT("bl");
+        case EPsdAnchorTag::BC:       return TEXT("bc");
+        case EPsdAnchorTag::BR:       return TEXT("br");
+        case EPsdAnchorTag::StretchH: return TEXT("stretch-h");
+        case EPsdAnchorTag::StretchV: return TEXT("stretch-v");
+        case EPsdAnchorTag::Fill:     return TEXT("fill");
+        case EPsdAnchorTag::None:
+        default:                      return nullptr;
+        }
+    }
+
+    const TCHAR* AnimTagToken(EPsdAnimTag Anim)
+    {
+        switch (Anim)
+        {
+        case EPsdAnimTag::Show:  return TEXT("show");
+        case EPsdAnimTag::Hide:  return TEXT("hide");
+        case EPsdAnimTag::Hover: return TEXT("hover");
+        case EPsdAnimTag::None:
+        default:                 return nullptr;
+        }
+    }
+
+    const TCHAR* StateTagToken(EPsdStateTag State)
+    {
+        switch (State)
+        {
+        case EPsdStateTag::Normal:   return TEXT("normal");
+        case EPsdStateTag::Hover:    return TEXT("hover");
+        case EPsdStateTag::Pressed:  return TEXT("pressed");
+        case EPsdStateTag::Disabled: return TEXT("disabled");
+        case EPsdStateTag::Fill:     return TEXT("fill");
+        case EPsdStateTag::Bg:       return TEXT("bg");
+        case EPsdStateTag::None:
+        default:                     return nullptr;
+        }
+    }
+
+    FString FormatFloat(float V)
+    {
+        // Emit as integer when whole, otherwise trimmed decimal — matches "@9s:16,16,16,16".
+        if (FMath::IsNearlyEqual(V, FMath::RoundToFloat(V)))
+        {
+            return FString::Printf(TEXT("%d"), static_cast<int32>(FMath::RoundToFloat(V)));
+        }
+        FString S = FString::SanitizeFloat(V);
+        return S;
+    }
+}
+
+TArray<FString> SPsdImportPreviewDialog::ReconstructTagChips(const FParsedLayerTags& Tags)
+{
+    TArray<FString> Chips;
+
+    if (const TCHAR* TypeTok = TagTypeToken(Tags.Type))
+    {
+        Chips.Add(FString::Printf(TEXT("@%s"), TypeTok));
+    }
+
+    if (const TCHAR* AnchorTok = AnchorTagToken(Tags.Anchor))
+    {
+        Chips.Add(FString::Printf(TEXT("@anchor:%s"), AnchorTok));
+    }
+
+    if (const TCHAR* AnimTok = AnimTagToken(Tags.Anim))
+    {
+        Chips.Add(FString::Printf(TEXT("@anim:%s"), AnimTok));
+    }
+
+    if (const TCHAR* StateTok = StateTagToken(Tags.State))
+    {
+        Chips.Add(FString::Printf(TEXT("@state:%s"), StateTok));
+    }
+
+    if (Tags.InputAction.IsSet())
+    {
+        Chips.Add(FString::Printf(TEXT("@ia:%s"), *Tags.InputAction.GetValue()));
+    }
+
+    if (Tags.NineSlice.IsSet())
+    {
+        const FPsdNineSliceMargin& M = Tags.NineSlice.GetValue();
+        if (M.bExplicit)
+        {
+            Chips.Add(FString::Printf(TEXT("@9s:%s,%s,%s,%s"),
+                *FormatFloat(M.L), *FormatFloat(M.T),
+                *FormatFloat(M.R), *FormatFloat(M.B)));
+        }
+        else
+        {
+            Chips.Add(TEXT("@9s"));
+        }
+    }
+
+    if (Tags.bIsVariants)
+    {
+        Chips.Add(TEXT("@variants"));
+    }
+
+    if (Tags.SmartObjectTypeName.IsSet())
+    {
+        Chips.Add(FString::Printf(TEXT("@smartobject:%s"), *Tags.SmartObjectTypeName.GetValue()));
+    }
+
+    return Chips;
+}
 
 FString SPsdImportPreviewDialog::InferWidgetTypeName(const FPsdLayer& Layer)
 {
@@ -108,6 +252,7 @@ void SPsdImportPreviewDialog::BuildTreeRecursive(
         Item->ChangeAnnotation = EPsdChangeAnnotation::None;
         Item->Depth = Depth;
         Item->Parent = Parent;
+        Item->ParsedTags = Layer.ParsedTags;
 
         if (Layer.Children.Num() > 0)
         {
@@ -433,12 +578,78 @@ TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
 
         // Col 3: Layer name
         + SHorizontalBox::Slot()
-        .FillWidth(1.f)
+        .AutoWidth()
         .VAlign(VAlign_Center)
         [
             SNew(STextBlock)
             .Text(FText::FromString(Item->LayerName))
             .Font(FAppStyle::GetFontStyle(TEXT("NormalFont")))
+        ]
+
+        // Col 3b: Tag chips — recognized (neutral) + unknown (warning) — D-26/D-27
+        + SHorizontalBox::Slot()
+        .FillWidth(1.f)
+        .VAlign(VAlign_Center)
+        .Padding(FMargin(6.f, 0.f))
+        [
+            [&]() -> TSharedRef<SWidget>
+            {
+                const TArray<FString> RecognizedChips = ReconstructTagChips(Item->ParsedTags);
+                const TArray<FString>& UnknownChips = Item->ParsedTags.UnknownTags;
+
+                if (RecognizedChips.Num() == 0 && UnknownChips.Num() == 0)
+                {
+                    return SNew(SSpacer);
+                }
+
+                TSharedRef<SWrapBox> Wrap = SNew(SWrapBox)
+                    .UseAllottedSize(true)
+                    .InnerSlotPadding(FVector2D(3.f, 2.f));
+
+                // Neutral chips — parser-recognized tags (D-26).
+                for (const FString& Chip : RecognizedChips)
+                {
+                    Wrap->AddSlot()
+                    [
+                        SNew(SBorder)
+                        .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
+                        .BorderBackgroundColor(FLinearColor(0.20f, 0.30f, 0.50f, 0.85f))
+                        .Padding(FMargin(5.f, 1.f))
+                        [
+                            SNew(STextBlock)
+                            .Text(FText::FromString(Chip))
+                            .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
+                            .ColorAndOpacity(FLinearColor::White)
+                        ]
+                    ];
+                }
+
+                // Warning chips — unknown / invalid tags (D-27). Tooltip carries the raw token.
+                for (const FString& Unknown : UnknownChips)
+                {
+                    const FString ChipText = FString::Printf(TEXT("@%s"), *Unknown);
+                    const FText Tooltip = FText::FromString(FString::Printf(
+                        TEXT("Unknown tag '@%s' — ignored by parser."), *Unknown));
+
+                    Wrap->AddSlot()
+                    [
+                        SNew(SBorder)
+                        .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
+                        .BorderBackgroundColor(FLinearColor(0.90f, 0.55f, 0.10f, 0.90f))
+                        .Padding(FMargin(5.f, 1.f))
+                        .ToolTipText(Tooltip)
+                        [
+                            SNew(STextBlock)
+                            .Text(FText::FromString(ChipText))
+                            .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
+                            .ColorAndOpacity(FLinearColor::White)
+                            .ToolTipText(Tooltip)
+                        ]
+                    ];
+                }
+
+                return Wrap;
+            }()
         ]
 
         // Col 4: Widget type badge — fixed 120px

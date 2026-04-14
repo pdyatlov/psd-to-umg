@@ -8,6 +8,7 @@
 #include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
 #include "PSD2UMGSetting.h"
+#include "UI/SPsdImportPreviewDialog.h"
 
 /**
  * Pure unit tests for FLayerTagParser (Phase 9 Wave 0).
@@ -329,6 +330,47 @@ void FLayerTagParserSpec::Define()
             TestTrue(TEXT("Vanilla still accepts"), Vanilla.CanMap(L));
 
             Settings->bUseCommonUI = bPrev;
+        });
+    });
+
+    Describe("ReconstructTagChips -- D-26/D-27 round-trip", [this]()
+    {
+        It("round-trips '@button @anchor:tl @9s:16,16,16,16' to canonical chip strings", [this]()
+        {
+            FString Diag;
+            const FParsedLayerTags T = ParseGroup(
+                TEXT("Panel @button @anchor:tl @9s:16,16,16,16"), Diag);
+
+            const TArray<FString> Chips = SPsdImportPreviewDialog::ReconstructTagChips(T);
+
+            TestEqual(TEXT("Chip count"), Chips.Num(), 3);
+            if (Chips.Num() == 3)
+            {
+                TestEqual(TEXT("Chip[0] = @button"),   Chips[0], FString(TEXT("@button")));
+                TestEqual(TEXT("Chip[1] = @anchor:tl"), Chips[1], FString(TEXT("@anchor:tl")));
+                TestEqual(TEXT("Chip[2] = @9s margins"), Chips[2],
+                          FString(TEXT("@9s:16,16,16,16")));
+            }
+        });
+
+        It("empty tag state produces zero chips", [this]()
+        {
+            FParsedLayerTags Empty;
+            Empty.Type = EPsdTagType::None;
+            const TArray<FString> Chips = SPsdImportPreviewDialog::ReconstructTagChips(Empty);
+            TestEqual(TEXT("No chips for empty tags"), Chips.Num(), 0);
+        });
+
+        It("emits @9s shorthand when bExplicit=false", [this]()
+        {
+            FString Diag;
+            const FParsedLayerTags T = ParseImage(TEXT("Panel @9s"), Diag);
+            // D-02: Image default type -> chips include @image + @9s (shorthand).
+            const TArray<FString> Chips = SPsdImportPreviewDialog::ReconstructTagChips(T);
+            TestTrue(TEXT("Includes shorthand @9s"),
+                     Chips.Contains(FString(TEXT("@9s"))));
+            TestFalse(TEXT("Does not emit explicit-margin form for shorthand"),
+                      Chips.ContainsByPredicate([](const FString& C){ return C.StartsWith(TEXT("@9s:")); }));
         });
     });
 }

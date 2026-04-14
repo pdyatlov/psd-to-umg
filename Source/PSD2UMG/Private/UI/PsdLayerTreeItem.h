@@ -2,6 +2,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Math/Color.h"
+#include "Parser/PsdTypes.h"
 
 /** Change annotation for reimport mode — indicates how this layer compares to the existing WBP. */
 enum class EPsdChangeAnnotation : uint8
@@ -23,4 +24,7 @@ struct FPsdLayerTreeItem
     int32 Depth = 0;
     TWeakPtr<FPsdLayerTreeItem> Parent;
     TArray<TSharedPtr<FPsdLayerTreeItem>> Children;
+
+    // Phase 9 (D-26/D-27): parsed tag state + unknown-tag diagnostics for chip rendering.
+    FParsedLayerTags ParsedTags;
 };

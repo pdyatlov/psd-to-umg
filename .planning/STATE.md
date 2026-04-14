@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 09-02-PLAN.md Task 6 checkpoint:human-verify — Task 6a (tag chips) completed at f4d3f42; awaiting human smoke test
-last_updated: "2026-04-14T12:51:15.543Z"
+stopped_at: Completed 09-03-PLAN.md (fixture PSD retag + spec alignment)
+last_updated: "2026-04-14T15:30:43.979Z"
 last_activity: 2026-04-14
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 31
-  completed_plans: 29
-  percent: 36
+  completed_plans: 30
+  percent: 97
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 09 (unified-layer-naming-convention-tag-based) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-04-14
 
-Progress: [████░░░░░░] 36%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [████░░░░░░] 36%
 | Phase 08 P03 | 5m | 1 tasks | 1 files |
 | Phase 09-unified-layer-naming-convention-tag-based P01 | 25m | 2 tasks | 6 files |
 | Phase 09-unified-layer-naming-convention-tag-based P02 | 35m | 4 tasks | 21 files |
+| Phase 09-unified-layer-naming-convention-tag-based P03 | 3h | 4 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,8 @@ Recent decisions affecting current work:
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-02 Task 1] Reimport identity-key strategy: option-a — match by ParsedTags.CleanName. Accepts one-time orphaning of pre-Phase-9 WBPs (D-15 hard cutover). Migration guide (Plan 09-04) must document delete-and-reimport for legacy assets.
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-02] FSwitcherLayerMapper retained at priority 199 dispatching on bIsVariants (parallel to FVariantsSuffixMapper at 200); the grammar has no @switcher tag so this avoids dead-coding the legacy class without behavioural drift.
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-02] FProgressLayerMapper falls back from FindChildByState(Bg) to FindChildByState(Normal) so single-untagged-image progress bars still produce a background brush.
+- [Phase 09-unified-layer-naming-convention-tag-based]: [09-03] Effects.psd and Typography.psd retained pre-Phase-9 names — their  separators are descriptive, not legacy dispatch prefixes; grammar has no matching @-tag so no rename needed
+- [Phase 09-unified-layer-naming-convention-tag-based]: [09-03] @9s tag attaches to the pixel layer, not its containing group (F9SliceImageLayerMapper consumes per-image)
 
 ### Roadmap Evolution
 
@@ -126,6 +129,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T12:51:15.538Z
-Stopped at: 09-02-PLAN.md Task 6 checkpoint:human-verify — Task 6a (tag chips) completed at f4d3f42
+Last session: 2026-04-14T15:30:20.585Z
+Stopped at: Completed 09-03-PLAN.md (fixture PSD retag + spec alignment)
 Resume file: None

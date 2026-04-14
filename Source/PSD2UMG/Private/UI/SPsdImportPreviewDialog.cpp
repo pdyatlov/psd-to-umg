@@ -659,20 +659,23 @@ TSharedRef<SWidget> SPsdImportPreviewDialog::BuildTagChipsForItem(const TSharedP
         .UseAllottedSize(true)
         .InnerSlotPadding(FVector2D(3.f, 2.f));
 
+    const FLinearColor RecognizedColor(0.30f, 0.65f, 1.00f, 1.0f);
+    const FLinearColor UnknownColor(1.00f, 0.30f, 0.30f, 1.0f);
+
     // Neutral chips — parser-recognized tags (D-26).
     for (const FString& Chip : RecognizedChips)
     {
         Wrap->AddSlot()
         [
             SNew(SBorder)
-            .BorderImage(FAppStyle::GetBrush(TEXT("WhiteBrush")))
-            .BorderBackgroundColor(FLinearColor(0.15f, 0.45f, 0.95f, 0.85f))
+            .BorderImage(FAppStyle::GetBrush(TEXT("Border")))
+            .BorderBackgroundColor(RecognizedColor)
             .Padding(FMargin(5.f, 1.f))
             [
                 SNew(STextBlock)
                 .Text(FText::FromString(Chip))
                 .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
-                .ColorAndOpacity(FLinearColor::White)
+                .ColorAndOpacity(RecognizedColor)
             ]
         ];
     }
@@ -687,15 +690,15 @@ TSharedRef<SWidget> SPsdImportPreviewDialog::BuildTagChipsForItem(const TSharedP
         Wrap->AddSlot()
         [
             SNew(SBorder)
-            .BorderImage(FAppStyle::GetBrush(TEXT("WhiteBrush")))
-            .BorderBackgroundColor(FLinearColor(0.85f, 0.15f, 0.15f, 0.90f))
+            .BorderImage(FAppStyle::GetBrush(TEXT("Border")))
+            .BorderBackgroundColor(UnknownColor)
             .Padding(FMargin(5.f, 1.f))
             .ToolTipText(Tooltip)
             [
                 SNew(STextBlock)
                 .Text(FText::FromString(ChipText))
                 .Font(FAppStyle::GetFontStyle(TEXT("SmallFont")))
-                .ColorAndOpacity(FLinearColor::White)
+                .ColorAndOpacity(UnknownColor)
                 .ToolTipText(Tooltip)
             ]
         ];

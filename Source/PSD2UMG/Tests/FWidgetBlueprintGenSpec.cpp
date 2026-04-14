@@ -652,13 +652,15 @@ void FWidgetBlueprintGenSpec::Define()
             FPsdDocument Doc;
             Doc.CanvasSize = FIntPoint(800, 600);
             Doc.SourcePath = TEXT("C:/test/9Slice.psd");
+            // @9s applies to an image layer with pixels (per grammar / DESIGN.md).
+            // Wrap it in a group so the canvas-root still has a container child.
             FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
-            Layer.Name = TEXT("Panel @9s");
+            Layer.Name = TEXT("Panel");
             Layer.Type = EPsdLayerType::Group;
             Layer.Bounds = FIntRect(0, 0, 400, 300);
             Layer.bVisible = true;
             FPsdLayer& Child = Layer.Children.AddDefaulted_GetRef();
-            Child.Name = TEXT("bg");
+            Child.Name = TEXT("bg @9s");
             Child.Type = EPsdLayerType::Image;
             Child.Bounds = FIntRect(0, 0, 400, 300);
             Child.PixelWidth = 400; Child.PixelHeight = 300;

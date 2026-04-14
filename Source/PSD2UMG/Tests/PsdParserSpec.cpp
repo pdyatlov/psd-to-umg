@@ -117,7 +117,7 @@ void FPsdParserSpec::Define()
 
         It("contains a Buttons group with 2 children", [this]()
         {
-            const FPsdLayer* Buttons = FindLayerByName(Doc.RootLayers, TEXT("Buttons"));
+            const FPsdLayer* Buttons = FindLayerByName(Doc.RootLayers, TEXT("Buttons @button"));
             if (!TestNotNull(TEXT("Buttons layer"), Buttons)) return;
             TestEqual(TEXT("Buttons.Type"), (int32)Buttons->Type, (int32)EPsdLayerType::Group);
             TestEqual(TEXT("Buttons.Children.Num"), Buttons->Children.Num(), 2);
@@ -125,9 +125,9 @@ void FPsdParserSpec::Define()
 
         It("contains BtnNormal image child (visible, RGBA buffer matches dimensions)", [this]()
         {
-            const FPsdLayer* Buttons = FindLayerByName(Doc.RootLayers, TEXT("Buttons"));
+            const FPsdLayer* Buttons = FindLayerByName(Doc.RootLayers, TEXT("Buttons @button"));
             if (!TestNotNull(TEXT("Buttons layer"), Buttons)) return;
-            const FPsdLayer* Btn = FindLayerByName(Buttons->Children, TEXT("BtnNormal"));
+            const FPsdLayer* Btn = FindLayerByName(Buttons->Children, TEXT("BtnNormal @state:normal"));
             if (!TestNotNull(TEXT("BtnNormal layer"), Btn)) return;
             TestEqual(TEXT("BtnNormal.Type"), (int32)Btn->Type, (int32)EPsdLayerType::Image);
             TestTrue(TEXT("BtnNormal.bVisible"), Btn->bVisible);
@@ -144,9 +144,9 @@ void FPsdParserSpec::Define()
 
         It("contains BtnHover image child (hidden, opacity ~0.5)", [this]()
         {
-            const FPsdLayer* Buttons = FindLayerByName(Doc.RootLayers, TEXT("Buttons"));
+            const FPsdLayer* Buttons = FindLayerByName(Doc.RootLayers, TEXT("Buttons @button"));
             if (!TestNotNull(TEXT("Buttons layer"), Buttons)) return;
-            const FPsdLayer* Btn = FindLayerByName(Buttons->Children, TEXT("BtnHover"));
+            const FPsdLayer* Btn = FindLayerByName(Buttons->Children, TEXT("BtnHover @state:hover"));
             if (!TestNotNull(TEXT("BtnHover layer"), Btn)) return;
             TestEqual(TEXT("BtnHover.Type"), (int32)Btn->Type, (int32)EPsdLayerType::Image);
             TestFalse(TEXT("BtnHover.bVisible"), Btn->bVisible);

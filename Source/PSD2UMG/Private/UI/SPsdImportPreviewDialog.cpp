@@ -245,7 +245,7 @@ void SPsdImportPreviewDialog::BuildTreeRecursive(
     for (const FPsdLayer& Layer : Layers)
     {
         TSharedPtr<FPsdLayerTreeItem> Item = MakeShared<FPsdLayerTreeItem>();
-        Item->LayerName = Layer.Name;
+        Item->LayerName = Layer.ParsedTags.CleanName.IsEmpty() ? Layer.Name : Layer.ParsedTags.CleanName;
         Item->WidgetTypeName = InferWidgetTypeName(Layer);
         Item->BadgeColor = BadgeColorForType(Item->WidgetTypeName);
         Item->bChecked = true;
@@ -666,7 +666,7 @@ TSharedRef<SWidget> SPsdImportPreviewDialog::BuildTagChipsForItem(const TSharedP
         [
             SNew(SBorder)
             .BorderImage(FAppStyle::GetBrush(TEXT("RoundedWarning")))
-            .BorderBackgroundColor(FLinearColor(0.20f, 0.30f, 0.50f, 0.85f))
+            .BorderBackgroundColor(FLinearColor(0.15f, 0.45f, 0.95f, 0.85f))
             .Padding(FMargin(5.f, 1.f))
             [
                 SNew(STextBlock)

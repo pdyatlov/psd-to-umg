@@ -74,6 +74,13 @@ struct PSD2UMG_API FPsdLayerEffects
 
 	// True if any of: inner shadow, gradient overlay, pattern overlay, bevel/emboss (per D-09)
 	bool bHasComplexEffects = false;
+
+	// Phase 4.1 TEXT-03 -- Layer-Style Stroke (from lfx2/FrFX descriptor).
+	// D-02: populated for ALL layer types; rendering on non-text is deferred to a future phase.
+	// Units: raw PSD pixels (DPI applied by FTextLayerMapper -- Option B per D-09).
+	bool bHasStroke = false;
+	FLinearColor StrokeColor = FLinearColor::Transparent;
+	float StrokeSize = 0.f;
 };
 
 /**

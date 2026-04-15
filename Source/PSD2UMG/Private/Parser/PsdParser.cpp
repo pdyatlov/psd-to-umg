@@ -506,14 +506,306 @@ namespace PSD2UMG::Parser::Internal
 		}
 	}
 
+	// ---------------------------------------------------------------------------
+	// Phase 4.1 TEXT-03: lfx2 / FrFX descriptor walker (D-01 corrected)
+	//
+	// Layer-Style Stroke in Photoshop CS+ is stored in the 'lfx2' (object-based
+	// effects) tagged block under descriptor key 'FrFX' (FrameFX).
+	// PhotoshopAPI v0.9 does not register 'lfx2' -- it surfaces as Unknown in
+	// unparsed_tagged_blocks().  The raw bytes are accessible via m_Data.
+	//
+	// lfx2 payload layout (PhotoshopAPI strips the 8BIM+key+length header):
+	//   [4 bytes] unknown / flags (always 0x00000000 in observed samples)
+	//   [4 bytes] descriptor version (0x00000010 = 16) -- the discriminator
+	//   [Descriptor] top-level descriptor with class_id 'null' and 12 items.
+	//                The stroke item has key 'FrFX' (Objc type).
+	//
+	// The walker is wrapped in try/catch -- malformed lfx2 blocks are silently
+	// skipped per RESEARCH Pitfall 1 defense.
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Walk the lfx2 (object-based effects) block, extract FrFX (Frame-FX / Stroke)
+	 * descriptor, and populate OutLayer.Effects.bHasStroke/StrokeColor/StrokeSize.
+	 * Called from ConvertLayerRecursive immediately after ExtractLayerEffects.
+	 * D-02: runs for ALL layer types; non-text rendering is deferred.
+	 */
+	static void ExtractLfx2Stroke(
+		const std::shared_ptr<PsdLayer>& InLayer,
+		FPsdLayer& OutLayer,
+		FPsdParseDiagnostics& OutDiag)
+	{
+		try
+		{
+			for (const auto& Block : InLayer->unparsed_tagged_blocks())
+			{
+				if (!Block) continue;
+				if (Block->getKey() != NAMESPACE_PSAPI::Enum::TaggedBlockKey::Unknown) continue;
+
+				const auto& Data = Block->m_Data;
+
+				// Discriminator: bytes [4..7] must be 0x00000010 (descriptor version 16).
+				// The first 4 bytes are flags (always 0) -- not the version.
+				if (Data.size() < 8) continue;
+				const uint32 DescVersion =
+					(static_cast<uint32>(static_cast<uint8>(Data[4])) << 24) |
+					(static_cast<uint32>(static_cast<uint8>(Data[5])) << 16) |
+					(static_cast<uint32>(static_cast<uint8>(Data[6])) << 8)  |
+					 static_cast<uint32>(static_cast<uint8>(Data[7]));
+				if (DescVersion != 0x00000010u) continue;
+
+				// This is likely an lfx2 block. Parse the Photoshop descriptor.
+				// The descriptor starts at byte offset 8 (after the 8-byte prefix).
+				size_t Pos = 8;
+
+				// ---- Low-level reader helpers ----
+				auto CheckRemaining = [&](size_t Need) -> bool
+				{
+					return (Pos + Need) <= Data.size();
+				};
+				auto ReadU8 = [&]() -> uint8
+				{
+					if (!CheckRemaining(1)) return 0;
+					return static_cast<uint8>(Data[Pos++]);
+				};
+				auto ReadU32BE = [&]() -> uint32
+				{
+					if (!CheckRemaining(4)) return 0;
+					uint32 V = (static_cast<uint32>(static_cast<uint8>(Data[Pos]))   << 24)
+					         | (static_cast<uint32>(static_cast<uint8>(Data[Pos+1])) << 16)
+					         | (static_cast<uint32>(static_cast<uint8>(Data[Pos+2])) << 8)
+					         |  static_cast<uint32>(static_cast<uint8>(Data[Pos+3]));
+					Pos += 4;
+					return V;
+				};
+				auto ReadDoubleBE = [&]() -> double
+				{
+					if (!CheckRemaining(8)) return 0.0;
+					uint8 Buf[8];
+					for (int i = 0; i < 8; ++i) Buf[i] = static_cast<uint8>(Data[Pos + i]);
+					Pos += 8;
+					// Reverse for little-endian host
+					uint8 Rev[8] = { Buf[7], Buf[6], Buf[5], Buf[4], Buf[3], Buf[2], Buf[1], Buf[0] };
+					double V;
+					FMemory::Memcpy(&V, Rev, 8);
+					return V;
+				};
+				// ps_string: uint32 len; if len==0 read 4-byte ASCII tag; else read len bytes.
+				auto ReadPsString = [&]() -> std::string
+				{
+					uint32 Len = ReadU32BE();
+					if (Len == 0)
+					{
+						if (!CheckRemaining(4)) return {};
+						char Tag[5] = {};
+						for (int i = 0; i < 4; ++i)
+							Tag[i] = static_cast<char>(static_cast<uint8>(Data[Pos + i]));
+						Pos += 4;
+						return std::string(Tag);
+					}
+					if (!CheckRemaining(Len)) return {};
+					std::string S;
+					S.resize(Len);
+					for (uint32 i = 0; i < Len; ++i)
+						S[i] = static_cast<char>(static_cast<uint8>(Data[Pos + i]));
+					Pos += Len;
+					return S;
+				};
+				// unicode_string: uint32 num_chars, then num_chars*2 bytes UTF-16 BE (skip content).
+				auto SkipUnicodeString = [&]()
+				{
+					uint32 Len = ReadU32BE();
+					Pos += Len * 2; // skip UTF-16 chars
+				};
+
+				// Recursive skip helper: ostype already consumed (4 bytes), skip the payload.
+				// Declared as std::function to allow self-recursion for Objc/VlLs.
+				std::function<void(const char*)> SkipValueAfterOsType;
+				SkipValueAfterOsType = [&](const char* OsType)
+				{
+					if (FCStringAnsi::Strcmp(OsType, "bool") == 0) { Pos += 1; }
+					else if (FCStringAnsi::Strcmp(OsType, "long") == 0) { Pos += 4; }
+					else if (FCStringAnsi::Strcmp(OsType, "doub") == 0) { Pos += 8; }
+					else if (FCStringAnsi::Strcmp(OsType, "UntF") == 0) { Pos += 12; } // 4 unit + 8 double
+					else if (FCStringAnsi::Strcmp(OsType, "enum") == 0) { ReadPsString(); ReadPsString(); }
+					else if (FCStringAnsi::Strcmp(OsType, "TEXT") == 0)
+					{
+						uint32 Len = ReadU32BE();
+						Pos += Len * 2; // UTF-16 chars
+					}
+					else if (FCStringAnsi::Strcmp(OsType, "tdta") == 0)
+					{
+						uint32 Len = ReadU32BE();
+						Pos += Len;
+					}
+					else if (FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					{
+						SkipUnicodeString();
+						ReadPsString(); // classID
+						uint32 Count = ReadU32BE();
+						for (uint32 i = 0; i < Count && CheckRemaining(8); ++i)
+						{
+							ReadPsString();
+							char OT2[5] = {};
+							for (int k = 0; k < 4; ++k)
+								OT2[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
+							Pos += 4;
+							SkipValueAfterOsType(OT2);
+						}
+					}
+					else if (FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
+					{
+						uint32 N = ReadU32BE();
+						for (uint32 i = 0; i < N && CheckRemaining(4); ++i)
+						{
+							char OT2[5] = {};
+							for (int k = 0; k < 4; ++k)
+								OT2[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
+							Pos += 4;
+							SkipValueAfterOsType(OT2);
+						}
+					}
+					else
+					{
+						// Unknown ostype -- log verbose and stop walking (safe abort)
+						UE_LOG(LogPSD2UMG, Verbose,
+							TEXT("ExtractLfx2Stroke: unknown ostype '%.4hs' at pos %zu; aborting"),
+							OsType, Pos);
+						Pos = Data.size(); // force loop exit
+					}
+				};
+
+				// ---- Walk the top-level descriptor ----
+				// Descriptor header: unicode_class_name, ps_string classID, uint32 item_count
+				SkipUnicodeString(); // class name (usually empty)
+				ReadPsString();       // classID ('null')
+				uint32 TopCount = ReadU32BE();
+
+				bool bFoundStroke = false;
+				for (uint32 i = 0; i < TopCount && CheckRemaining(8) && !bFoundStroke; ++i)
+				{
+					std::string ItemKey = ReadPsString();
+
+					if (!CheckRemaining(4)) break;
+					char OsType[5] = {};
+					for (int k = 0; k < 4; ++k)
+						OsType[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
+					Pos += 4;
+
+					// We are looking for 'FrFX' with ostype 'Objc' (the stroke sub-descriptor)
+					if (ItemKey == "FrFX" && FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					{
+						// ---- Parse the FrFX Objc descriptor ----
+						SkipUnicodeString(); // class name
+						ReadPsString();       // classID ('FrFX')
+						uint32 FrFXCount = ReadU32BE();
+
+						bool  bEnab      = false;
+						double SzPx      = 0.0;
+						double OpctPct   = 100.0;
+						double Rd        = 0.0, Grn = 0.0, Bl = 0.0;
+
+						for (uint32 j = 0; j < FrFXCount && CheckRemaining(8); ++j)
+						{
+							std::string FKey = ReadPsString();
+
+							if (!CheckRemaining(4)) break;
+							char FOsType[5] = {};
+							for (int k = 0; k < 4; ++k)
+								FOsType[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
+							Pos += 4;
+
+							if (FKey == "enab" && FCStringAnsi::Strcmp(FOsType, "bool") == 0)
+							{
+								bEnab = (ReadU8() != 0);
+							}
+							else if (FKey == "Sz  " && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
+							{
+								Pos += 4; // skip unit tag (#Pxl)
+								SzPx = ReadDoubleBE();
+							}
+							else if (FKey == "Opct" && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
+							{
+								Pos += 4; // skip unit tag (#Prc)
+								OpctPct = ReadDoubleBE();
+							}
+							else if (FKey == "Clr " && FCStringAnsi::Strcmp(FOsType, "Objc") == 0)
+							{
+								// RGBC sub-descriptor: keys "Rd  ", "Grn ", "Bl  " -- doubles in 0..255
+								SkipUnicodeString();
+								ReadPsString(); // classID ('RGBC')
+								uint32 ClrCount = ReadU32BE();
+								for (uint32 c = 0; c < ClrCount && CheckRemaining(8); ++c)
+								{
+									std::string CKey = ReadPsString();
+									if (!CheckRemaining(4)) break;
+									char COsType[5] = {};
+									for (int k = 0; k < 4; ++k)
+										COsType[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
+									Pos += 4;
+									if (FCStringAnsi::Strcmp(COsType, "doub") == 0)
+									{
+										double V = ReadDoubleBE();
+										if      (CKey == "Rd  ") Rd  = V;
+										else if (CKey == "Grn ") Grn = V;
+										else if (CKey == "Bl  ") Bl  = V;
+									}
+									else
+									{
+										SkipValueAfterOsType(COsType);
+									}
+								}
+							}
+							else
+							{
+								SkipValueAfterOsType(FOsType);
+							}
+						}
+
+						if (bEnab)
+						{
+							OutLayer.Effects.bHasStroke = true;
+							OutLayer.Effects.StrokeSize = static_cast<float>(SzPx);
+							const float A = FMath::Clamp(static_cast<float>(OpctPct / 100.0), 0.f, 1.f);
+							OutLayer.Effects.StrokeColor = FLinearColor::FromSRGBColor(
+								FColor(
+									static_cast<uint8>(FMath::Clamp(Rd  / 255.0, 0.0, 1.0) * 255.0),
+									static_cast<uint8>(FMath::Clamp(Grn / 255.0, 0.0, 1.0) * 255.0),
+									static_cast<uint8>(FMath::Clamp(Bl  / 255.0, 0.0, 1.0) * 255.0),
+									static_cast<uint8>(A * 255.0)));
+							UE_LOG(LogPSD2UMG, Log,
+								TEXT("Layer '%s' lfx2 stroke: enab=1 size=%.2fpx color=(%.2f,%.2f,%.2f,%.2f)"),
+								*OutLayer.Name,
+								OutLayer.Effects.StrokeSize,
+								OutLayer.Effects.StrokeColor.R,
+								OutLayer.Effects.StrokeColor.G,
+								OutLayer.Effects.StrokeColor.B,
+								OutLayer.Effects.StrokeColor.A);
+						}
+
+						bFoundStroke = true; // stop searching this block
+					}
+					else
+					{
+						SkipValueAfterOsType(OsType);
+					}
+				}
+
+				if (bFoundStroke)
+					break; // one lfx2 per layer
+			}
+		}
+		catch (...)
+		{
+			OutDiag.AddWarning(OutLayer.Name,
+				TEXT("Failed to parse lfx2 stroke block; silently ignored."));
+		}
+	}
+
 	// Phase 4.1 D-05/D-06: route text-parented layer effects onto the text payload
 	// and clear the Effects flags so downstream generator paths do not double-render
 	// (D-13). Called from ConvertLayerRecursive after both ExtractLayerEffects and
-	// ExtractSingleRunText have populated their respective fields.
-	//
-	// Plan 04.1-01 routes Drop Shadow only. Plan 04.1-02 extends this helper for
-	// Stroke -- keep the shape such that adding `if (Layer.Effects.bHasStroke) { ... }`
-	// is a minimal diff.
+	// ExtractLfx2Stroke have populated their respective fields.
 	static void RouteTextEffects(FPsdLayer& Layer)
 	{
 		if (Layer.Type != EPsdLayerType::Text) return;
@@ -524,7 +816,20 @@ namespace PSD2UMG::Parser::Internal
 			Layer.Text.ShadowColor  = Layer.Effects.DropShadowColor;   // opacity baked into A
 			Layer.Effects.bHasDropShadow = false;                      // D-13 double-render guard
 		}
-		// TEXT-03 stroke routing added by Plan 04.1-02.
+
+		// TEXT-03 -- D-03: Layer-Style stroke wins over TySh stroke (D-04: silent override
+		// with optional Verbose log if TySh had already set OutlineSize).
+		if (Layer.Effects.bHasStroke)
+		{
+			if (Layer.Text.OutlineSize > 0.f)
+			{
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Layer-Style stroke overriding TySh stroke on layer '%s'"), *Layer.Name);
+			}
+			Layer.Text.OutlineColor  = Layer.Effects.StrokeColor;
+			Layer.Text.OutlineSize   = Layer.Effects.StrokeSize; // raw PSD px; mapper applies x0.75
+			Layer.Effects.bHasStroke = false;                    // D-13-style guard
+		}
 	}
 
 	void ConvertLayerRecursive(
@@ -547,6 +852,8 @@ namespace PSD2UMG::Parser::Internal
 
 		// Phase 5: extract layer effects from lrFX tagged block
 		ExtractLayerEffects(InLayer, OutLayer, OutDiag);
+		// Phase 4.1 TEXT-03: extract Layer-Style Stroke from lfx2 descriptor (D-02: all layer types)
+		ExtractLfx2Stroke(InLayer, OutLayer, OutDiag);
 
 		// Layer-type dispatch via RTTI. bUseRTTI=true is set in PSD2UMG.Build.cs.
 		if (auto Group = std::dynamic_pointer_cast<GroupLayer<PsdPixelType>>(InLayer))

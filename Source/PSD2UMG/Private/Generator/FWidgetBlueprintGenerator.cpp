@@ -10,6 +10,7 @@
 #include "PSD2UMGSetting.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "WidgetBlueprintGeneratedClass.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
@@ -377,6 +378,58 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     {
         UE_LOG(LogPSD2UMG, Error, TEXT("FWidgetBlueprintGenerator: FactoryCreateNew returned null for %s"), *WbpAssetName);
         return nullptr;
+    }
+
+    // Step 2b: Evict any widgets the factory / OnWidgetBlueprintCreated hook
+    // inserted before we populate. Project plugins commonly listen to this
+    // event and inject default widgets; they can collide by-name with PSD
+    // layer widgets during blueprint compile ("Cannot replace existing object
+    // of a different class"). Sweeping here guarantees a pristine tree.
+    if (WBP->WidgetTree)
+    {
+        WBP->WidgetTree->RootWidget = nullptr;
+        TArray<UObject*> TreeSubobjects;
+        GetObjectsWithOuter(WBP->WidgetTree, TreeSubobjects, /*bIncludeNestedObjects=*/true);
+        int32 EvictedCount = 0;
+        for (UObject* Obj : TreeSubobjects)
+        {
+            if (!Obj) continue;
+            Obj->ClearFlags(RF_Standalone | RF_Public);
+            Obj->MarkAsGarbage();
+            Obj->Rename(nullptr, GetTransientPackage(),
+                REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
+            ++EvictedCount;
+        }
+        if (EvictedCount > 0)
+        {
+            UE_LOG(LogPSD2UMG, Warning,
+                TEXT("FWidgetBlueprintGenerator: evicted %d factory/hook-inserted widget(s) from fresh WidgetTree"),
+                EvictedCount);
+        }
+    }
+
+    // Also sweep the BlueprintGeneratedClass CDO's WidgetTree archetype if it
+    // exists — same reasoning as above but for the class-level defaults that
+    // get baked into the generated class template during compile.
+    if (WBP->GeneratedClass)
+    {
+        if (UWidgetBlueprintGeneratedClass* BPGClass = Cast<UWidgetBlueprintGeneratedClass>(WBP->GeneratedClass))
+        {
+            if (UWidgetTree* ArchetypeTree = BPGClass->GetWidgetTreeArchetype())
+            {
+                ArchetypeTree->RootWidget = nullptr;
+                TArray<UObject*> ArchetypeSubobjects;
+                GetObjectsWithOuter(ArchetypeTree, ArchetypeSubobjects, /*bIncludeNestedObjects=*/true);
+                for (UObject* Obj : ArchetypeSubobjects)
+                {
+                    if (!Obj) continue;
+                    Obj->ClearFlags(RF_Standalone | RF_Public);
+                    Obj->MarkAsGarbage();
+                    Obj->Rename(nullptr, GetTransientPackage(),
+                        REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
+                }
+            }
+        }
     }
 
     // Step 3: Set up root canvas

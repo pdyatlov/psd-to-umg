@@ -869,15 +869,15 @@ namespace PSD2UMG::Parser::Internal
 			const int64 ContentStart = LenAt + 4;
 			if (ContentStart + static_cast<int64>(BlockLen) > N) continue;
 
-			// Scan backwards for nearest 8BIM+luni before this offset
+			// Scan FORWARD for nearest 8BIM+luni after this offset.
+			// PSD layer records write lfx2 near the START of the additional-info
+			// section and luni near the END, so the owning layer's luni is the
+			// next luni in the file, not the previous one.
 			FString LayerName;
-			int64 SearchFrom = i - 8; // start just before this block
-			for (int64 j = SearchFrom; j >= 0; --j)
+			for (int64 j = ContentStart + BlockLen; j <= N - 8; ++j)
 			{
 				if (FileBytes[j] != 0x38) continue;
-				if (j + 8 > N) continue;
 				if (FMemory::Memcmp(&FileBytes[j], LuniSig, 8) != 0) continue;
-				// Found luni block
 				LayerName = ParseLuniLayerName(FileBytes, j);
 				break;
 			}
@@ -885,7 +885,7 @@ namespace PSD2UMG::Parser::Internal
 			if (LayerName.IsEmpty())
 			{
 				OutDiag.AddWarning(TEXT(""),
-					FString::Printf(TEXT("lfx2 at offset %lld: could not find preceding luni block; skipping."),
+					FString::Printf(TEXT("lfx2 at offset %lld: could not find following luni block; skipping."),
 						static_cast<long long>(i)));
 				continue;
 			}

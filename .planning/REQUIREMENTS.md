@@ -191,8 +191,8 @@
 | TEX-03 | Phase 3 | Complete |
 | TEXT-01 | Phase 4 | Complete |
 | TEXT-02 | Phase 4 | Complete |
-| TEXT-03 | Phase 4 → 4.1 | Unsatisfied (layer-style stroke on text hits D-08 flatten path — needs text-effect dispatch) |
-| TEXT-04 | Phase 4 → 4.1 | Deferred to Phase 4.1 (layer-style shadow on text — same dispatch fix as TEXT-03) |
+| TEXT-03 | Phase 4.1 | Complete (lfx2/FrFX raw-file scanner + RouteTextEffects stroke branch; in-editor smoke test 2026-04-15) |
+| TEXT-04 | Phase 4.1 | Complete (RouteTextEffects shadow branch + UTextBlock::SetShadowOffset/ColorAndOpacity; in-editor smoke test 2026-04-15) |
 | TEXT-05 | Phase 4 | Complete |
 | TEXT-06 | Phase 4 | Complete |
 | FX-01 | Phase 5 | Complete |

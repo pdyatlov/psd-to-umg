@@ -15,8 +15,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: UE5 Port** - Rename plugin, fix deprecated APIs, verify clean load in UE 5.7.4
 - [x] **Phase 2: C++ PSD Parser** - Integrate PhotoshopAPI, build FPsdParser, replace Python import pipeline
 - [x] **Phase 3: Layer Mapping & Widget Blueprint Generation** - Map PSD layers to UMG widgets, generate valid Widget Blueprints with textures and anchors (completed 2026-04-09)
-- [ ] **Phase 4: Text, Fonts & Typography** - Full text layer support with DPI conversion, font mapping, outline, shadow
-- [ ] **Phase 5: Layer Effects & Blend Modes** - Opacity, color overlay, drop shadow, flatten fallback for complex effects
+- [x] **Phase 4: Text, Fonts & Typography** - Full text layer support with DPI conversion, font mapping, outline, shadow (completed 2026-04-15 via Phase 4.1 gap closure)
+- [x] **Phase 5: Layer Effects & Blend Modes** - Opacity, color overlay, drop shadow, flatten fallback for complex effects
 - [x] **Phase 6: Advanced Layout** - 9-slice, improved anchors, Smart Object recursive import, variant switchers (completed 2026-04-10)
 - [x] **Phase 7: Editor UI, Preview & Settings** - Plugin settings, import preview dialog, reimport, context menu, CommonUI mode, animations (completed 2026-04-10)
 - [x] **Phase 8: Testing, Documentation & Release** - Unit/integration tests, test PSDs, docs, CI/CD, example project (completed 2026-04-13)

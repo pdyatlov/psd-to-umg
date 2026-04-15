@@ -322,9 +322,47 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
         UE_LOG(LogPSD2UMG, Warning,
             TEXT("FWidgetBlueprintGenerator: removing existing blueprint '%s' before regeneration"),
             *WbpAssetName);
+
+        // Rename every widget in the old WidgetTree out of the canonical path first.
+        // Without this, a surviving widget archetype (e.g., inside the BlueprintGeneratedClass
+        // CDO) can collide by-name with the new tree during compilation, producing
+        // "Cannot replace existing object of a different class" fatal asserts when
+        // the PSD's widget class for that name changes between imports.
+        if (UWidgetBlueprint* ExistingWBP = Cast<UWidgetBlueprint>(Existing))
+        {
+            if (UWidgetTree* OldTree = ExistingWBP->WidgetTree)
+            {
+                TArray<UWidget*> OldWidgets;
+                OldTree->ForEachWidget([&OldWidgets](UWidget* W) { if (W) OldWidgets.Add(W); });
+                for (UWidget* W : OldWidgets)
+                {
+                    W->ClearFlags(RF_Standalone | RF_Public);
+                    W->MarkAsGarbage();
+                    W->Rename(nullptr, GetTransientPackage(),
+                        REN_DontCreateRedirectors | REN_NonTransactional);
+                }
+                OldTree->RootWidget = nullptr;
+            }
+        }
+
         Existing->ClearFlags(RF_Standalone | RF_Public);
         Existing->MarkAsGarbage();
         Existing->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
+
+        // Also clear the BlueprintGeneratedClass path if it survived. Its CDO holds
+        // widget-archetype subobjects that otherwise reappear at the canonical names.
+        if (UClass* OldClass = FindObject<UClass>(WbpPackage, *FString::Printf(TEXT("%s_C"), *WbpAssetName)))
+        {
+            OldClass->ClearFlags(RF_Standalone | RF_Public);
+            OldClass->MarkAsGarbage();
+            OldClass->Rename(nullptr, GetTransientPackage(),
+                REN_DontCreateRedirectors | REN_NonTransactional);
+        }
+
+        // Force a GC pass so stale subobjects are actually reaped before the new
+        // blueprint claims the path. Without this the class/archetype references
+        // can linger long enough to trip the by-name check in StaticAllocateObject.
+        CollectGarbage(RF_NoFlags, /*bPurgeObjectsOnFullPurge=*/true);
     }
 
     // Step 2: Create WBP via factory (canonical editor path — same as "New Widget Blueprint" in Content Browser)

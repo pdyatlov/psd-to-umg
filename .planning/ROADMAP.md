@@ -190,7 +190,7 @@ Plans:
 **Requirements:** TEXT-03, TEXT-04
 **Depends on:** Phase 4, Phase 5, Phase 9
 **Gap Closure:** Closes requirement gaps from `.planning/v1.0-MILESTONE-AUDIT.md`
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [x] 04.1-01-PLAN.md — TEXT-04 Drop Shadow routing: un-comment FPsdTextRun shadow fields, add RouteTextEffects helper, mapper shadow block, TextEffects.psd fixture + FTextEffectsSpec (Wave 1)

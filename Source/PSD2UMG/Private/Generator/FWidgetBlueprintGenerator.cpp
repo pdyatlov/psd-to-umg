@@ -391,12 +391,17 @@ static void CollectWidgetsByName(UWidgetTree* Tree, TMap<FString, UWidget*>& Out
 }
 
 // ---------------------------------------------------------------------------
-// Internal helper: recursively update canvas from layer array
+// Internal helper: recursively update canvas from layer array.
+// Parent is generalized to UPanelWidget*:
+//   UCanvasPanel  -> AddChildToCanvas + anchor/offset/z-order for new children;
+//                    diff-update strategy for existing canvas children.
+//   UPanelWidget* -> AddChild (engine-default slot) for new children;
+//                    clear-and-rebuild via PopulateChildren for non-canvas recursion (D-11).
 // ---------------------------------------------------------------------------
 static void UpdateCanvas(
     FLayerMappingRegistry& Registry,
     UWidgetTree* Tree,
-    UCanvasPanel* Parent,
+    UPanelWidget* Parent,
     const TArray<FPsdLayer>& Layers,
     const FPsdDocument& Doc,
     const FIntPoint& CanvasSize,
@@ -417,7 +422,7 @@ static void UpdateCanvas(
             ExistingWidgets.Remove(Layer.Name); // mark as handled
 
             // Update PSD-sourced properties on existing widget
-            // Update canvas slot position/size
+            // Canvas-only: update slot position/size (non-canvas slots have no PSD-sourced state — D-03)
             if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Existing->Slot))
             {
                 FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer, Layer.Bounds, CanvasSize);
@@ -471,7 +476,7 @@ static void UpdateCanvas(
         }
         else
         {
-            // New layer: create widget and add to canvas
+            // New layer: create widget and attach to parent
             if (Layer.Bounds.IsEmpty() && Layer.Type != EPsdLayerType::Group)
             {
                 UE_LOG(LogPSD2UMG, Warning, TEXT("Update: skipping zero-size new layer: %s"), *Layer.Name);
@@ -485,8 +490,20 @@ static void UpdateCanvas(
                 continue;
             }
 
-            UCanvasPanelSlot* Slot = Parent->AddChildToCanvas(NewWidget);
-            if (Slot)
+            // Dispatch attachment on parent panel type (D-10)
+            UPanelSlot* Slot = nullptr;
+            UCanvasPanel* CanvasParent = Cast<UCanvasPanel>(Parent);
+            if (CanvasParent)
+            {
+                Slot = CanvasParent->AddChildToCanvas(NewWidget);
+            }
+            else
+            {
+                Slot = Parent->AddChild(NewWidget);
+            }
+
+            // Canvas-only: apply anchor/offset layout to new widget slot
+            if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
             {
                 FAnchorResult AnchorResult = FAnchorCalculator::Calculate(Layer, Layer.Bounds, CanvasSize);
                 FAnchorData Data;
@@ -512,7 +529,7 @@ static void UpdateCanvas(
                         static_cast<float>(CanvasSize.X - Layer.Bounds.Max.X),
                         static_cast<float>(CanvasSize.Y - Layer.Bounds.Max.Y));
                 }
-                Slot->SetLayout(Data);
+                CanvasSlot->SetLayout(Data);
             }
             UE_LOG(LogPSD2UMG, Log, TEXT("Update: added new widget '%s'"), *Layer.Name);
         }
@@ -520,21 +537,40 @@ static void UpdateCanvas(
         // Recurse into group children
         if (Layer.Type == EPsdLayerType::Group && !Layer.Children.IsEmpty())
         {
+            UPanelWidget* ChildPanel = nullptr;
             UWidget** GroupWidgetPtr = ExistingWidgets.Find(Layer.Name);
-            UCanvasPanel* ChildCanvas = nullptr;
             if (GroupWidgetPtr)
             {
-                ChildCanvas = Cast<UCanvasPanel>(*GroupWidgetPtr);
+                ChildPanel = Cast<UPanelWidget>(*GroupWidgetPtr);
             }
-            if (!ChildCanvas)
+            if (!ChildPanel)
             {
                 // Try to find from the newly added widget
                 UWidget* Added = Tree->FindWidget(FName(*Layer.Name));
-                ChildCanvas = Cast<UCanvasPanel>(Added);
+                ChildPanel = Cast<UPanelWidget>(Added);
             }
-            if (ChildCanvas)
+            if (ChildPanel)
             {
-                UpdateCanvas(Registry, Tree, ChildCanvas, Layer.Children, Doc, CanvasSize, ExistingWidgets, SkippedLayerNames);
+                if (!Cast<UCanvasPanel>(ChildPanel))
+                {
+                    // D-11: clear-and-rebuild for non-canvas panels.
+                    // Non-canvas slots carry no PSD-sourced state worth preserving,
+                    // so the simplest correct approach is to clear and re-add children
+                    // via the same PopulateChildren helper used by the Generate path.
+                    ChildPanel->ClearChildren();
+                    PopulateChildren(Registry, Tree, ChildPanel, Layer.Children, Doc, CanvasSize, SkippedLayerNames);
+                }
+                else
+                {
+                    // Canvas: preserve diff-update behavior (PANEL-05 parity)
+                    UpdateCanvas(Registry, Tree, ChildPanel, Layer.Children, Doc, CanvasSize, ExistingWidgets, SkippedLayerNames);
+                }
+            }
+            else
+            {
+                UE_LOG(LogPSD2UMG, Error,
+                    TEXT("Update: group layer '%s' has no matching UPanelWidget in existing WBP; %d children dropped"),
+                    *Layer.Name, Layer.Children.Num());
             }
         }
     }

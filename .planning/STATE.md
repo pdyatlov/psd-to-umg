@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 04.1-01-PLAN.md
-last_updated: "2026-04-15T09:04:32.172Z"
+status: verifying
+stopped_at: Completed 04.1-02-PLAN.md
+last_updated: "2026-04-15T09:15:38.057Z"
 last_activity: 2026-04-15
 progress:
   total_phases: 10
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 33
-  completed_plans: 32
+  completed_plans: 33
   percent: 97
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 04.1 (text-layer-effects-dispatch) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-15
 
 Progress: [██████████] 97%
@@ -79,6 +79,7 @@ Progress: [██████████] 97%
 | Phase 09-unified-layer-naming-convention-tag-based P03 | 3h | 4 tasks | 6 files |
 | Phase 09-unified-layer-naming-convention-tag-based P04 | 5m | 2 tasks | 2 files |
 | Phase 04.1-text-layer-effects-dispatch P01 | 20m | 2 tasks | 5 files |
+| Phase 04.1-text-layer-effects-dispatch P02 | 25m | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -117,6 +118,8 @@ Recent decisions affecting current work:
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-04] Migration guide documents delete-and-reimport as the supported path for pre-Phase-9 WBPs (option-a ParsedTags.CleanName identity from Plan 02 surfaced as designer-facing guidance)
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-04] Button_NN retained in README as Phase-9 parser auto-name (D-21), not legacy dispatch; benign grep hit
 - [Phase 04.1-text-layer-effects-dispatch]: DPI conversion for shadow offset applied in FTextLayerMapper (D-09 Option B) matching OutlineSize pattern; RouteTextEffects helper in Internal namespace clears bHasDropShadow after routing (D-13 guard)
+- [Phase 04.1-text-layer-effects-dispatch]: lfx2 discriminator at m_Data[4..7] (version=0x10), not [0..3] as documented; 8-byte prefix confirmed empirically
+- [Phase 04.1-text-layer-effects-dispatch]: Hand-rolled lfx2 descriptor walker with std::function recursive skip for Objc/VlLs; FLinearColor::FromSRGBColor for RGBC channels (no ARGB swizzle)
 
 ### Roadmap Evolution
 
@@ -134,6 +137,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T09:04:32.168Z
-Stopped at: Completed 04.1-01-PLAN.md
+Last session: 2026-04-15T09:15:38.052Z
+Stopped at: Completed 04.1-02-PLAN.md
 Resume file: None

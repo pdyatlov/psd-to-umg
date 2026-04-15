@@ -194,4 +194,4 @@ Plans:
 
 Plans:
 - [x] 04.1-01-PLAN.md — TEXT-04 Drop Shadow routing: un-comment FPsdTextRun shadow fields, add RouteTextEffects helper, mapper shadow block, TextEffects.psd fixture + FTextEffectsSpec (Wave 1)
-- [ ] 04.1-02-PLAN.md — TEXT-03 Layer-Style Stroke: lfx2/FrFX descriptor walker, FPsdLayerEffects stroke fields, extend RouteTextEffects + fixture + invert PsdParserSpec text_stroked (Wave 2)
+- [x] 04.1-02-PLAN.md — TEXT-03 Layer-Style Stroke: lfx2/FrFX descriptor walker, FPsdLayerEffects stroke fields, extend RouteTextEffects + fixture + invert PsdParserSpec text_stroked (Wave 2)

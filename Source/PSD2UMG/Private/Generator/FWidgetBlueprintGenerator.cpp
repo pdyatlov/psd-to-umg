@@ -13,6 +13,8 @@
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
+#include "Components/PanelSlot.h"
+#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "UObject/UObjectGlobals.h"
@@ -23,12 +25,15 @@
 #include "WidgetBlueprint.h"
 
 // ---------------------------------------------------------------------------
-// Internal helper: recursively populate a canvas panel from a layer array
+// Internal helper: recursively populate a panel widget from a layer array.
+// Dispatches child attachment on the runtime type of Parent:
+//   UCanvasPanel  -> AddChildToCanvas + full anchor/offset/z-order logic
+//   UPanelWidget* -> AddChild (engine-default slot; no positional data)
 // ---------------------------------------------------------------------------
-static void PopulateCanvas(
+static void PopulateChildren(
     FLayerMappingRegistry& Registry,
     UWidgetTree* Tree,
-    UCanvasPanel* Parent,
+    UPanelWidget* Parent,
     const TArray<FPsdLayer>& Layers,
     const FPsdDocument& Doc,
     const FIntPoint& CanvasSize,
@@ -64,6 +69,9 @@ static void PopulateCanvas(
         {
             FlattenedLayer = Layer;
             FlattenedLayer.Type = EPsdLayerType::Image;
+            // Mappers dispatch on ParsedTags.Type; keep it in lock-step with Type
+            // so the flattened copy routes to FImageLayerMapper instead of FGroupLayerMapper.
+            FlattenedLayer.ParsedTags.Type = EPsdTagType::Image;
             FlattenedLayer.Children.Empty(); // flatten = no children
             LayerPtr = &FlattenedLayer;
             bFlattened = true;
@@ -81,9 +89,24 @@ static void PopulateCanvas(
             continue; // D-08: skip + warn
         }
 
-        // Add to canvas and configure slot
-        UCanvasPanelSlot* Slot = Parent->AddChildToCanvas(Widget);
-        if (Slot)
+        // ---- Dispatch child attachment on parent panel type ----
+        UPanelSlot* Slot = nullptr;
+        UCanvasPanel* CanvasParent = Cast<UCanvasPanel>(Parent);
+        if (CanvasParent)
+        {
+            Slot = CanvasParent->AddChildToCanvas(Widget);
+        }
+        else
+        {
+            Slot = Parent->AddChild(Widget);
+            UE_LOG(LogPSD2UMG, Log,
+                TEXT("Layer '%s' attached to non-canvas parent '%s' (class %s) — slot defaults applied"),
+                *LayerPtr->Name, *Parent->GetName(), *Parent->GetClass()->GetName());
+        }
+        if (!Slot) { continue; }
+
+        // ---- Canvas-only: anchor/offset/z-order configuration ----
+        if (UCanvasPanelSlot* CanvasSlot = Cast<UCanvasPanelSlot>(Slot))
         {
             FAnchorData Data;
             Data.Alignment = FVector2D(0.f, 0.f);
@@ -161,9 +184,9 @@ static void PopulateCanvas(
                 Data.Offsets.Right = LayerPtr->Text.BoxWidthPx;
             }
 
-            Slot->SetLayout(Data);
+            CanvasSlot->SetLayout(Data);
             // ZOrder: PSD index 0 = topmost. UMG higher = on top. Invert.
-            Slot->SetZOrder(TotalLayers - 1 - i);
+            CanvasSlot->SetZOrder(TotalLayers - 1 - i);
 
             UE_LOG(LogPSD2UMG, Log,
                 TEXT("Layer '%s': bounds=(%d,%d)-(%d,%d) canvas=%dx%d anchors=(%.2f,%.2f,%.2f,%.2f) stretchH=%d stretchV=%d offsets=(L%.1f T%.1f R%.1f B%.1f)"),
@@ -175,37 +198,7 @@ static void PopulateCanvas(
                 AnchorResult.bStretchH ? 1 : 0, AnchorResult.bStretchV ? 1 : 0,
                 Data.Offsets.Left, Data.Offsets.Top, Data.Offsets.Right, Data.Offsets.Bottom);
 
-            // ---- Phase 5: Layer Effects ----
-
-            // FX-01: Opacity (per D-03) — only set when < 1.0
-            if (LayerPtr->Opacity < 1.0f)
-            {
-                Widget->SetRenderOpacity(LayerPtr->Opacity);
-            }
-
-            // FX-02: Visibility (per D-01, D-02) — create as Collapsed if hidden
-            if (!LayerPtr->bVisible)
-            {
-                Widget->SetVisibility(ESlateVisibility::Collapsed);
-            }
-
-            // FX-03: Color Overlay (per D-04, D-05) — image layers only
-            if (LayerPtr->Effects.bHasColorOverlay)
-            {
-                if (UImage* Img = Cast<UImage>(Widget))
-                {
-                    FSlateBrush Brush = Img->GetBrush();
-                    Brush.TintColor = FSlateColor(LayerPtr->Effects.ColorOverlayColor);
-                    Img->SetBrush(Brush);
-                }
-                else
-                {
-                    UE_LOG(LogPSD2UMG, Warning,
-                        TEXT("Color overlay on non-image layer '%s' ignored (per D-05)."), *LayerPtr->Name);
-                }
-            }
-
-            // FX-04: Drop Shadow (per D-06, D-07, D-08)
+            // FX-04: Drop Shadow (per D-06, D-07, D-08) — canvas-only sibling pattern
             if (LayerPtr->Effects.bHasDropShadow && LayerPtr->Type == EPsdLayerType::Image)
             {
                 if (UImage* MainImg = Cast<UImage>(Widget))
@@ -224,35 +217,78 @@ static void PopulateCanvas(
                     ShadowImg->SetRenderOpacity(LayerPtr->Effects.DropShadowColor.A);
 
                     // Add to canvas and position with offset
-                    UCanvasPanelSlot* ShadowSlot = Parent->AddChildToCanvas(ShadowImg);
+                    UCanvasPanelSlot* ShadowSlot = CanvasParent->AddChildToCanvas(ShadowImg);
                     if (ShadowSlot)
                     {
                         FAnchorData ShadowData;
-                        ShadowData.Anchors = Slot->GetLayout().Anchors;
-                        FMargin ShadowOffsets = Slot->GetLayout().Offsets;
+                        ShadowData.Anchors = CanvasSlot->GetLayout().Anchors;
+                        FMargin ShadowOffsets = CanvasSlot->GetLayout().Offsets;
                         ShadowOffsets.Left += static_cast<float>(LayerPtr->Effects.DropShadowOffset.X);
                         ShadowOffsets.Top += static_cast<float>(LayerPtr->Effects.DropShadowOffset.Y);
                         ShadowData.Offsets = ShadowOffsets;
                         ShadowSlot->SetLayout(ShadowData);
                         // Shadow behind main widget (lower ZOrder)
-                        ShadowSlot->SetZOrder(Slot->GetZOrder() - 1);
+                        ShadowSlot->SetZOrder(CanvasSlot->GetZOrder() - 1);
                     }
                 }
             }
-            else if (LayerPtr->Effects.bHasDropShadow)
+            else if (LayerPtr->Effects.bHasDropShadow && LayerPtr->Type != EPsdLayerType::Image)
             {
                 UE_LOG(LogPSD2UMG, Warning,
                     TEXT("Drop shadow on non-image layer '%s' — no-op (per D-08)."), *LayerPtr->Name);
+            }
+        } // end canvas-only block
+
+        // ---- Drop-shadow skip warning for non-canvas parents (D-06) ----
+        if (!CanvasParent && LayerPtr->Effects.bHasDropShadow && LayerPtr->Type == EPsdLayerType::Image)
+        {
+            UE_LOG(LogPSD2UMG, Warning,
+                TEXT("Drop shadow on layer '%s' inside non-canvas parent '%s' — no-op (canvas-only sibling pattern)."),
+                *LayerPtr->Name, *Parent->GetName());
+        }
+
+        // ---- Phase 5: Layer Effects — operate on Widget directly, independent of parent type ----
+
+        // FX-01: Opacity (per D-03) — only set when < 1.0
+        if (LayerPtr->Opacity < 1.0f)
+        {
+            Widget->SetRenderOpacity(LayerPtr->Opacity);
+        }
+
+        // FX-02: Visibility (per D-01, D-02) — create as Collapsed if hidden
+        if (!LayerPtr->bVisible)
+        {
+            Widget->SetVisibility(ESlateVisibility::Collapsed);
+        }
+
+        // FX-03: Color Overlay (per D-04, D-05) — image layers only
+        if (LayerPtr->Effects.bHasColorOverlay)
+        {
+            if (UImage* Img = Cast<UImage>(Widget))
+            {
+                FSlateBrush Brush = Img->GetBrush();
+                Brush.TintColor = FSlateColor(LayerPtr->Effects.ColorOverlayColor);
+                Img->SetBrush(Brush);
+            }
+            else
+            {
+                UE_LOG(LogPSD2UMG, Warning,
+                    TEXT("Color overlay on non-image layer '%s' ignored (per D-05)."), *LayerPtr->Name);
             }
         }
 
         // Recurse into group children (skip if flattened)
         if (!bFlattened && Layer.Type == EPsdLayerType::Group && !Layer.Children.IsEmpty())
         {
-            UCanvasPanel* ChildCanvas = Cast<UCanvasPanel>(Widget);
-            if (ChildCanvas)
+            if (UPanelWidget* ChildPanel = Cast<UPanelWidget>(Widget))
             {
-                PopulateCanvas(Registry, Tree, ChildCanvas, Layer.Children, Doc, CanvasSize, SkippedLayerNames);
+                PopulateChildren(Registry, Tree, ChildPanel, Layer.Children, Doc, CanvasSize, SkippedLayerNames);
+            }
+            else
+            {
+                UE_LOG(LogPSD2UMG, Error,
+                    TEXT("Group layer '%s' mapped to non-panel widget '%s' (class %s); %d children dropped"),
+                    *Layer.Name, *Widget->GetName(), *Widget->GetClass()->GetName(), Layer.Children.Num());
             }
         }
     }
@@ -323,7 +359,7 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     // the parent WBP location without interface changes (per plan 06-02 depth strategy).
     FSmartObjectImporter::SetCurrentPackagePath(WbpPackagePath);
     FLayerMappingRegistry Registry;
-    PopulateCanvas(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
+    PopulateChildren(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
 
     // Step 5: Compile AFTER full tree population (critical — compiling before population leaves empty BP)
     FKismetEditorUtilities::CompileBlueprint(WBP);

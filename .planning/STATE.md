@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 09-04-PLAN.md (migration guide + README rewrite) — Phase 9 complete
-last_updated: "2026-04-14T15:36:19.376Z"
-last_activity: 2026-04-14
+status: executing
+stopped_at: 04.1-01 code tasks complete; awaiting TextEffects.psd fixture (human-action checkpoint)
+last_updated: "2026-04-15T08:56:47.327Z"
+last_activity: 2026-04-15 -- Phase 04.1 execution started
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 9
-  total_plans: 31
-  completed_plans: 31
+  total_plans: 33
+  completed_plans: 32
   percent: 97
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 09 — unified-layer-naming-convention-tag-based
+**Current focus:** Phase 04.1 — text-layer-effects-dispatch
 
 ## Current Position
 
-Phase: 09 (unified-layer-naming-convention-tag-based) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-04-14
+Phase: 04.1 (text-layer-effects-dispatch) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 04.1
+Last activity: 2026-04-15 -- Phase 04.1 execution started
 
 Progress: [██████████] 97%
 
@@ -115,6 +115,7 @@ Recent decisions affecting current work:
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-03] @9s tag attaches to the pixel layer, not its containing group (F9SliceImageLayerMapper consumes per-image)
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-04] Migration guide documents delete-and-reimport as the supported path for pre-Phase-9 WBPs (option-a ParsedTags.CleanName identity from Plan 02 surfaced as designer-facing guidance)
 - [Phase 09-unified-layer-naming-convention-tag-based]: [09-04] Button_NN retained in README as Phase-9 parser auto-name (D-21), not legacy dispatch; benign grep hit
+- [Phase 04.1-text-layer-effects-dispatch]: DPI conversion for shadow offset applied in FTextLayerMapper (D-09 Option B) matching OutlineSize pattern; RouteTextEffects helper in Internal namespace clears bHasDropShadow after routing (D-13 guard)
 
 ### Roadmap Evolution
 
@@ -132,6 +133,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T15:36:19.371Z
-Stopped at: Completed 09-04-PLAN.md (migration guide + README rewrite) — Phase 9 complete
+Last session: 2026-04-15T08:56:39.875Z
+Stopped at: 04.1-01 code tasks complete; awaiting TextEffects.psd fixture (human-action checkpoint)
 Resume file: None

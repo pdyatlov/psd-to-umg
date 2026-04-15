@@ -54,11 +54,11 @@
 
 ### Text & Typography
 
-- [ ] **TEXT-01**: DPI conversion applied: Photoshop point size × 0.75 = UMG font size (72→96 DPI)
+- [x] **TEXT-01**: DPI conversion applied: Photoshop point size × 0.75 = UMG font size (72→96 DPI)
 - [x] **TEXT-02**: Bold and italic weight/style applied via TypefaceFontName
-- [ ] **TEXT-03**: Text outline (stroke) applied via FSlateFontInfo.OutlineSettings
-- [ ] **TEXT-04**: Text shadow applied via SetShadowOffset + SetShadowColorAndOpacity
-- [ ] **TEXT-05**: Font mapping system: Photoshop font name → UE font asset via plugin settings
+- [ ] **TEXT-03**: Text outline (stroke) applied via FSlateFontInfo.OutlineSettings — layer-style Stroke on text dispatch handled in Phase 4.1
+- [x] **TEXT-04**: Text shadow applied via SetShadowOffset + SetShadowColorAndOpacity — layer-style Drop Shadow on text dispatch handled in Phase 4.1
+- [x] **TEXT-05**: Font mapping system: Photoshop font name → UE font asset via plugin settings
 - [x] **TEXT-06**: Multi-line text with AutoWrapText enabled when text box width is defined
 
 ### Layer Effects
@@ -106,6 +106,18 @@
 - [x] **DOC-02**: CONVENTIONS.md with full layer naming convention reference for designers
 - [x] **DOC-03**: CHANGELOG.md
 - [x] **DOC-04**: Example project: 3-4 pre-imported PSD→WBP demonstrations (HUD, main menu, settings screen, popup)
+
+### Unified Tag-Based Layer Naming (Phase 9)
+
+- [x] **TAG-01**: `FLayerTagParser::Parse` produces `FParsedLayerTags` per layer as single source of truth
+- [x] **TAG-02**: All mapper and generator callsites consume parsed struct; zero raw `Layer.Name` dispatch
+- [x] **TAG-03**: Grammar formalized in `Docs/LayerTagGrammar.md` (EBNF, canonical tag list)
+- [x] **TAG-04**: Migration guide ships at `Docs/Migration-PrefixToTag.md` (legacy → tag mappings)
+- [x] **TAG-05**: Phase 8 fixture PSDs retagged; spec assertions aligned to new grammar
+- [x] **TAG-06**: README layer-naming section rewritten to show only new grammar
+- [x] **TAG-07**: Last-wins conflict handling + unknown-tag diagnostics emitted by parser
+- [x] **TAG-08**: State-child lookup centralized via `FindChildByState`
+- [x] **TAG-09**: Import Preview dialog renders recognized/unknown tag chips per layer row (D-26/D-27)
 
 ## v2 Requirements
 
@@ -177,11 +189,11 @@
 | TEX-01 | Phase 3 | Complete |
 | TEX-02 | Phase 3 | Complete |
 | TEX-03 | Phase 3 | Complete |
-| TEXT-01 | Phase 4 | Pending |
+| TEXT-01 | Phase 4 | Complete |
 | TEXT-02 | Phase 4 | Complete |
-| TEXT-03 | Phase 4 | Pending |
-| TEXT-04 | Phase 4 | Pending |
-| TEXT-05 | Phase 4 | Pending |
+| TEXT-03 | Phase 4 → 4.1 | Unsatisfied (layer-style stroke on text hits D-08 flatten path — needs text-effect dispatch) |
+| TEXT-04 | Phase 4 → 4.1 | Deferred to Phase 4.1 (layer-style shadow on text — same dispatch fix as TEXT-03) |
+| TEXT-05 | Phase 4 | Complete |
 | TEXT-06 | Phase 4 | Complete |
 | FX-01 | Phase 5 | Complete |
 | FX-02 | Phase 5 | Complete |
@@ -211,10 +223,19 @@
 | DOC-02 | Phase 8 | Complete |
 | DOC-03 | Phase 8 | Complete |
 | DOC-04 | Phase 8 | Complete |
+| TAG-01 | Phase 9 | Complete |
+| TAG-02 | Phase 9 | Complete |
+| TAG-03 | Phase 9 | Complete |
+| TAG-04 | Phase 9 | Complete |
+| TAG-05 | Phase 9 | Complete |
+| TAG-06 | Phase 9 | Complete |
+| TAG-07 | Phase 9 | Complete |
+| TAG-08 | Phase 9 | Complete |
+| TAG-09 | Phase 9 | Complete |
 
 **Coverage:**
-- v1 requirements: 66 total
-- Mapped to phases: 66
+- v1 requirements: 75 total
+- Mapped to phases: 75
 - Unmapped: 0
 
 ---

@@ -183,3 +183,15 @@ Plans:
 - [x] 09-02-PLAN.md — Rewrite all mappers/AnchorCalculator/AnimationBuilder/PreviewDialog to consume ParsedTags; resolve reimport identity-key strategy (Wave 2)
 - [x] 09-03-PLAN.md — Retag 5 fixture PSDs + update spec assertions; bring automation suite back to green (Wave 3)
 - [x] 09-04-PLAN.md — Ship Migration-PrefixToTag.md + rewrite README naming section (Wave 4)
+
+### Phase 4.1: Text Layer Effects Dispatch (Gap Closure)
+
+**Goal:** Close the TEXT-03 / TEXT-04 dispatch gap surfaced by v1.0 milestone audit. Photoshop Layer-Style Stroke and Drop Shadow applied to Text layers currently hit the Phase-5 D-08 flatten path ("no pixel data for flatten — effects ignored") and are silently dropped. Route text-parented `Stroke` and `DropShadow` effects to `FParsedTextRun.OutlineColor/Size` and new shadow fields, so `FTextLayerMapper` applies them via `FSlateFontInfo::OutlineSettings` and `UTextBlock::SetShadowOffset` + `SetShadowColorAndOpacity`.
+**Requirements:** TEXT-03, TEXT-04
+**Depends on:** Phase 4, Phase 5, Phase 9
+**Gap Closure:** Closes requirement gaps from `.planning/v1.0-MILESTONE-AUDIT.md`
+**Plans:** 2 plans
+
+Plans:
+- [x] 04.1-01-PLAN.md — TEXT-04 Drop Shadow routing: un-comment FPsdTextRun shadow fields, add RouteTextEffects helper, mapper shadow block, TextEffects.psd fixture + FTextEffectsSpec (Wave 1)
+- [ ] 04.1-02-PLAN.md — TEXT-03 Layer-Style Stroke: lfx2/FrFX descriptor walker, FPsdLayerEffects stroke fields, extend RouteTextEffects + fixture + invert PsdParserSpec text_stroked (Wave 2)

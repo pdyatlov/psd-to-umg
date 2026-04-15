@@ -49,13 +49,11 @@ struct PSD2UMG_API FPsdTextRun
 	FLinearColor OutlineColor = FLinearColor::Transparent;
 	float OutlineSize = 0.f;
 
-	// TEXT-04 fields intentionally omitted -- PhotoshopAPI v0.9 does not
-	// expose drop shadow data (verified in 04-RESEARCH.md against vendored
-	// headers). CONTEXT.md D-10 listed these as advisory only. Revisit in
-	// Phase 4.1 gap closure if PhotoshopAPI adds support or if we implement
-	// manual TySh descriptor parsing.
-	// FVector2D ShadowOffset;
-	// FLinearColor ShadowColor;
+	// Phase 4.1 gap closure (TEXT-04) -- drop shadow payload routed from
+	// FPsdLayerEffects by PsdParser::RouteTextEffects after ExtractLayerEffects.
+	// Units: raw PSD pixels / linear color; DPI conversion applied by FTextLayerMapper (D-09 Option B).
+	FVector2D ShadowOffset = FVector2D::ZeroVector;
+	FLinearColor ShadowColor = FLinearColor::Transparent;
 };
 
 /**

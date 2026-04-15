@@ -506,6 +506,27 @@ namespace PSD2UMG::Parser::Internal
 		}
 	}
 
+	// Phase 4.1 D-05/D-06: route text-parented layer effects onto the text payload
+	// and clear the Effects flags so downstream generator paths do not double-render
+	// (D-13). Called from ConvertLayerRecursive after both ExtractLayerEffects and
+	// ExtractSingleRunText have populated their respective fields.
+	//
+	// Plan 04.1-01 routes Drop Shadow only. Plan 04.1-02 extends this helper for
+	// Stroke -- keep the shape such that adding `if (Layer.Effects.bHasStroke) { ... }`
+	// is a minimal diff.
+	static void RouteTextEffects(FPsdLayer& Layer)
+	{
+		if (Layer.Type != EPsdLayerType::Text) return;
+
+		if (Layer.Effects.bHasDropShadow)
+		{
+			Layer.Text.ShadowOffset = Layer.Effects.DropShadowOffset;  // raw PSD pixels
+			Layer.Text.ShadowColor  = Layer.Effects.DropShadowColor;   // opacity baked into A
+			Layer.Effects.bHasDropShadow = false;                      // D-13 double-render guard
+		}
+		// TEXT-03 stroke routing added by Plan 04.1-02.
+	}
+
 	void ConvertLayerRecursive(
 		const std::shared_ptr<PsdLayer>& InLayer,
 		FPsdLayer& OutLayer,
@@ -572,6 +593,7 @@ namespace PSD2UMG::Parser::Internal
 		{
 			OutLayer.Type = EPsdLayerType::Text;
 			ExtractSingleRunText(Text, OutLayer, OutDiag);
+			RouteTextEffects(OutLayer);
 			return;
 		}
 

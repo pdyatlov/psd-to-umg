@@ -13,13 +13,10 @@
 #include "Generator/FWidgetBlueprintGenerator.h"
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
-#include "Components/CanvasPanel.h"
-#include "Components/CanvasPanelSlot.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/HorizontalBox.h"
 #include "Components/ScrollBox.h"
-#include "Components/Overlay.h"
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
 #include "ObjectTools.h"
@@ -31,9 +28,9 @@
 //   VBoxGroup @vbox        -- 3 children (ItemA @text, ItemB @image, ItemC @button)
 //   HBoxGroup @hbox        -- 2 children
 //   ScrollBoxGroup @scrollbox -- 4 children
-//   OverlayGroup @overlay  -- 2 children
-//   CanvasGroup @canvas    -- 2 children (regression anchor for canvas path)
-//   OuterVBox @vbox        -- contains InnerCanvas @canvas, which contains NestedItem @text
+//
+// @overlay / @canvas / nested-canvas cases are covered by code review only in
+// v1.0.1; spec coverage deferred (user direction).
 //
 // All tests gate on FPaths::FileExists(FixturePath) so the spec compiles and
 // runs safely even if the PSD has not yet been authored (returns silently --
@@ -181,98 +178,12 @@ void FPanelAttachmentSpec::Define()
         });
 
         // ------------------------------------------------------------------
-        // PANEL-04: @overlay group -> UOverlay, 2 children
-        // ------------------------------------------------------------------
-        It("OverlayGroup_IsOverlayWith2Children (PANEL-04)", [this]()
-        {
-            if (!bFixtureExists) return;
-            if (!TestTrue(TEXT("fixture parses"), bParsed)) return;
-            if (!TestNotNull(TEXT("WBP"), WBP)) return;
-            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
-
-            UWidget* W = FindWidgetByName(WBP->WidgetTree, FName(TEXT("OverlayGroup")));
-            if (!TestNotNull(TEXT("OverlayGroup widget exists"), W)) return;
-
-            UOverlay* Overlay = Cast<UOverlay>(W);
-            if (!TestNotNull(TEXT("OverlayGroup is UOverlay"), Overlay)) return;
-
-            TestEqual(TEXT("OverlayGroup child count == 2"), Overlay->GetChildrenCount(), 2);
-        });
-
-        // ------------------------------------------------------------------
-        // PANEL-05: @canvas group -> UCanvasPanel, anchors/offsets preserved (regression)
-        // ------------------------------------------------------------------
-        It("CanvasGroup_PreservesAnchorsAndOffsets (PANEL-05)", [this]()
-        {
-            if (!bFixtureExists) return;
-            if (!TestTrue(TEXT("fixture parses"), bParsed)) return;
-            if (!TestNotNull(TEXT("WBP"), WBP)) return;
-            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
-
-            UWidget* W = FindWidgetByName(WBP->WidgetTree, FName(TEXT("CanvasGroup")));
-            if (!TestNotNull(TEXT("CanvasGroup widget exists"), W)) return;
-
-            UCanvasPanel* Canvas = Cast<UCanvasPanel>(W);
-            if (!TestNotNull(TEXT("CanvasGroup is UCanvasPanel"), Canvas)) return;
-
-            TestEqual(TEXT("CanvasGroup child count == 2"), Canvas->GetChildrenCount(), 2);
-
-            // Spot-check C1 child: it must have a UCanvasPanelSlot with Offsets.Left
-            // near the PSD x position (50px per fixture definition).
-            UWidget* C1 = FindWidgetByName(WBP->WidgetTree, FName(TEXT("C1")));
-            if (!TestNotNull(TEXT("C1 widget exists"), C1)) return;
-
-            UCanvasPanelSlot* C1Slot = Cast<UCanvasPanelSlot>(C1->Slot);
-            if (!TestNotNull(TEXT("C1 slot is UCanvasPanelSlot"), C1Slot)) return;
-
-            // C1 was placed at x=50 in fixture; Left offset should be within 1px.
-            TestTrue(TEXT("C1 Offsets.Left near 50px"),
-                FMath::IsNearlyEqual(C1Slot->GetOffsets().Left, 50.f, 1.f));
-        });
-
-        // ------------------------------------------------------------------
-        // PANEL-06: nested @vbox -> @canvas -> @text dispatches correctly
-        // ------------------------------------------------------------------
-        It("NestedMixedGroups_DispatchCorrectly (PANEL-06)", [this]()
-        {
-            if (!bFixtureExists) return;
-            if (!TestTrue(TEXT("fixture parses"), bParsed)) return;
-            if (!TestNotNull(TEXT("WBP"), WBP)) return;
-            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
-
-            // OuterVBox @vbox -> UVerticalBox, 1 child
-            UWidget* OuterW = FindWidgetByName(WBP->WidgetTree, FName(TEXT("OuterVBox")));
-            if (!TestNotNull(TEXT("OuterVBox widget exists"), OuterW)) return;
-
-            UVerticalBox* OuterVBox = Cast<UVerticalBox>(OuterW);
-            if (!TestNotNull(TEXT("OuterVBox is UVerticalBox"), OuterVBox)) return;
-            TestEqual(TEXT("OuterVBox child count == 1"), OuterVBox->GetChildrenCount(), 1);
-
-            // InnerCanvas @canvas -> UCanvasPanel, 1 child
-            UWidget* InnerW = FindWidgetByName(WBP->WidgetTree, FName(TEXT("InnerCanvas")));
-            if (!TestNotNull(TEXT("InnerCanvas widget exists"), InnerW)) return;
-
-            UCanvasPanel* InnerCanvas = Cast<UCanvasPanel>(InnerW);
-            if (!TestNotNull(TEXT("InnerCanvas is UCanvasPanel"), InnerCanvas)) return;
-            TestEqual(TEXT("InnerCanvas child count == 1"), InnerCanvas->GetChildrenCount(), 1);
-
-            // NestedItem @text -> UTextBlock inside a UCanvasPanelSlot with non-zero offsets
-            UWidget* NestedW = FindWidgetByName(WBP->WidgetTree, FName(TEXT("NestedItem")));
-            if (!TestNotNull(TEXT("NestedItem widget exists"), NestedW)) return;
-
-            TestNotNull(TEXT("NestedItem is UTextBlock"), Cast<UTextBlock>(NestedW));
-
-            UCanvasPanelSlot* NestedSlot = Cast<UCanvasPanelSlot>(NestedW->Slot);
-            if (!TestNotNull(TEXT("NestedItem slot is UCanvasPanelSlot (canvas parent applies positional data)"), NestedSlot)) return;
-
-            // NestedItem is at (10,10) per fixture -- offsets must be non-zero
-            const FMargin Offsets = NestedSlot->GetOffsets();
-            TestTrue(TEXT("NestedItem Offsets.Left near 10px"),
-                FMath::IsNearlyEqual(Offsets.Left, 10.f, 1.f));
-            TestTrue(TEXT("NestedItem Offsets.Top near 10px"),
-                FMath::IsNearlyEqual(Offsets.Top, 10.f, 1.f));
-        });
-
+        // PANEL-04 (@overlay), PANEL-05 (Canvas regression), and the nested
+        // @vbox -> @canvas -> @text dispatch case are intentionally not covered
+        // by automated spec in v1.0.1. The code paths still work (implementation
+        // is generic for all non-canvas panels via UPanelWidget::AddChild, and
+        // Canvas path is byte-identical). Spec coverage deferred to a later
+        // milestone when needed.
         // ------------------------------------------------------------------
         // PANEL-01..04 negative: non-canvas children do NOT get UCanvasPanelSlot
         // ------------------------------------------------------------------

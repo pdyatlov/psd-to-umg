@@ -313,44 +313,34 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     }
     WbpPackage->FullyLoad();
 
-    // Step 1b: If a WBP with this name already exists in the package, delete it
-    // first. UE's CreateBlueprint asserts that no blueprint with the target name
-    // exists (Kismet2.cpp FindObject check). This happens on re-import of the
-    // same PSD or when a previous test/import left a stale asset.
-    if (UBlueprint* Existing = FindObject<UBlueprint>(WbpPackage, *WbpAssetName))
+    // Step 1b: Sweep ANY residual objects under the target package (not just a
+    // UBlueprint). FindObject<UBlueprint> can miss stale widget-tree subobjects
+    // left from previous import/compile cycles — particularly when the BlueprintGeneratedClass
+    // or an archetype survived in memory but the UBlueprint itself was never loaded.
+    // Surviving subobjects named the same as widgets we're about to create cause
+    // "Cannot replace existing object of a different class" fatals during compile.
     {
-        UE_LOG(LogPSD2UMG, Warning,
-            TEXT("FWidgetBlueprintGenerator: removing existing blueprint '%s' before regeneration"),
-            *WbpAssetName);
-
-        // Rename every widget in the old WidgetTree out of the canonical path first.
-        // Without this, a surviving widget archetype (e.g., inside the BlueprintGeneratedClass
-        // CDO) can collide by-name with the new tree during compilation, producing
-        // "Cannot replace existing object of a different class" fatal asserts when
-        // the PSD's widget class for that name changes between imports.
-        if (UWidgetBlueprint* ExistingWBP = Cast<UWidgetBlueprint>(Existing))
+        TArray<UObject*> PackageObjects;
+        GetObjectsWithOuter(WbpPackage, PackageObjects, /*bIncludeNestedObjects=*/true);
+        int32 StaleCount = 0;
+        for (UObject* Obj : PackageObjects)
         {
-            if (UWidgetTree* OldTree = ExistingWBP->WidgetTree)
-            {
-                TArray<UWidget*> OldWidgets;
-                OldTree->ForEachWidget([&OldWidgets](UWidget* W) { if (W) OldWidgets.Add(W); });
-                for (UWidget* W : OldWidgets)
-                {
-                    W->ClearFlags(RF_Standalone | RF_Public);
-                    W->MarkAsGarbage();
-                    W->Rename(nullptr, GetTransientPackage(),
-                        REN_DontCreateRedirectors | REN_NonTransactional);
-                }
-                OldTree->RootWidget = nullptr;
-            }
+            if (!Obj) continue;
+            Obj->ClearFlags(RF_Standalone | RF_Public);
+            Obj->MarkAsGarbage();
+            Obj->Rename(nullptr, GetTransientPackage(),
+                REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
+            ++StaleCount;
+        }
+        if (StaleCount > 0)
+        {
+            UE_LOG(LogPSD2UMG, Warning,
+                TEXT("FWidgetBlueprintGenerator: evicted %d residual object(s) from package '%s' before regeneration"),
+                StaleCount, *WbpPackage->GetName());
         }
 
-        Existing->ClearFlags(RF_Standalone | RF_Public);
-        Existing->MarkAsGarbage();
-        Existing->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
-
-        // Also clear the BlueprintGeneratedClass path if it survived. Its CDO holds
-        // widget-archetype subobjects that otherwise reappear at the canonical names.
+        // The BlueprintGeneratedClass lives OUTSIDE the package outer in some cases
+        // (StaticFindObject by full path catches it). Name is "<AssetName>_C".
         if (UClass* OldClass = FindObject<UClass>(WbpPackage, *FString::Printf(TEXT("%s_C"), *WbpAssetName)))
         {
             OldClass->ClearFlags(RF_Standalone | RF_Public);
@@ -359,10 +349,12 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
                 REN_DontCreateRedirectors | REN_NonTransactional);
         }
 
-        // Force a GC pass so stale subobjects are actually reaped before the new
-        // blueprint claims the path. Without this the class/archetype references
-        // can linger long enough to trip the by-name check in StaticAllocateObject.
-        CollectGarbage(RF_NoFlags, /*bPurgeObjectsOnFullPurge=*/true);
+        // Force a full GC so stale subobjects are actually reaped before the new
+        // blueprint claims the canonical path.
+        if (StaleCount > 0)
+        {
+            CollectGarbage(RF_NoFlags, /*bPurgeObjectsOnFullPurge=*/true);
+        }
     }
 
     // Step 2: Create WBP via factory (canonical editor path — same as "New Widget Blueprint" in Content Browser)

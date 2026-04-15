@@ -18,10 +18,10 @@ PSD2UMG transforms Photoshop files into fully functional UMG Widget Blueprints i
 
 **Requirements:** PANEL-01, PANEL-02, PANEL-03, PANEL-04, PANEL-05, PANEL-06, PANEL-07
 **Depends on:** v1.0 (Phase 3 generator, Phase 9 tag parser)
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans executed
 - [x] 10-01-PLAN.md — Refactor Generate path (PopulateCanvas → panel-type dispatch + diagnostic)
 - [x] 10-02-PLAN.md — Refactor Update/reimport path with clear-and-rebuild for non-canvas
-- [ ] 10-03-PLAN.md — Panels.psd fixture (human checkpoint) + FPanelAttachmentSpec
+- [x] 10-03-PLAN.md — Panels.psd fixture (human checkpoint) + FPanelAttachmentSpec (VBox/HBox/ScrollBox; Overlay/Canvas/Nested deferred per user direction)
 
 ## v1.1+ Backlog
 

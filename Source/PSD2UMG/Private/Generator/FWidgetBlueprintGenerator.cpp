@@ -82,12 +82,19 @@ static void PopulateChildren(
             UE_LOG(LogPSD2UMG, Warning, TEXT("Layer '%s' has complex effects but no pixel data for flatten — effects ignored (per D-08 pattern)"), *Layer.Name);
         }
 
+        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 20] PRE-map layer='%s' cleanName='%s' type=%d tagType=%d"),
+            *LayerPtr->Name, *LayerPtr->ParsedTags.CleanName,
+            static_cast<int32>(LayerPtr->Type), static_cast<int32>(LayerPtr->ParsedTags.Type));
+
         UWidget* Widget = Registry.MapLayer(*LayerPtr, Doc, Tree);
         if (!Widget)
         {
             UE_LOG(LogPSD2UMG, Warning, TEXT("No mapper for layer: %s (type=%d)"), *Layer.Name, static_cast<int32>(Layer.Type));
             continue; // D-08: skip + warn
         }
+
+        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 20] POST-map widget='%s' class=%s"),
+            *Widget->GetName(), *Widget->GetClass()->GetName());
 
         // ---- Dispatch child attachment on parent panel type ----
         UPanelSlot* Slot = nullptr;

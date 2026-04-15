@@ -103,13 +103,15 @@ UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc
     // wrap disabled so short button/title labels never wrap unexpectedly.
     TextWidget->SetAutoWrapText(Layer.Text.bHasExplicitWidth);
 
-    // TEXT-04 — drop shadow DEFERRED.
-    // PhotoshopAPI v0.9 does not expose text drop-shadow effect data (verified
-    // against vendored headers in .planning/phases/04-text-fonts-typography/
-    // 04-RESEARCH.md). The requirement is tracked as a partial delivery; a
-    // follow-up decimal phase (4.1) will close the gap when either PhotoshopAPI
-    // adds support or manual TySh descriptor parsing is implemented.
-    // Intentionally no shadow offset or shadow color calls here.
+    // TEXT-04 — drop shadow via UTextBlock native API (D-08).
+    // DPI conversion (x0.75) applied here to match the outline pattern above (D-09 Option B).
+    // FPsdTextRun.ShadowOffset/ShadowColor are raw PSD pixels / linear color populated by
+    // PsdParser::RouteTextEffects when the text layer had a PS Drop Shadow effect.
+    if (!Layer.Text.ShadowOffset.IsZero() || Layer.Text.ShadowColor.A > 0.f)
+    {
+        TextWidget->SetShadowOffset(Layer.Text.ShadowOffset * 0.75);
+        TextWidget->SetShadowColorAndOpacity(Layer.Text.ShadowColor);
+    }
 
     // Color (Phase 3 baseline).
     TextWidget->SetColorAndOpacity(FSlateColor(Layer.Text.Color));

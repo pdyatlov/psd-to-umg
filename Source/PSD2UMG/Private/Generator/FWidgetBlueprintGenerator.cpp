@@ -37,25 +37,12 @@ static void PopulateChildren(
     const TArray<FPsdLayer>& Layers,
     const FPsdDocument& Doc,
     const FIntPoint& CanvasSize,
-    const TSet<FString>& SkippedLayerNames = TSet<FString>(),
-    int32 Depth = 0)
+    const TSet<FString>& SkippedLayerNames = TSet<FString>())
 {
     const int32 TotalLayers = Layers.Num();
-    const FString Indent = FString::ChrN(Depth * 2, TEXT(' '));
-    UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 30] %sPopulateChildren ENTER depth=%d parent='%s' class=%s count=%d"),
-        *Indent, Depth,
-        Parent ? *Parent->GetName() : TEXT("<null>"),
-        Parent ? *Parent->GetClass()->GetName() : TEXT("<null>"),
-        TotalLayers);
-
     for (int32 i = 0; i < TotalLayers; ++i)
     {
         const FPsdLayer& Layer = Layers[i];
-        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 30] %s  [%d/%d] layer='%s' cleanName='%s' type=%d tagType=%d childCount=%d"),
-            *Indent, i + 1, TotalLayers,
-            *Layer.Name, *Layer.ParsedTags.CleanName,
-            static_cast<int32>(Layer.Type), static_cast<int32>(Layer.ParsedTags.Type),
-            Layer.Children.Num());
 
         // Skip layers the user unchecked in the preview dialog
         if (SkippedLayerNames.Contains(Layer.Name))
@@ -95,40 +82,25 @@ static void PopulateChildren(
             UE_LOG(LogPSD2UMG, Warning, TEXT("Layer '%s' has complex effects but no pixel data for flatten — effects ignored (per D-08 pattern)"), *Layer.Name);
         }
 
-        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 20] PRE-map layer='%s' cleanName='%s' type=%d tagType=%d"),
-            *LayerPtr->Name, *LayerPtr->ParsedTags.CleanName,
-            static_cast<int32>(LayerPtr->Type), static_cast<int32>(LayerPtr->ParsedTags.Type));
-
-        // [DIAG 20] Pre-flight: does a widget with this clean-name already exist in the tree?
-        // If yes, log it (then evict it) — this catches the collision BEFORE UE's NewObject fatal fires.
+        // If the layer's CleanName collides with a widget already in the tree
+        // (duplicate Photoshop layer names — common for copy-pasted panels/cards),
+        // mangle the clean name to a unique variant (e.g. 'background_1',
+        // 'background_2', ...). UWidgetTree shares a single flat outer for every
+        // widget, so duplicates would otherwise trip 'Cannot replace existing
+        // object of a different class' during construction or compile.
+        FPsdLayer UniqueLayer; // mutable copy only when we need to rename
         if (Tree && !LayerPtr->ParsedTags.CleanName.IsEmpty())
         {
-            const FName CleanFName(*LayerPtr->ParsedTags.CleanName);
-            if (UWidget* Existing = Tree->FindWidget(CleanFName))
+            const FName BaseFName(*LayerPtr->ParsedTags.CleanName);
+            if (StaticFindObjectFast(nullptr, Tree, BaseFName))
             {
-                UE_LOG(LogPSD2UMG, Error,
-                    TEXT("[DIAG 20] !!! COLLISION: widget named '%s' already exists (class=%s, outer=%s, flags=0x%08x). Evicting."),
-                    *LayerPtr->ParsedTags.CleanName,
-                    *Existing->GetClass()->GetName(),
-                    Existing->GetOuter() ? *Existing->GetOuter()->GetPathName() : TEXT("null"),
-                    (int32)Existing->GetFlags());
-                Existing->ClearFlags(RF_Standalone | RF_Public);
-                Existing->MarkAsGarbage();
-                Existing->Rename(nullptr, GetTransientPackage(),
-                    REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
-            }
-            // Also scan for any UObject (not just UWidget) at the same outer+name path
-            if (UObject* AnyExisting = StaticFindObjectFast(nullptr, Tree, CleanFName))
-            {
-                UE_LOG(LogPSD2UMG, Error,
-                    TEXT("[DIAG 20] !!! NON-WIDGET COLLISION: object named '%s' found at tree outer (class=%s, full=%s)"),
-                    *LayerPtr->ParsedTags.CleanName,
-                    *AnyExisting->GetClass()->GetName(),
-                    *AnyExisting->GetPathName());
-                AnyExisting->ClearFlags(RF_Standalone | RF_Public);
-                AnyExisting->MarkAsGarbage();
-                AnyExisting->Rename(nullptr, GetTransientPackage(),
-                    REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
+                const FName UniqueFName = MakeUniqueObjectName(Tree, UWidget::StaticClass(), BaseFName);
+                UE_LOG(LogPSD2UMG, Warning,
+                    TEXT("Layer '%s' clean name '%s' collides with existing widget; renaming to '%s'"),
+                    *LayerPtr->Name, *LayerPtr->ParsedTags.CleanName, *UniqueFName.ToString());
+                UniqueLayer = *LayerPtr;
+                UniqueLayer.ParsedTags.CleanName = UniqueFName.ToString();
+                LayerPtr = &UniqueLayer;
             }
         }
 
@@ -138,9 +110,6 @@ static void PopulateChildren(
             UE_LOG(LogPSD2UMG, Warning, TEXT("No mapper for layer: %s (type=%d)"), *Layer.Name, static_cast<int32>(Layer.Type));
             continue; // D-08: skip + warn
         }
-
-        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 20] POST-map widget='%s' class=%s"),
-            *Widget->GetName(), *Widget->GetClass()->GetName());
 
         // ---- Dispatch child attachment on parent panel type ----
         UPanelSlot* Slot = nullptr;
@@ -335,7 +304,7 @@ static void PopulateChildren(
         {
             if (UPanelWidget* ChildPanel = Cast<UPanelWidget>(Widget))
             {
-                PopulateChildren(Registry, Tree, ChildPanel, Layer.Children, Doc, CanvasSize, SkippedLayerNames, Depth + 1);
+                PopulateChildren(Registry, Tree, ChildPanel, Layer.Children, Doc, CanvasSize, SkippedLayerNames);
             }
             else
             {
@@ -345,9 +314,6 @@ static void PopulateChildren(
             }
         }
     }
-
-    UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 30] %sPopulateChildren EXIT depth=%d parent='%s'"),
-        *Indent, Depth, Parent ? *Parent->GetName() : TEXT("<null>"));
 }
 
 // ---------------------------------------------------------------------------
@@ -499,36 +465,6 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     FLayerMappingRegistry Registry;
     PopulateChildren(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
 
-    // [DIAG 10] Dump the widget tree RIGHT BEFORE compile so we can see exactly what's present.
-    // Also dump the entire package contents in case something landed outside the tree.
-    {
-        TArray<UObject*> TreeSubobjects;
-        GetObjectsWithOuter(WBP->WidgetTree, TreeSubobjects, /*bIncludeNestedObjects=*/true);
-        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 10] Pre-compile WidgetTree dump — %d subobjects:"), TreeSubobjects.Num());
-        for (UObject* Obj : TreeSubobjects)
-        {
-            if (!Obj) continue;
-            UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 10]   tree: %s '%s' (outer=%s)"),
-                *Obj->GetClass()->GetName(), *Obj->GetName(),
-                Obj->GetOuter() ? *Obj->GetOuter()->GetName() : TEXT("null"));
-        }
-
-        TArray<UObject*> PackageSubobjects;
-        GetObjectsWithOuter(WbpPackage, PackageSubobjects, /*bIncludeNestedObjects=*/true);
-        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 10] Pre-compile Package dump — %d subobjects:"), PackageSubobjects.Num());
-        for (UObject* Obj : PackageSubobjects)
-        {
-            if (!Obj) continue;
-            if (Obj->GetFName() == TEXT("background"))
-            {
-                UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 10]   !!! 'background' = %s at outer=%s full=%s"),
-                    *Obj->GetClass()->GetName(),
-                    Obj->GetOuter() ? *Obj->GetOuter()->GetPathName() : TEXT("null"),
-                    *Obj->GetPathName());
-            }
-        }
-    }
-
     // Step 5: Compile AFTER full tree population (critical — compiling before population leaves empty BP)
     FKismetEditorUtilities::CompileBlueprint(WBP);
 
@@ -651,7 +587,26 @@ static void UpdateCanvas(
                 continue;
             }
 
-            UWidget* NewWidget = Registry.MapLayer(Layer, Doc, Tree);
+            // Resolve CleanName collisions (duplicate Photoshop layer names) by
+            // mangling to a unique variant. Same pattern as PopulateChildren.
+            const FPsdLayer* LayerForMap = &Layer;
+            FPsdLayer UniqueLayer;
+            if (Tree && !Layer.ParsedTags.CleanName.IsEmpty())
+            {
+                const FName BaseFName(*Layer.ParsedTags.CleanName);
+                if (StaticFindObjectFast(nullptr, Tree, BaseFName))
+                {
+                    const FName UniqueFName = MakeUniqueObjectName(Tree, UWidget::StaticClass(), BaseFName);
+                    UE_LOG(LogPSD2UMG, Warning,
+                        TEXT("Update: layer '%s' clean name '%s' collides; renaming to '%s'"),
+                        *Layer.Name, *Layer.ParsedTags.CleanName, *UniqueFName.ToString());
+                    UniqueLayer = Layer;
+                    UniqueLayer.ParsedTags.CleanName = UniqueFName.ToString();
+                    LayerForMap = &UniqueLayer;
+                }
+            }
+
+            UWidget* NewWidget = Registry.MapLayer(*LayerForMap, Doc, Tree);
             if (!NewWidget)
             {
                 UE_LOG(LogPSD2UMG, Warning, TEXT("Update: no mapper for new layer '%s'"), *Layer.Name);

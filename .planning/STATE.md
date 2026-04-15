@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 04.1-02-PLAN.md
-last_updated: "2026-04-15T09:15:38.057Z"
+status: v1.0 archived
+stopped_at: v1.0 milestone archived 2026-04-15
+last_updated: "2026-04-15T12:00:00.000Z"
 last_activity: 2026-04-15
 progress:
   total_phases: 10
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 04.1 — text-layer-effects-dispatch
+**Current focus:** v1.0 archived — awaiting v2 planning
 
 ## Current Position
 
-Phase: 04.1 (text-layer-effects-dispatch) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: none (between milestones)
+Plan: n/a
+Status: v1.0 milestone archived 2026-04-15
 Last activity: 2026-04-15
 
 Progress: [██████████] 97%

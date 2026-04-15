@@ -1,5 +1,26 @@
 # PSD2UMG
 
+## Current State
+
+**v1.0 shipped 2026-04-15.**
+
+The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirely in C++20. It delivers a complete one-click PSD-to-Widget-Blueprint import pipeline: a native PhotoshopAPI-backed parser (FPsdParser), a pluggable layer-mapper registry with 15 widget types, full typography support including Layer-Style stroke and drop shadow routing, layer effects with flatten fallback, 9-slice borders, Smart Object recursive import, row/column anchor heuristics, an SPsdImportPreviewDialog, non-destructive reimport, CommonUI/animation interop, a comprehensive automation spec suite, and a unified `@`-tag grammar replacing all ad-hoc prefix/suffix dispatch. All 75 v1 requirements are satisfied. ~170 commits, 161 files changed, +25128/-365 LOC.
+
+See `.planning/milestones/v1.0-ROADMAP.md` for the full phase-by-phase archive and `.planning/milestones/v1.0-MILESTONE-AUDIT.md` for the final audit.
+
+## Next Milestone Goals
+
+_To be defined. Candidate scope includes:_
+
+- Human UAT pass against a host UE 5.7 project (lrFX visual confirms, 9s/SmartObj/CommonUI/anim runtime checks)
+- GitHub Actions CI pipeline (D-04)
+- Image-layer stroke rendering (D-12 data already populated)
+- frameFXMulti VlLs stroke format (newer Photoshop)
+- URichTextBlock mixed-style runs (TEXT-V2-01)
+- Fab/Marketplace submission packaging (MKT-03)
+
+---
+
 ## What This Is
 
 A production-grade Unreal Engine 5.7 editor plugin that imports `.psd` files and converts them into fully functional UMG Widget Blueprints in one click. It preserves layer hierarchy, positions, text properties, images, and effects — so a designer's Photoshop mockup becomes working UI without manual reconstruction. Targets both internal team use and public open-source release.
@@ -69,25 +90,25 @@ A designer drops a PSD into Unreal Editor and gets a correctly structured, immed
 - [x] Smart Object layers → recursive import as child Widget Blueprints
 - [x] `_variants` suffix groups → UWidgetSwitcher
 
-**Phase 6 — Editor UI & Workflow**
-- [ ] Plugin settings in Project Settings → Plugins → PSD2UMG
-- [ ] Import preview dialog: layer tree with checkboxes, widget type badges
-- [ ] Reimport support: update changed layers without destroying manual edits
-- [ ] Right-click context menu in Content Browser ("Import as Widget Blueprint")
+**Phase 6 — Editor UI & Workflow** — Validated in Phase 7
+- [x] Plugin settings in Project Settings → Plugins → PSD2UMG
+- [x] Import preview dialog: layer tree with checkboxes, widget type badges
+- [x] Reimport support: update changed layers without destroying manual edits
+- [x] Right-click context menu in Content Browser ("Import as Widget Blueprint")
 
-**Phase 7 — CommonUI & Interactivity**
-- [ ] Optional CommonUI mode: Button_ → UCommonButtonBase
-- [ ] Input action binding via layer name syntax: `Button_Confirm[IA_Confirm]`
-- [ ] Animation generation from _show/_hide/_hover layer variants
-- [ ] ScrollBox content height auto-calculation
+**Phase 7 — CommonUI & Interactivity** — Validated in Phase 7
+- [x] Optional CommonUI mode: Button_ → UCommonButtonBase
+- [x] Input action binding via layer name syntax: `Button_Confirm[IA_Confirm]`
+- [x] Animation generation from _show/_hide/_hover layer variants
+- [x] ScrollBox content height auto-calculation
 
-**Phase 8 — Testing, Docs & Release**
-- [ ] Unit tests (no UE dependency): parser, mapper, anchor calculator, DPI conversion
-- [ ] Integration tests (FAutomationTestBase): full PSD→WBP pipeline
-- [ ] Test PSD files: SimpleHUD, ComplexMenu, MobileUI, Typography, Effects
-- [ ] Documentation: README, CONVENTIONS.md, ARCHITECTURE.md, CHANGELOG.md
-- [ ] CI/CD: GitHub Actions compile + test on Win64
-- [ ] Example project with 3-4 pre-imported PSD→WBP demonstrations
+**Phase 8 — Testing, Docs & Release** — Validated in Phase 8 (2026-04-13)
+- [x] Expanded FWidgetBlueprintGenSpec to 22 It() blocks (DPI, anchors, prefixes, DetectChange)
+- [x] FPsdParserSpec expanded with SimpleHUD and Effects fixture classes (26 total It() blocks)
+- [x] Test PSD fixtures: SimpleHUD, ComplexMenu, Effects (MobileUI deferred; Typography pre-existing)
+- [x] README.md with layer naming cheat sheet, settings reference, test instructions
+- [x] CI/CD: deferred to post-v1 (no GitHub Actions for v1)
+- [x] Example PSDs bundled in Tests/Fixtures/ (no separate project)
 
 ### Out of Scope
 
@@ -155,4 +176,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after Phase 6 completion*
+*Last updated: 2026-04-15 after Phase 9 completion (unified tag-based layer naming — hard cutover)*

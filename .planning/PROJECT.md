@@ -8,15 +8,29 @@ The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirel
 
 See `.planning/milestones/v1.0-ROADMAP.md` for the full phase-by-phase archive and `.planning/milestones/v1.0-MILESTONE-AUDIT.md` for the final audit.
 
-## Next Milestone Goals
+## Current Milestone: v1.0.1 Panel Child Attachment Hotfix
 
-_To be defined. Candidate scope includes:_
+**Goal:** Close the v1.0 gap where non-canvas group tags (`@vbox`, `@hbox`, `@scrollbox`, `@overlay`) silently drop all children. The generator's recursion is hard-cast to `UCanvasPanel`; the mapper creates the correct panel widget but no children are ever attached.
+
+**Target features:**
+- Child attachment dispatches on parent panel type (`AddChildToCanvas` for Canvas; `UPanelWidget::AddChild` for VBox/HBox/ScrollBox/Overlay).
+- VBox / HBox children stack by PSD z-order; no PSD position applied.
+- ScrollBox / Overlay children added in order with default slot properties.
+- Fixture PSD with nested non-canvas groups; spec asserts child counts > 0.
+- Diagnostic warning on any unattached child (no more silent drops).
+
+**Out of scope:** configurable slot properties (alignment, padding, orientation), image-layer stroke rendering, other v1.0 tech-debt.
+
+## Next Milestone Goals (v1.1+)
+
+_Candidate scope:_
 
 - Human UAT pass against a host UE 5.7 project (lrFX visual confirms, 9s/SmartObj/CommonUI/anim runtime checks)
 - GitHub Actions CI pipeline (D-04)
 - Image-layer stroke rendering (D-12 data already populated)
 - frameFXMulti VlLs stroke format (newer Photoshop)
 - URichTextBlock mixed-style runs (TEXT-V2-01)
+- Configurable panel slot properties (HBox alignment, Overlay padding, ScrollBox orientation)
 - Fab/Marketplace submission packaging (MKT-03)
 
 ---

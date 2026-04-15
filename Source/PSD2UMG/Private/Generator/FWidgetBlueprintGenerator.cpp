@@ -10,7 +10,6 @@
 #include "PSD2UMGSetting.h"
 
 #include "Blueprint/WidgetTree.h"
-#include "WidgetBlueprintGeneratedClass.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
@@ -443,6 +442,36 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     FSmartObjectImporter::SetCurrentPackagePath(WbpPackagePath);
     FLayerMappingRegistry Registry;
     PopulateChildren(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
+
+    // [DIAG 10] Dump the widget tree RIGHT BEFORE compile so we can see exactly what's present.
+    // Also dump the entire package contents in case something landed outside the tree.
+    {
+        TArray<UObject*> TreeSubobjects;
+        GetObjectsWithOuter(WBP->WidgetTree, TreeSubobjects, /*bIncludeNestedObjects=*/true);
+        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 10] Pre-compile WidgetTree dump — %d subobjects:"), TreeSubobjects.Num());
+        for (UObject* Obj : TreeSubobjects)
+        {
+            if (!Obj) continue;
+            UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 10]   tree: %s '%s' (outer=%s)"),
+                *Obj->GetClass()->GetName(), *Obj->GetName(),
+                Obj->GetOuter() ? *Obj->GetOuter()->GetName() : TEXT("null"));
+        }
+
+        TArray<UObject*> PackageSubobjects;
+        GetObjectsWithOuter(WbpPackage, PackageSubobjects, /*bIncludeNestedObjects=*/true);
+        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 10] Pre-compile Package dump — %d subobjects:"), PackageSubobjects.Num());
+        for (UObject* Obj : PackageSubobjects)
+        {
+            if (!Obj) continue;
+            if (Obj->GetFName() == TEXT("background"))
+            {
+                UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 10]   !!! 'background' = %s at outer=%s full=%s"),
+                    *Obj->GetClass()->GetName(),
+                    Obj->GetOuter() ? *Obj->GetOuter()->GetPathName() : TEXT("null"),
+                    *Obj->GetPathName());
+            }
+        }
+    }
 
     // Step 5: Compile AFTER full tree population (critical — compiling before population leaves empty BP)
     FKismetEditorUtilities::CompileBlueprint(WBP);

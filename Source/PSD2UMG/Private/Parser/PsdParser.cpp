@@ -7,6 +7,7 @@
 #include "Math/IntRect.h"
 #include "Math/IntPoint.h"
 #include "Math/Color.h"
+#include "Misc/FileHelper.h"
 
 #include <algorithm>
 #include <exception>
@@ -507,299 +508,426 @@ namespace PSD2UMG::Parser::Internal
 	}
 
 	// ---------------------------------------------------------------------------
-	// Phase 4.1 TEXT-03: lfx2 / FrFX descriptor walker (D-01 corrected)
+	// Phase 4.1 TEXT-03: lfx2 / FrFX descriptor walker
 	//
 	// Layer-Style Stroke in Photoshop CS+ is stored in the 'lfx2' (object-based
 	// effects) tagged block under descriptor key 'FrFX' (FrameFX).
-	// PhotoshopAPI v0.9 does not register 'lfx2' -- it surfaces as Unknown in
-	// unparsed_tagged_blocks().  The raw bytes are accessible via m_Data.
-	//
-	// lfx2 payload layout (PhotoshopAPI strips the 8BIM+key+length header):
-	//   [4 bytes] unknown / flags (always 0x00000000 in observed samples)
-	//   [4 bytes] descriptor version (0x00000010 = 16) -- the discriminator
-	//   [Descriptor] top-level descriptor with class_id 'null' and 12 items.
-	//                The stroke item has key 'FrFX' (Objc type).
-	//
-	// The walker is wrapped in try/catch -- malformed lfx2 blocks are silently
-	// skipped per RESEARCH Pitfall 1 defense.
+	// PhotoshopAPI v0.9 silently drops 'lfx2' blocks -- they never appear in
+	// unparsed_tagged_blocks(). We therefore scan the raw PSD file bytes directly
+	// for 8BIM+lfx2 signatures and build a TMap<LayerName, FPsdStrokeInfo> in
+	// ParseFile before ConvertLayerRecursive is called.
 	// ---------------------------------------------------------------------------
 
-	/**
-	 * Walk the lfx2 (object-based effects) block, extract FrFX (Frame-FX / Stroke)
-	 * descriptor, and populate OutLayer.Effects.bHasStroke/StrokeColor/StrokeSize.
-	 * Called from ConvertLayerRecursive immediately after ExtractLayerEffects.
-	 * D-02: runs for ALL layer types; non-text rendering is deferred.
-	 */
-	static void ExtractLfx2Stroke(
-		const std::shared_ptr<PsdLayer>& InLayer,
-		FPsdLayer& OutLayer,
-		FPsdParseDiagnostics& OutDiag)
+	/** Stroke info extracted from a raw lfx2/FrFX descriptor. */
+	struct FPsdStrokeInfo
 	{
-		try
+		bool         bEnabled  = false;
+		float        SizePx    = 0.f;
+		FLinearColor Color     = FLinearColor::White;
+	};
+
+	/**
+	 * Parse a Photoshop FrFX descriptor from raw bytes.
+	 * Data must start at the flags+version prefix (8 bytes) that precedes the
+	 * top-level Descriptor (i.e. raw lfx2 content, offset 0).
+	 * Returns true if a stroke was found and enabled.
+	 */
+	static bool ParseFrFXDescriptor(
+		const TArrayView<const uint8>& Data,
+		FPsdStrokeInfo& Out)
+	{
+		if (Data.Num() < 8) return false;
+
+		// Discriminator: bytes [4..7] must be 0x00000010 (descriptor version 16).
+		const uint32 DescVersion =
+			(static_cast<uint32>(Data[4]) << 24) |
+			(static_cast<uint32>(Data[5]) << 16) |
+			(static_cast<uint32>(Data[6]) << 8)  |
+			 static_cast<uint32>(Data[7]);
+		if (DescVersion != 0x00000010u) return false;
+
+		// The descriptor starts at byte offset 8 (after the 8-byte prefix).
+		size_t Pos = 8;
+
+			// ---- Low-level reader helpers ----
+		auto CheckRemaining = [&](size_t Need) -> bool
 		{
-			for (const auto& Block : InLayer->unparsed_tagged_blocks())
+			return (Pos + Need) <= static_cast<size_t>(Data.Num());
+		};
+		auto ReadU8 = [&]() -> uint8
+		{
+			if (!CheckRemaining(1)) return 0;
+			return static_cast<uint8>(Data[Pos++]);
+		};
+		auto ReadU32BE = [&]() -> uint32
+		{
+			if (!CheckRemaining(4)) return 0;
+			uint32 V = (static_cast<uint32>(Data[Pos])   << 24)
+			         | (static_cast<uint32>(Data[Pos+1]) << 16)
+			         | (static_cast<uint32>(Data[Pos+2]) << 8)
+			         |  static_cast<uint32>(Data[Pos+3]);
+			Pos += 4;
+			return V;
+		};
+		auto ReadDoubleBE = [&]() -> double
+		{
+			if (!CheckRemaining(8)) return 0.0;
+			uint8 Buf[8];
+			for (int i = 0; i < 8; ++i) Buf[i] = Data[Pos + i];
+			Pos += 8;
+			// Reverse for little-endian host
+			uint8 Rev[8] = { Buf[7], Buf[6], Buf[5], Buf[4], Buf[3], Buf[2], Buf[1], Buf[0] };
+			double V;
+			FMemory::Memcpy(&V, Rev, 8);
+			return V;
+		};
+		// ps_string: uint32 len; if len==0 read 4-byte ASCII tag; else read len bytes.
+		auto ReadPsString = [&]() -> std::string
+		{
+			uint32 Len = ReadU32BE();
+			if (Len == 0)
 			{
-				if (!Block) continue;
-				if (Block->getKey() != NAMESPACE_PSAPI::Enum::TaggedBlockKey::Unknown) continue;
+				if (!CheckRemaining(4)) return {};
+				char Tag[5] = {};
+				for (int i = 0; i < 4; ++i)
+					Tag[i] = static_cast<char>(Data[Pos + i]);
+				Pos += 4;
+				return std::string(Tag);
+			}
+			if (!CheckRemaining(Len)) return {};
+			std::string S;
+			S.resize(Len);
+			for (uint32 i = 0; i < Len; ++i)
+				S[i] = static_cast<char>(Data[Pos + i]);
+			Pos += Len;
+			return S;
+		};
+		// unicode_string: uint32 num_chars, then num_chars*2 bytes UTF-16 BE (skip content).
+		auto SkipUnicodeString = [&]()
+		{
+			uint32 Len = ReadU32BE();
+			Pos += Len * 2; // skip UTF-16 chars
+		};
 
-				const auto& Data = Block->m_Data;
-
-				// Discriminator: bytes [4..7] must be 0x00000010 (descriptor version 16).
-				// The first 4 bytes are flags (always 0) -- not the version.
-				if (Data.size() < 8) continue;
-				const uint32 DescVersion =
-					(static_cast<uint32>(static_cast<uint8>(Data[4])) << 24) |
-					(static_cast<uint32>(static_cast<uint8>(Data[5])) << 16) |
-					(static_cast<uint32>(static_cast<uint8>(Data[6])) << 8)  |
-					 static_cast<uint32>(static_cast<uint8>(Data[7]));
-				if (DescVersion != 0x00000010u) continue;
-
-				// This is likely an lfx2 block. Parse the Photoshop descriptor.
-				// The descriptor starts at byte offset 8 (after the 8-byte prefix).
-				size_t Pos = 8;
-
-				// ---- Low-level reader helpers ----
-				auto CheckRemaining = [&](size_t Need) -> bool
+		// Recursive skip helper: ostype already consumed (4 bytes), skip the payload.
+		// Declared as std::function to allow self-recursion for Objc/VlLs.
+		std::function<void(const char*)> SkipValueAfterOsType;
+		SkipValueAfterOsType = [&](const char* OsType)
+		{
+			if (FCStringAnsi::Strcmp(OsType, "bool") == 0) { Pos += 1; }
+			else if (FCStringAnsi::Strcmp(OsType, "long") == 0) { Pos += 4; }
+			else if (FCStringAnsi::Strcmp(OsType, "doub") == 0) { Pos += 8; }
+			else if (FCStringAnsi::Strcmp(OsType, "UntF") == 0) { Pos += 12; } // 4 unit + 8 double
+			else if (FCStringAnsi::Strcmp(OsType, "enum") == 0) { ReadPsString(); ReadPsString(); }
+			else if (FCStringAnsi::Strcmp(OsType, "TEXT") == 0)
+			{
+				uint32 Len = ReadU32BE();
+				Pos += Len * 2; // UTF-16 chars
+			}
+			else if (FCStringAnsi::Strcmp(OsType, "tdta") == 0)
+			{
+				uint32 Len = ReadU32BE();
+				Pos += Len;
+			}
+			else if (FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+			{
+				SkipUnicodeString();
+				ReadPsString(); // classID
+				uint32 Count = ReadU32BE();
+				for (uint32 i = 0; i < Count && CheckRemaining(8); ++i)
 				{
-					return (Pos + Need) <= Data.size();
-				};
-				auto ReadU8 = [&]() -> uint8
-				{
-					if (!CheckRemaining(1)) return 0;
-					return static_cast<uint8>(Data[Pos++]);
-				};
-				auto ReadU32BE = [&]() -> uint32
-				{
-					if (!CheckRemaining(4)) return 0;
-					uint32 V = (static_cast<uint32>(static_cast<uint8>(Data[Pos]))   << 24)
-					         | (static_cast<uint32>(static_cast<uint8>(Data[Pos+1])) << 16)
-					         | (static_cast<uint32>(static_cast<uint8>(Data[Pos+2])) << 8)
-					         |  static_cast<uint32>(static_cast<uint8>(Data[Pos+3]));
+					ReadPsString();
+					char OT2[5] = {};
+					for (int k = 0; k < 4; ++k)
+						OT2[k] = static_cast<char>(Data[Pos + k]);
 					Pos += 4;
-					return V;
-				};
-				auto ReadDoubleBE = [&]() -> double
+					SkipValueAfterOsType(OT2);
+				}
+			}
+			else if (FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
+			{
+				uint32 N = ReadU32BE();
+				for (uint32 i = 0; i < N && CheckRemaining(4); ++i)
 				{
-					if (!CheckRemaining(8)) return 0.0;
-					uint8 Buf[8];
-					for (int i = 0; i < 8; ++i) Buf[i] = static_cast<uint8>(Data[Pos + i]);
-					Pos += 8;
-					// Reverse for little-endian host
-					uint8 Rev[8] = { Buf[7], Buf[6], Buf[5], Buf[4], Buf[3], Buf[2], Buf[1], Buf[0] };
-					double V;
-					FMemory::Memcpy(&V, Rev, 8);
-					return V;
-				};
-				// ps_string: uint32 len; if len==0 read 4-byte ASCII tag; else read len bytes.
-				auto ReadPsString = [&]() -> std::string
-				{
-					uint32 Len = ReadU32BE();
-					if (Len == 0)
-					{
-						if (!CheckRemaining(4)) return {};
-						char Tag[5] = {};
-						for (int i = 0; i < 4; ++i)
-							Tag[i] = static_cast<char>(static_cast<uint8>(Data[Pos + i]));
-						Pos += 4;
-						return std::string(Tag);
-					}
-					if (!CheckRemaining(Len)) return {};
-					std::string S;
-					S.resize(Len);
-					for (uint32 i = 0; i < Len; ++i)
-						S[i] = static_cast<char>(static_cast<uint8>(Data[Pos + i]));
-					Pos += Len;
-					return S;
-				};
-				// unicode_string: uint32 num_chars, then num_chars*2 bytes UTF-16 BE (skip content).
-				auto SkipUnicodeString = [&]()
-				{
-					uint32 Len = ReadU32BE();
-					Pos += Len * 2; // skip UTF-16 chars
-				};
+					char OT2[5] = {};
+					for (int k = 0; k < 4; ++k)
+						OT2[k] = static_cast<char>(Data[Pos + k]);
+					Pos += 4;
+					SkipValueAfterOsType(OT2);
+				}
+			}
+			else
+			{
+				// Unknown ostype -- log verbose and stop walking (safe abort)
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("ParseFrFXDescriptor: unknown ostype '%.4hs' at pos %zu; aborting"),
+					OsType, Pos);
+				Pos = static_cast<size_t>(Data.Num()); // force loop exit
+			}
+		};
 
-				// Recursive skip helper: ostype already consumed (4 bytes), skip the payload.
-				// Declared as std::function to allow self-recursion for Objc/VlLs.
-				std::function<void(const char*)> SkipValueAfterOsType;
-				SkipValueAfterOsType = [&](const char* OsType)
-				{
-					if (FCStringAnsi::Strcmp(OsType, "bool") == 0) { Pos += 1; }
-					else if (FCStringAnsi::Strcmp(OsType, "long") == 0) { Pos += 4; }
-					else if (FCStringAnsi::Strcmp(OsType, "doub") == 0) { Pos += 8; }
-					else if (FCStringAnsi::Strcmp(OsType, "UntF") == 0) { Pos += 12; } // 4 unit + 8 double
-					else if (FCStringAnsi::Strcmp(OsType, "enum") == 0) { ReadPsString(); ReadPsString(); }
-					else if (FCStringAnsi::Strcmp(OsType, "TEXT") == 0)
-					{
-						uint32 Len = ReadU32BE();
-						Pos += Len * 2; // UTF-16 chars
-					}
-					else if (FCStringAnsi::Strcmp(OsType, "tdta") == 0)
-					{
-						uint32 Len = ReadU32BE();
-						Pos += Len;
-					}
-					else if (FCStringAnsi::Strcmp(OsType, "Objc") == 0)
-					{
-						SkipUnicodeString();
-						ReadPsString(); // classID
-						uint32 Count = ReadU32BE();
-						for (uint32 i = 0; i < Count && CheckRemaining(8); ++i)
-						{
-							ReadPsString();
-							char OT2[5] = {};
-							for (int k = 0; k < 4; ++k)
-								OT2[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
-							Pos += 4;
-							SkipValueAfterOsType(OT2);
-						}
-					}
-					else if (FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
-					{
-						uint32 N = ReadU32BE();
-						for (uint32 i = 0; i < N && CheckRemaining(4); ++i)
-						{
-							char OT2[5] = {};
-							for (int k = 0; k < 4; ++k)
-								OT2[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
-							Pos += 4;
-							SkipValueAfterOsType(OT2);
-						}
-					}
-					else
-					{
-						// Unknown ostype -- log verbose and stop walking (safe abort)
-						UE_LOG(LogPSD2UMG, Verbose,
-							TEXT("ExtractLfx2Stroke: unknown ostype '%.4hs' at pos %zu; aborting"),
-							OsType, Pos);
-						Pos = Data.size(); // force loop exit
-					}
-				};
+		// ---- Walk the top-level descriptor ----
+		// Descriptor header: unicode_class_name, ps_string classID, uint32 item_count
+		SkipUnicodeString(); // class name (usually empty)
+		ReadPsString();       // classID ('null')
+		uint32 TopCount = ReadU32BE();
 
-				// ---- Walk the top-level descriptor ----
-				// Descriptor header: unicode_class_name, ps_string classID, uint32 item_count
-				SkipUnicodeString(); // class name (usually empty)
-				ReadPsString();       // classID ('null')
-				uint32 TopCount = ReadU32BE();
+		bool bFoundStroke = false;
+		for (uint32 i = 0; i < TopCount && CheckRemaining(8) && !bFoundStroke; ++i)
+		{
+			std::string ItemKey = ReadPsString();
 
-				bool bFoundStroke = false;
-				for (uint32 i = 0; i < TopCount && CheckRemaining(8) && !bFoundStroke; ++i)
+			if (!CheckRemaining(4)) break;
+			char OsType[5] = {};
+			for (int k = 0; k < 4; ++k)
+				OsType[k] = static_cast<char>(Data[Pos + k]);
+			Pos += 4;
+
+			// We are looking for 'FrFX' with ostype 'Objc' (the stroke sub-descriptor)
+			if (ItemKey == "FrFX" && FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+			{
+				// ---- Parse the FrFX Objc descriptor ----
+				SkipUnicodeString(); // class name
+				ReadPsString();       // classID ('FrFX')
+				uint32 FrFXCount = ReadU32BE();
+
+				bool   bEnab    = false;
+				double SzPx     = 0.0;
+				double OpctPct  = 100.0;
+				double Rd       = 0.0, Grn = 0.0, Bl = 0.0;
+
+				for (uint32 j = 0; j < FrFXCount && CheckRemaining(8); ++j)
 				{
-					std::string ItemKey = ReadPsString();
+					std::string FKey = ReadPsString();
 
 					if (!CheckRemaining(4)) break;
-					char OsType[5] = {};
+					char FOsType[5] = {};
 					for (int k = 0; k < 4; ++k)
-						OsType[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
+						FOsType[k] = static_cast<char>(Data[Pos + k]);
 					Pos += 4;
 
-					// We are looking for 'FrFX' with ostype 'Objc' (the stroke sub-descriptor)
-					if (ItemKey == "FrFX" && FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					if (FKey == "enab" && FCStringAnsi::Strcmp(FOsType, "bool") == 0)
 					{
-						// ---- Parse the FrFX Objc descriptor ----
-						SkipUnicodeString(); // class name
-						ReadPsString();       // classID ('FrFX')
-						uint32 FrFXCount = ReadU32BE();
-
-						bool  bEnab      = false;
-						double SzPx      = 0.0;
-						double OpctPct   = 100.0;
-						double Rd        = 0.0, Grn = 0.0, Bl = 0.0;
-
-						for (uint32 j = 0; j < FrFXCount && CheckRemaining(8); ++j)
+						bEnab = (ReadU8() != 0);
+					}
+					else if (FKey == "Sz  " && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
+					{
+						Pos += 4; // skip unit tag (#Pxl)
+						SzPx = ReadDoubleBE();
+					}
+					else if (FKey == "Opct" && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
+					{
+						Pos += 4; // skip unit tag (#Prc)
+						OpctPct = ReadDoubleBE();
+					}
+					else if (FKey == "Clr " && FCStringAnsi::Strcmp(FOsType, "Objc") == 0)
+					{
+						// RGBC sub-descriptor: keys "Rd  ", "Grn ", "Bl  " -- doubles in 0..255
+						SkipUnicodeString();
+						ReadPsString(); // classID ('RGBC')
+						uint32 ClrCount = ReadU32BE();
+						for (uint32 c = 0; c < ClrCount && CheckRemaining(8); ++c)
 						{
-							std::string FKey = ReadPsString();
-
+							std::string CKey = ReadPsString();
 							if (!CheckRemaining(4)) break;
-							char FOsType[5] = {};
+							char COsType[5] = {};
 							for (int k = 0; k < 4; ++k)
-								FOsType[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
+								COsType[k] = static_cast<char>(Data[Pos + k]);
 							Pos += 4;
-
-							if (FKey == "enab" && FCStringAnsi::Strcmp(FOsType, "bool") == 0)
+							if (FCStringAnsi::Strcmp(COsType, "doub") == 0)
 							{
-								bEnab = (ReadU8() != 0);
-							}
-							else if (FKey == "Sz  " && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
-							{
-								Pos += 4; // skip unit tag (#Pxl)
-								SzPx = ReadDoubleBE();
-							}
-							else if (FKey == "Opct" && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
-							{
-								Pos += 4; // skip unit tag (#Prc)
-								OpctPct = ReadDoubleBE();
-							}
-							else if (FKey == "Clr " && FCStringAnsi::Strcmp(FOsType, "Objc") == 0)
-							{
-								// RGBC sub-descriptor: keys "Rd  ", "Grn ", "Bl  " -- doubles in 0..255
-								SkipUnicodeString();
-								ReadPsString(); // classID ('RGBC')
-								uint32 ClrCount = ReadU32BE();
-								for (uint32 c = 0; c < ClrCount && CheckRemaining(8); ++c)
-								{
-									std::string CKey = ReadPsString();
-									if (!CheckRemaining(4)) break;
-									char COsType[5] = {};
-									for (int k = 0; k < 4; ++k)
-										COsType[k] = static_cast<char>(static_cast<uint8>(Data[Pos + k]));
-									Pos += 4;
-									if (FCStringAnsi::Strcmp(COsType, "doub") == 0)
-									{
-										double V = ReadDoubleBE();
-										if      (CKey == "Rd  ") Rd  = V;
-										else if (CKey == "Grn ") Grn = V;
-										else if (CKey == "Bl  ") Bl  = V;
-									}
-									else
-									{
-										SkipValueAfterOsType(COsType);
-									}
-								}
+								double V = ReadDoubleBE();
+								if      (CKey == "Rd  ") Rd  = V;
+								else if (CKey == "Grn ") Grn = V;
+								else if (CKey == "Bl  ") Bl  = V;
 							}
 							else
 							{
-								SkipValueAfterOsType(FOsType);
+								SkipValueAfterOsType(COsType);
 							}
 						}
-
-						if (bEnab)
-						{
-							OutLayer.Effects.bHasStroke = true;
-							OutLayer.Effects.StrokeSize = static_cast<float>(SzPx);
-							const float A = FMath::Clamp(static_cast<float>(OpctPct / 100.0), 0.f, 1.f);
-							OutLayer.Effects.StrokeColor = FLinearColor::FromSRGBColor(
-								FColor(
-									static_cast<uint8>(FMath::Clamp(Rd  / 255.0, 0.0, 1.0) * 255.0),
-									static_cast<uint8>(FMath::Clamp(Grn / 255.0, 0.0, 1.0) * 255.0),
-									static_cast<uint8>(FMath::Clamp(Bl  / 255.0, 0.0, 1.0) * 255.0),
-									static_cast<uint8>(A * 255.0)));
-							UE_LOG(LogPSD2UMG, Log,
-								TEXT("Layer '%s' lfx2 stroke: enab=1 size=%.2fpx color=(%.2f,%.2f,%.2f,%.2f)"),
-								*OutLayer.Name,
-								OutLayer.Effects.StrokeSize,
-								OutLayer.Effects.StrokeColor.R,
-								OutLayer.Effects.StrokeColor.G,
-								OutLayer.Effects.StrokeColor.B,
-								OutLayer.Effects.StrokeColor.A);
-						}
-
-						bFoundStroke = true; // stop searching this block
 					}
 					else
 					{
-						SkipValueAfterOsType(OsType);
+						SkipValueAfterOsType(FOsType);
 					}
 				}
 
-				if (bFoundStroke)
-					break; // one lfx2 per layer
+				if (bEnab)
+				{
+					Out.bEnabled = true;
+					Out.SizePx   = static_cast<float>(SzPx);
+					const float A = FMath::Clamp(static_cast<float>(OpctPct / 100.0), 0.f, 1.f);
+					Out.Color = FLinearColor::FromSRGBColor(
+						FColor(
+							static_cast<uint8>(FMath::Clamp(Rd  / 255.0, 0.0, 1.0) * 255.0),
+							static_cast<uint8>(FMath::Clamp(Grn / 255.0, 0.0, 1.0) * 255.0),
+							static_cast<uint8>(FMath::Clamp(Bl  / 255.0, 0.0, 1.0) * 255.0),
+							static_cast<uint8>(A * 255.0)));
+				}
+
+				bFoundStroke = true; // stop searching this descriptor
+			}
+			else
+			{
+				SkipValueAfterOsType(OsType);
 			}
 		}
-		catch (...)
+
+		return bFoundStroke && Out.bEnabled;
+	}
+
+	// ---------------------------------------------------------------------------
+	// Raw PSD lfx2 scanner
+	//
+	// Scans the raw PSD file bytes for 8BIM+lfx2 signatures. For each hit,
+	// scans backwards for the nearest 8BIM+luni (unicode layer name) to
+	// associate the stroke with a layer name. Builds Lfx2StrokeMap passed
+	// into ConvertLayerRecursive.
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Parse an 8BIMluni block at FileBytes[LuniOffset] and return the layer name.
+	 * LuniOffset points at the start of the 8BIM signature.
+	 * Returns empty string on parse failure (caller logs warning).
+	 */
+	static FString ParseLuniLayerName(const TArray<uint8>& FileBytes, int64 LuniOffset)
+	{
+		// Format: "8BIM" (4) + "luni" (4) + uint32BE length (4) + uint32BE char_count (4) + UTF-16BE chars
+		const int64 Total = FileBytes.Num();
+		const int64 LenOffset = LuniOffset + 8;
+		if (LenOffset + 8 > Total) return FString();
+
+		const uint32 BlockLen =
+			(static_cast<uint32>(FileBytes[LenOffset])     << 24) |
+			(static_cast<uint32>(FileBytes[LenOffset + 1]) << 16) |
+			(static_cast<uint32>(FileBytes[LenOffset + 2]) << 8)  |
+			 static_cast<uint32>(FileBytes[LenOffset + 3]);
+
+		const int64 CharCountOffset = LenOffset + 4;
+		if (CharCountOffset + 4 > Total) return FString();
+
+		const uint32 CharCount =
+			(static_cast<uint32>(FileBytes[CharCountOffset])     << 24) |
+			(static_cast<uint32>(FileBytes[CharCountOffset + 1]) << 16) |
+			(static_cast<uint32>(FileBytes[CharCountOffset + 2]) << 8)  |
+			 static_cast<uint32>(FileBytes[CharCountOffset + 3]);
+
+		const int64 CharsOffset = CharCountOffset + 4;
+		if (CharCount == 0 || CharsOffset + static_cast<int64>(CharCount) * 2 > Total)
+			return FString();
+
+		// Convert UTF-16 BE to FString via manual byte swap to LE
+		TArray<TCHAR> Chars;
+		Chars.Reserve(static_cast<int32>(CharCount) + 1);
+		for (uint32 c = 0; c < CharCount; ++c)
 		{
-			OutDiag.AddWarning(OutLayer.Name,
-				TEXT("Failed to parse lfx2 stroke block; silently ignored."));
+			const uint8 Hi = FileBytes[CharsOffset + c * 2];
+			const uint8 Lo = FileBytes[CharsOffset + c * 2 + 1];
+			const uint16 CP = (static_cast<uint16>(Hi) << 8) | Lo;
+			Chars.Add(static_cast<TCHAR>(CP));
 		}
+		Chars.Add(0);
+		return FString(Chars.GetData());
+	}
+
+	/**
+	 * Scan raw PSD file bytes for all 8BIM+lfx2 blocks. For each, scan backwards
+	 * for the nearest 8BIM+luni to get the layer name. Parse the lfx2 content via
+	 * ParseFrFXDescriptor. Populate OutMap with enabled stroke info per layer name.
+	 */
+	static void ScanRawLfx2Blocks(
+		const TArray<uint8>& FileBytes,
+		TMap<FString, FPsdStrokeInfo>& OutMap,
+		FPsdParseDiagnostics& OutDiag)
+	{
+		const int64 N = FileBytes.Num();
+		if (N < 12) return;
+
+		// Signatures as byte arrays for memcmp scanning
+		// 8BIM+lfx2 = { 0x38,0x42,0x49,0x4D, 0x6C,0x66,0x78,0x32 }
+		// 8BIM+luni = { 0x38,0x42,0x49,0x4D, 0x6C,0x75,0x6E,0x69 }
+		static const uint8 Lfx2Sig[8] = { 0x38,0x42,0x49,0x4D, 0x6C,0x66,0x78,0x32 };
+		static const uint8 LuniSig[8] = { 0x38,0x42,0x49,0x4D, 0x6C,0x75,0x6E,0x69 };
+
+		int32 HitCount = 0;
+		for (int64 i = 0; i <= N - 12; ++i)
+		{
+			// Scan for 8BIMlfx2
+			if (FileBytes[i] != 0x38) continue;
+			if (FMemory::Memcmp(&FileBytes[i], Lfx2Sig, 8) != 0) continue;
+
+			// Read uint32BE block length immediately after the 8-byte sig
+			const int64 LenAt = i + 8;
+			if (LenAt + 4 > N) continue;
+			const uint32 BlockLen =
+				(static_cast<uint32>(FileBytes[LenAt])     << 24) |
+				(static_cast<uint32>(FileBytes[LenAt + 1]) << 16) |
+				(static_cast<uint32>(FileBytes[LenAt + 2]) << 8)  |
+				 static_cast<uint32>(FileBytes[LenAt + 3]);
+
+			const int64 ContentStart = LenAt + 4;
+			if (ContentStart + static_cast<int64>(BlockLen) > N) continue;
+
+			// Scan backwards for nearest 8BIM+luni before this offset
+			FString LayerName;
+			int64 SearchFrom = i - 8; // start just before this block
+			for (int64 j = SearchFrom; j >= 0; --j)
+			{
+				if (FileBytes[j] != 0x38) continue;
+				if (j + 8 > N) continue;
+				if (FMemory::Memcmp(&FileBytes[j], LuniSig, 8) != 0) continue;
+				// Found luni block
+				LayerName = ParseLuniLayerName(FileBytes, j);
+				break;
+			}
+
+			if (LayerName.IsEmpty())
+			{
+				OutDiag.AddWarning(TEXT(""),
+					FString::Printf(TEXT("lfx2 at offset %lld: could not find preceding luni block; skipping."),
+						static_cast<long long>(i)));
+				continue;
+			}
+
+			// Build a TArrayView over the content bytes and parse
+			TArrayView<const uint8> ContentView(FileBytes.GetData() + ContentStart, static_cast<int32>(BlockLen));
+			FPsdStrokeInfo StrokeInfo;
+			if (ParseFrFXDescriptor(ContentView, StrokeInfo))
+			{
+				OutMap.Add(LayerName, StrokeInfo);
+				UE_LOG(LogPSD2UMG, Log,
+					TEXT("lfx2 raw scan: layer '%s' stroke enab=1 size=%.2fpx color=(%.2f,%.2f,%.2f,%.2f)"),
+					*LayerName,
+					StrokeInfo.SizePx,
+					StrokeInfo.Color.R,
+					StrokeInfo.Color.G,
+					StrokeInfo.Color.B,
+					StrokeInfo.Color.A);
+			}
+			++HitCount;
+		}
+
+		UE_LOG(LogPSD2UMG, Verbose,
+			TEXT("ScanRawLfx2Blocks: scanned %lld bytes, found %d lfx2 blocks, %d with enabled stroke"),
+			static_cast<long long>(N), HitCount, OutMap.Num());
+	}
+
+	/**
+	 * Apply pre-scanned lfx2 stroke info (from ScanRawLfx2Blocks) to the layer.
+	 * Replaces the dead PhotoshopAPI-block-based walker.
+	 */
+	static void ExtractLfx2Stroke(
+		const FString& LayerName,
+		const TMap<FString, FPsdStrokeInfo>& Lfx2Map,
+		FPsdLayer& OutLayer)
+	{
+		const FPsdStrokeInfo* Info = Lfx2Map.Find(LayerName);
+		if (!Info || !Info->bEnabled) return;
+
+		OutLayer.Effects.bHasStroke  = true;
+		OutLayer.Effects.StrokeSize  = Info->SizePx;
+		OutLayer.Effects.StrokeColor = Info->Color;
 	}
 
 	// Phase 4.1 D-05/D-06: route text-parented layer effects onto the text payload
@@ -835,7 +963,8 @@ namespace PSD2UMG::Parser::Internal
 	void ConvertLayerRecursive(
 		const std::shared_ptr<PsdLayer>& InLayer,
 		FPsdLayer& OutLayer,
-		FPsdParseDiagnostics& OutDiag)
+		FPsdParseDiagnostics& OutDiag,
+		const TMap<FString, FPsdStrokeInfo>& Lfx2Map)
 	{
 		if (!InLayer)
 		{
@@ -852,8 +981,9 @@ namespace PSD2UMG::Parser::Internal
 
 		// Phase 5: extract layer effects from lrFX tagged block
 		ExtractLayerEffects(InLayer, OutLayer, OutDiag);
-		// Phase 4.1 TEXT-03: extract Layer-Style Stroke from lfx2 descriptor (D-02: all layer types)
-		ExtractLfx2Stroke(InLayer, OutLayer, OutDiag);
+		// Phase 4.1 TEXT-03: extract Layer-Style Stroke from raw-scanned lfx2 map
+		// (PhotoshopAPI v0.9 silently drops lfx2 blocks -- scanned from raw bytes in ParseFile)
+		ExtractLfx2Stroke(OutLayer.Name, Lfx2Map, OutLayer);
 
 		// Layer-type dispatch via RTTI. bUseRTTI=true is set in PSD2UMG.Build.cs.
 		if (auto Group = std::dynamic_pointer_cast<GroupLayer<PsdPixelType>>(InLayer))
@@ -864,7 +994,7 @@ namespace PSD2UMG::Parser::Internal
 			for (const auto& Child : Children)
 			{
 				FPsdLayer& ChildOut = OutLayer.Children.AddDefaulted_GetRef();
-				ConvertLayerRecursive(Child, ChildOut, OutDiag);
+				ConvertLayerRecursive(Child, ChildOut, OutDiag, Lfx2Map);
 			}
 			return;
 		}
@@ -963,12 +1093,27 @@ namespace PSD2UMG::Parser
 				static_cast<int32>(File.width()),
 				static_cast<int32>(File.height()));
 
+			// Pre-scan raw PSD bytes for lfx2 stroke data (PhotoshopAPI v0.9 drops lfx2 silently)
+			TMap<FString, Internal::FPsdStrokeInfo> Lfx2Map;
+			{
+				TArray<uint8> RawBytes;
+				if (FFileHelper::LoadFileToArray(RawBytes, *Path))
+				{
+					Internal::ScanRawLfx2Blocks(RawBytes, Lfx2Map, OutDiag);
+				}
+				else
+				{
+					OutDiag.AddWarning(TEXT(""),
+						FString::Printf(TEXT("Could not load raw bytes for lfx2 scan: '%s'; stroke effects will be missing."), *Path));
+				}
+			}
+
 			auto& RootLayers = File.layers();
 			OutDoc.RootLayers.Reserve(static_cast<int32>(RootLayers.size()));
 			for (const auto& Child : RootLayers)
 			{
 				FPsdLayer& ChildOut = OutDoc.RootLayers.AddDefaulted_GetRef();
-				Internal::ConvertLayerRecursive(Child, ChildOut, OutDiag);
+				Internal::ConvertLayerRecursive(Child, ChildOut, OutDiag, Lfx2Map);
 			}
 
 			// Phase 9: populate FPsdLayer::ParsedTags after Type is known (post-pass).

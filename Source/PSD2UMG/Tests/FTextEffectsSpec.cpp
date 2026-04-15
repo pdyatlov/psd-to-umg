@@ -224,6 +224,114 @@ void FTextEffectsSpec::Define()
             TestFalse(TEXT("no _Shadow UImage sibling"), bFoundShadowImage);
         });
 
+        // ------------------------------------------------------------------
+        // TEXT-03 Cases: Layer-Style Stroke round-trip (Plan 04.1-02)
+        //
+        // Fixture golden values (empirically verified from TextEffects.psd):
+        //   text_stroke: enab=true, Sz=2px, Color=#FF0000 (R=255/0/0), Opct=100%
+        //   text_stroke_and_shadow: same stroke + drop shadow
+        //   text_complex: gradient overlay, no stroke (FrFX.enab=false)
+        //
+        // DPI: 2px * 0.75 = 1.5 -> RoundToInt = 2 (applied in FTextLayerMapper)
+        // ------------------------------------------------------------------
+
+        // Case 8: text_stroke routed state -- Effects.bHasStroke cleared, Text.OutlineSize==2px
+        It("text_stroke has Effects.bHasStroke cleared and Text.OutlineSize == 2.0f after routing (TEXT-03)", [this]()
+        {
+            if (!bFixtureExists) return;
+            if (!TestTrue(TEXT("fixture parses"), bParsed)) return;
+
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_stroke"));
+            if (!TestNotNull(TEXT("text_stroke layer exists"), L)) return;
+
+            // RouteTextEffects should have moved stroke to Text and cleared Effects.bHasStroke
+            TestFalse(TEXT("Effects.bHasStroke cleared after routing"), L->Effects.bHasStroke);
+            TestTrue(TEXT("Text.OutlineSize == 2.0 (raw PSD pixels)"),
+                FMath::IsNearlyEqual(L->Text.OutlineSize, 2.0f, 0.1f));
+            TestTrue(TEXT("Text.OutlineColor.A > 0 (stroke color has opacity)"),
+                L->Text.OutlineColor.A > 0.f);
+        });
+
+        // Case 9: text_stroke UTextBlock OutlineSize == 2 (2px * 0.75 = 1.5 -> round = 2)
+        It("text_stroke UTextBlock OutlineSize == 2 (DPI-converted: 2px * 0.75 rounded) (TEXT-03)", [this]()
+        {
+            if (!bFixtureExists) return;
+            if (!bParsed) return;
+            if (!TestNotNull(TEXT("WBP"), WBP)) return;
+            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
+
+            UTextBlock* TB = FindTextBlockByName(WBP->WidgetTree, TEXT("text_stroke"));
+            if (!TestNotNull(TEXT("text_stroke UTextBlock"), TB)) return;
+
+            // 2px * 0.75 = 1.5 -> FMath::RoundToInt = 2
+            const int32 ExpectedOutlineSize = FMath::RoundToInt(2.f * 0.75f);
+            TestTrue(TEXT("OutlineSize == 2"),
+                TB->GetFont().OutlineSettings.OutlineSize == ExpectedOutlineSize);
+        });
+
+        // Case 10: text_stroke UTextBlock OutlineColor is red (R>0.9, G<0.1, B<0.1)
+        It("text_stroke UTextBlock OutlineColor is red (TEXT-03)", [this]()
+        {
+            if (!bFixtureExists) return;
+            if (!bParsed) return;
+            if (!TestNotNull(TEXT("WBP"), WBP)) return;
+            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
+
+            UTextBlock* TB = FindTextBlockByName(WBP->WidgetTree, TEXT("text_stroke"));
+            if (!TestNotNull(TEXT("text_stroke UTextBlock"), TB)) return;
+
+            // FrFX color: R=255, G~0, B~0 (near-red in sRGB -> linear color)
+            // After FLinearColor::FromSRGBColor: R~1.0, G~0, B~0 (within 0.1 tolerance)
+            const FLinearColor OC = TB->GetFont().OutlineSettings.OutlineColor;
+            TestTrue(TEXT("OutlineColor R > 0.9"), OC.R > 0.9f);
+            TestTrue(TEXT("OutlineColor G < 0.1"), OC.G < 0.1f);
+            TestTrue(TEXT("OutlineColor B < 0.1"), OC.B < 0.1f);
+        });
+
+        // Case 11: text_stroke_and_shadow has BOTH non-zero outline AND non-zero shadow offset
+        It("text_stroke_and_shadow has both outline and shadow (TEXT-03)", [this]()
+        {
+            if (!bFixtureExists) return;
+            if (!bParsed) return;
+            if (!TestNotNull(TEXT("WBP"), WBP)) return;
+            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
+
+            UTextBlock* TB = FindTextBlockByName(WBP->WidgetTree, TEXT("text_stroke_and_shadow"));
+            if (!TestNotNull(TEXT("text_stroke_and_shadow UTextBlock"), TB)) return;
+
+            TestTrue(TEXT("OutlineSize > 0"), TB->GetFont().OutlineSettings.OutlineSize > 0);
+            TestFalse(TEXT("ShadowOffset non-zero"), TB->GetShadowOffset().IsZero());
+        });
+
+        // Case 12: text_complex has no outline (FrFX.enab=false, only gradient overlay)
+        It("text_complex UTextBlock has zero outline (gradient overlay is complex effects only) (D-11)", [this]()
+        {
+            if (!bFixtureExists) return;
+            if (!bParsed) return;
+            if (!TestNotNull(TEXT("WBP"), WBP)) return;
+            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
+
+            UTextBlock* TB = FindTextBlockByName(WBP->WidgetTree, TEXT("text_complex"));
+            if (!TestNotNull(TEXT("text_complex UTextBlock"), TB)) return;
+
+            TestTrue(TEXT("OutlineSize == 0"), TB->GetFont().OutlineSettings.OutlineSize == 0);
+            TestTrue(TEXT("zero shadow offset"), TB->GetShadowOffset().IsZero());
+        });
+
+        // Case 13: text_complex parsed layer has Effects.bHasComplexEffects == true (D-11 path)
+        It("text_complex parsed layer has bHasComplexEffects == true (gradient overlay triggers D-11 warning)", [this]()
+        {
+            if (!bFixtureExists) return;
+            if (!TestTrue(TEXT("fixture parses"), bParsed)) return;
+
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_complex"));
+            if (!TestNotNull(TEXT("text_complex layer exists"), L)) return;
+
+            TestTrue(TEXT("bHasComplexEffects (from gradient overlay)"), L->Effects.bHasComplexEffects);
+            // Stroke is disabled (FrFX.enab=false), so bHasStroke stays false
+            TestFalse(TEXT("bHasStroke false (stroke not enabled)"), L->Effects.bHasStroke);
+        });
+
         AfterEach([this]()
         {
             const FString AssetPath = TEXT("/Game/_Test/WBPGen/WBP_TextEffects_Spec.WBP_TextEffects_Spec");

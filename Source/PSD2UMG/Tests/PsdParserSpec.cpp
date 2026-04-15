@@ -263,15 +263,19 @@ void FPsdParserTypographySpec::Define()
             TestTrue(TEXT("bItalic"), L->Text.bItalic);
         });
 
-        It("text_stroked has complex effects from Layer Style Stroke", [this]()
+        It("text_stroked has bHasStroke routed to Text.OutlineSize>0 (TEXT-03)", [this]()
         {
             const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_stroked"));
             if (!TestNotNull(TEXT("text_stroked"), L)) return;
-            // PhotoshopAPI v0.9 does not expose lfx2 (object-based effects), so Layer Style
-            // Stroke is detected as a complex effect via lrFX, but OutlineSize/OutlineColor
-            // cannot be extracted. Character-level strokes (style_run_stroke_flag) would work
-            // but are rarely used in practice. For now, verify the layer is flagged.
-            TestTrue(TEXT("bHasComplexEffects (from Layer Style)"), L->Effects.bHasComplexEffects);
+            // Phase 4.1 TEXT-03: lfx2/FrFX descriptor walker now decodes Layer-Style Stroke.
+            // RouteTextEffects copies Stroke->Text.Outline* and clears Effects.bHasStroke (D-13).
+            // NOTE: Typography.psd text_stroked also has isdw+bevl in lrFX, so bHasComplexEffects
+            // remains true -- this is correct and independent of the stroke routing.
+            TestFalse(TEXT("Effects.bHasStroke cleared after routing"), L->Effects.bHasStroke);
+            TestTrue(TEXT("Text.OutlineSize > 0 (Layer-Style stroke routed)"), L->Text.OutlineSize > 0.f);
+            TestTrue(TEXT("Text.OutlineColor has non-zero alpha"), L->Text.OutlineColor.A > 0.f);
+            TestTrue(TEXT("bHasComplexEffects true (isdw+bevl in lrFX, independent of stroke)"),
+                L->Effects.bHasComplexEffects);
         });
 
         It("text_paragraph has bHasExplicitWidth=true and BoxWidthPx > 100", [this]()

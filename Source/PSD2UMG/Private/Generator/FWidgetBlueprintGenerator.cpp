@@ -37,12 +37,25 @@ static void PopulateChildren(
     const TArray<FPsdLayer>& Layers,
     const FPsdDocument& Doc,
     const FIntPoint& CanvasSize,
-    const TSet<FString>& SkippedLayerNames = TSet<FString>())
+    const TSet<FString>& SkippedLayerNames = TSet<FString>(),
+    int32 Depth = 0)
 {
     const int32 TotalLayers = Layers.Num();
+    const FString Indent = FString::ChrN(Depth * 2, TEXT(' '));
+    UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 30] %sPopulateChildren ENTER depth=%d parent='%s' class=%s count=%d"),
+        *Indent, Depth,
+        Parent ? *Parent->GetName() : TEXT("<null>"),
+        Parent ? *Parent->GetClass()->GetName() : TEXT("<null>"),
+        TotalLayers);
+
     for (int32 i = 0; i < TotalLayers; ++i)
     {
         const FPsdLayer& Layer = Layers[i];
+        UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 30] %s  [%d/%d] layer='%s' cleanName='%s' type=%d tagType=%d childCount=%d"),
+            *Indent, i + 1, TotalLayers,
+            *Layer.Name, *Layer.ParsedTags.CleanName,
+            static_cast<int32>(Layer.Type), static_cast<int32>(Layer.ParsedTags.Type),
+            Layer.Children.Num());
 
         // Skip layers the user unchecked in the preview dialog
         if (SkippedLayerNames.Contains(Layer.Name))
@@ -85,6 +98,39 @@ static void PopulateChildren(
         UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 20] PRE-map layer='%s' cleanName='%s' type=%d tagType=%d"),
             *LayerPtr->Name, *LayerPtr->ParsedTags.CleanName,
             static_cast<int32>(LayerPtr->Type), static_cast<int32>(LayerPtr->ParsedTags.Type));
+
+        // [DIAG 20] Pre-flight: does a widget with this clean-name already exist in the tree?
+        // If yes, log it (then evict it) — this catches the collision BEFORE UE's NewObject fatal fires.
+        if (Tree && !LayerPtr->ParsedTags.CleanName.IsEmpty())
+        {
+            const FName CleanFName(*LayerPtr->ParsedTags.CleanName);
+            if (UWidget* Existing = Tree->FindWidget(CleanFName))
+            {
+                UE_LOG(LogPSD2UMG, Error,
+                    TEXT("[DIAG 20] !!! COLLISION: widget named '%s' already exists (class=%s, outer=%s, flags=0x%08x). Evicting."),
+                    *LayerPtr->ParsedTags.CleanName,
+                    *Existing->GetClass()->GetName(),
+                    Existing->GetOuter() ? *Existing->GetOuter()->GetPathName() : TEXT("null"),
+                    (int32)Existing->GetFlags());
+                Existing->ClearFlags(RF_Standalone | RF_Public);
+                Existing->MarkAsGarbage();
+                Existing->Rename(nullptr, GetTransientPackage(),
+                    REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
+            }
+            // Also scan for any UObject (not just UWidget) at the same outer+name path
+            if (UObject* AnyExisting = StaticFindObjectFast(nullptr, Tree, CleanFName))
+            {
+                UE_LOG(LogPSD2UMG, Error,
+                    TEXT("[DIAG 20] !!! NON-WIDGET COLLISION: object named '%s' found at tree outer (class=%s, full=%s)"),
+                    *LayerPtr->ParsedTags.CleanName,
+                    *AnyExisting->GetClass()->GetName(),
+                    *AnyExisting->GetPathName());
+                AnyExisting->ClearFlags(RF_Standalone | RF_Public);
+                AnyExisting->MarkAsGarbage();
+                AnyExisting->Rename(nullptr, GetTransientPackage(),
+                    REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
+            }
+        }
 
         UWidget* Widget = Registry.MapLayer(*LayerPtr, Doc, Tree);
         if (!Widget)
@@ -289,7 +335,7 @@ static void PopulateChildren(
         {
             if (UPanelWidget* ChildPanel = Cast<UPanelWidget>(Widget))
             {
-                PopulateChildren(Registry, Tree, ChildPanel, Layer.Children, Doc, CanvasSize, SkippedLayerNames);
+                PopulateChildren(Registry, Tree, ChildPanel, Layer.Children, Doc, CanvasSize, SkippedLayerNames, Depth + 1);
             }
             else
             {
@@ -299,6 +345,9 @@ static void PopulateChildren(
             }
         }
     }
+
+    UE_LOG(LogPSD2UMG, Warning, TEXT("[DIAG 30] %sPopulateChildren EXIT depth=%d parent='%s'"),
+        *Indent, Depth, Parent ? *Parent->GetName() : TEXT("<null>"));
 }
 
 // ---------------------------------------------------------------------------

@@ -281,11 +281,24 @@ namespace PSD2UMG::Parser::Internal
 					TEXT("Text layer fill color not found in run or normal style; leaving default."));
 			}
 
-			// Justification (first paragraph run).
+			// Justification: prefer the first paragraph run; fall back to the default
+			// paragraph sheet for layers whose run dict omits the Justification key
+			// (common for single-line center-aligned point text).
+			// TEXT-F-02 (Phase 12) — see 12-RESEARCH §TEXT-F-02.
+			const TCHAR* JustSource = TEXT("none");
 			if (auto J = Text->paragraph_run_justification(0); J.has_value())
 			{
 				OutLayer.Text.Alignment = MapJustification(*J);
+				JustSource = TEXT("run[0]");
 			}
+			else if (auto J = Text->paragraph_normal_justification(); J.has_value())
+			{
+				OutLayer.Text.Alignment = MapJustification(*J);
+				JustSource = TEXT("normal");
+			}
+			UE_LOG(LogPSD2UMG, Verbose,
+				TEXT("Text layer '%s' justification source=%s value=%d"),
+				*OutLayer.Name, JustSource, (int32)OutLayer.Text.Alignment.GetValue());
 
 			// Phase 4 -- weight / style flags (first run).
 			// Check Faux Bold/Italic flags from Photoshop character panel.

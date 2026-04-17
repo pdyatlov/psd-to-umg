@@ -43,7 +43,10 @@ See [milestones/v1.0.1-ROADMAP.md](milestones/v1.0.1-ROADMAP.md) for full phase 
   2. Hidden layers are visually distinct from visible layers in the dialog tree (dimmed row, eye-closed icon, or [hidden] label)
   3. Unchecking a layer in the dialog results in that layer's widget not appearing in the generated WBP
   4. Unchecking a group layer also excludes all of its children from the generated WBP
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 11-01-PLAN.md — Data model + bVisible init fix (FPsdLayerTreeItem fields, BuildTreeRecursive, LayerName bug)
+- [ ] 11-02-PLAN.md — UI eye-icon column in OnGenerateRow
 
 ### Phase 12: Text Property Fidelity
 **Goal**: Text layers import with correct font size, paragraph alignment, and fill color — what the designer set in Photoshop is what appears in UMG
@@ -59,7 +62,7 @@ See [milestones/v1.0.1-ROADMAP.md](milestones/v1.0.1-ROADMAP.md) for full phase 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 11. Import Dialog Hidden-Layer Filtering | 0/? | Not started | - |
+| 11. Import Dialog Hidden-Layer Filtering | 0/2 | Not started | - |
 | 12. Text Property Fidelity | 0/? | Not started | - |
 
 ## v1.2+ Backlog

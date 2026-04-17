@@ -249,6 +249,17 @@ namespace PSD2UMG::Parser::Internal
 				}
 			}
 
+			// TEXT-F-03 diagnostic (Phase 12): log raw fill-color values so future
+			// fill-channel regressions can be diagnosed without code edits.
+			UE_LOG(LogPSD2UMG, Verbose,
+				TEXT("Text layer '%s' fill source=%s size=%zu values=[%.4f,%.4f,%.4f,%.4f]"),
+				*OutLayer.Name, FillSource,
+				Fill.has_value() ? Fill->size() : static_cast<size_t>(0u),
+				(Fill.has_value() && Fill->size() > 0) ? (*Fill)[0] : 0.0,
+				(Fill.has_value() && Fill->size() > 1) ? (*Fill)[1] : 0.0,
+				(Fill.has_value() && Fill->size() > 2) ? (*Fill)[2] : 0.0,
+				(Fill.has_value() && Fill->size() > 3) ? (*Fill)[3] : 0.0);
+
 			if (Fill.has_value() && Fill->size() >= 4)
 			{
 				// PhotoshopAPI returns text fill color as ARGB doubles in [0..1],

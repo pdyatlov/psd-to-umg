@@ -568,7 +568,7 @@ TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
         .Padding(FMargin(2.f, 0.f))
         [
             SNew(SBox)
-            .WidthOverride(20.f)
+            .WidthOverride(16.f)
             .HeightOverride(16.f)
             [
                 SNew(SImage)

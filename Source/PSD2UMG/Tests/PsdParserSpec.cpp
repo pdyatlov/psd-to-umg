@@ -230,11 +230,11 @@ void FPsdParserTypographySpec::Define()
 
     Describe("Typography fixture", [this]()
     {
-        It("loads successfully with 5 root layers", [this]()
+        It("loads successfully with 8 root layers", [this]()
         {
             TestTrue(TEXT("bParsed"), bParsed);
             TestFalse(TEXT("Diag.HasErrors()"), Diag.HasErrors());
-            TestEqual(TEXT("RootLayers.Num"), Doc.RootLayers.Num(), 5);
+            TestEqual(TEXT("RootLayers.Num"), Doc.RootLayers.Num(), 8);
         });
 
         It("text_regular has bBold=false, bItalic=false, bHasExplicitWidth=false", [this]()
@@ -298,6 +298,16 @@ void FPsdParserTypographySpec::Define()
             if (!TestNotNull(TEXT("text_paragraph"), L)) return;
             TestTrue(TEXT("bHasExplicitWidth"), L->Text.bHasExplicitWidth);
             TestTrue(TEXT("BoxWidthPx > 100"), L->Text.BoxWidthPx > 100.f);
+        });
+
+        It("text_centered has Alignment == ETextJustify::Center (TEXT-F-02)", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_centered"));
+            if (!TestNotNull(TEXT("text_centered exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Text);
+            TestEqual(TEXT("Alignment is Center"),
+                (int32)L->Text.Alignment.GetValue(),
+                (int32)ETextJustify::Center);
         });
     });
 }

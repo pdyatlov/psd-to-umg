@@ -991,6 +991,18 @@ namespace PSD2UMG::Parser::Internal
 			Layer.Text.OutlineSize   = Layer.Effects.StrokeSize; // raw PSD px; mapper applies x0.75
 			Layer.Effects.bHasStroke = false;                    // D-13-style guard
 		}
+
+		// TEXT-F-03 (Phase 12): Color Overlay on text layers wins over the run/normal
+		// fill (matches Photoshop's render order — overlay paints on top of fill).
+		// Mirrors drop-shadow and stroke routing above; clears the flag so the
+		// generator's image-only FX-03 block does not emit the "non-image layer
+		// ignored" warning (D-13 double-render guard).
+		// See 12-RESEARCH §TEXT-F-03 CORRECTION.
+		if (Layer.Effects.bHasColorOverlay)
+		{
+			Layer.Text.Color = Layer.Effects.ColorOverlayColor;
+			Layer.Effects.bHasColorOverlay = false; // D-13 double-render guard
+		}
 	}
 
 	void ConvertLayerRecursive(

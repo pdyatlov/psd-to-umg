@@ -97,6 +97,56 @@ void FTextPipelineSpec::Define()
             {
                 TestTrue(TEXT("paragraph wraps"), T->GetAutoWrapText());
             }
+
+            // text_centered — TEXT-F-02.
+            if (UTextBlock* T = FindText(Tree, TEXT("text_centered")))
+            {
+                TestEqual(TEXT("centered justification is Center"),
+                    (int32)T->GetJustification(),
+                    (int32)ETextJustify::Center);
+            }
+            else
+            {
+                AddError(TEXT("text_centered widget not found in generated WBP"));
+            }
+
+            // text_gray — TEXT-F-03 fill path.
+            if (UTextBlock* T = FindText(Tree, TEXT("text_gray")))
+            {
+                const FSlateColor SC = T->GetColorAndOpacity();
+                const FLinearColor LC = SC.GetSpecifiedColor();
+                TestTrue(TEXT("text_gray R within 0.1 of G"),
+                    FMath::IsNearlyEqual(LC.R, LC.G, 0.1f));
+                TestTrue(TEXT("text_gray R within 0.1 of B"),
+                    FMath::IsNearlyEqual(LC.R, LC.B, 0.1f));
+                TestTrue(TEXT("text_gray R less than 0.9 (not white)"), LC.R < 0.9f);
+                TestTrue(TEXT("text_gray R greater than 0.05 (not black)"), LC.R > 0.05f);
+            }
+            else
+            {
+                AddError(TEXT("text_gray widget not found in generated WBP"));
+            }
+
+            // text_overlay_gray — TEXT-F-03 overlay-routing path.
+            // End-to-end pin: PSD Layer Style Color Overlay -> RouteTextEffects routes
+            // onto Text.Color -> mapper sets ColorAndOpacity -> UMG widget renders gray
+            // (NOT the white character fill the layer was authored with).
+            if (UTextBlock* T = FindText(Tree, TEXT("text_overlay_gray")))
+            {
+                const FSlateColor SC = T->GetColorAndOpacity();
+                const FLinearColor LC = SC.GetSpecifiedColor();
+                TestTrue(TEXT("text_overlay_gray R within 0.1 of G (gray, not red)"),
+                    FMath::IsNearlyEqual(LC.R, LC.G, 0.1f));
+                TestTrue(TEXT("text_overlay_gray R within 0.1 of B (gray, not red)"),
+                    FMath::IsNearlyEqual(LC.R, LC.B, 0.1f));
+                TestTrue(TEXT("text_overlay_gray R less than 0.9 (overlay overrode white fill)"),
+                    LC.R < 0.9f);
+                TestTrue(TEXT("text_overlay_gray R greater than 0.05 (not black)"), LC.R > 0.05f);
+            }
+            else
+            {
+                AddError(TEXT("text_overlay_gray widget not found in generated WBP"));
+            }
         });
 
         AfterEach([this]()

@@ -221,6 +221,15 @@ namespace PSD2UMG::Parser::Internal
 			if (auto FontSize = Text->style_run_font_size(0); FontSize.has_value())
 			{
 				OutLayer.Text.SizePx = static_cast<float>(*FontSize);
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Text layer '%s' style_run_font_size(0) raw=%.4f stored=%.4f"),
+					*OutLayer.Name, *FontSize, OutLayer.Text.SizePx);
+			}
+			else
+			{
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Text layer '%s' style_run_font_size(0) returned nullopt"),
+					*OutLayer.Name);
 			}
 
 			// Fill colour. Try every color source PhotoshopAPI exposes and log

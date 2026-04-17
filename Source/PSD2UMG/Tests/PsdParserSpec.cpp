@@ -309,6 +309,60 @@ void FPsdParserTypographySpec::Define()
                 (int32)L->Text.Alignment.GetValue(),
                 (int32)ETextJustify::Center);
         });
+
+        It("text_gray has Color approximately gray via fill path (TEXT-F-03)", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_gray"));
+            if (!TestNotNull(TEXT("text_gray exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Text);
+
+            // sRGB #808080 -> linear ~0.2159 per channel (FColor 128 -> sRGB
+            // gamma-decoded). Allow +/-0.05 tolerance for any rounding.
+            const FLinearColor ExpectedGrayLinear = FLinearColor::FromSRGBColor(FColor(128, 128, 128, 255));
+            TestTrue(TEXT("Color is approximately gray (R approx G approx B near linear ~0.2159)"),
+                ColorsNearlyEqual(L->Text.Color, ExpectedGrayLinear, 0.05f));
+
+            // Defensive: not red (R is not >> G/B) and not white (R is not ~1.0).
+            TestTrue(TEXT("R within 0.1 of G"),
+                FMath::IsNearlyEqual(L->Text.Color.R, L->Text.Color.G, 0.1f));
+            TestTrue(TEXT("R within 0.1 of B"),
+                FMath::IsNearlyEqual(L->Text.Color.R, L->Text.Color.B, 0.1f));
+            TestTrue(TEXT("R less than 0.9 (not white)"), L->Text.Color.R < 0.9f);
+
+            // text_gray has no Layer Style -> bHasColorOverlay must be false here
+            // regardless of routing (no overlay was ever set).
+            TestFalse(TEXT("text_gray has no Color Overlay flag"),
+                L->Effects.bHasColorOverlay);
+        });
+
+        It("text_overlay_gray has Color approximately gray via overlay routing AND bHasColorOverlay cleared (TEXT-F-03 routing)", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_overlay_gray"));
+            if (!TestNotNull(TEXT("text_overlay_gray exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Text);
+
+            // Expected: RouteTextEffects copied Effects.ColorOverlayColor (#808080)
+            // onto Text.Color, OVERRIDING the white character fill the layer was
+            // authored with. This pins overlay-wins-over-fill behaviour.
+            const FLinearColor ExpectedGrayLinear = FLinearColor::FromSRGBColor(FColor(128, 128, 128, 255));
+            TestTrue(TEXT("Text.Color is approximately gray (overlay color, not white fill)"),
+                ColorsNearlyEqual(L->Text.Color, ExpectedGrayLinear, 0.05f));
+
+            // Defensive: not white (would mean overlay routing failed and the white
+            // character fill leaked through).
+            TestTrue(TEXT("R less than 0.9 (overlay overrode the white fill)"),
+                L->Text.Color.R < 0.9f);
+            TestTrue(TEXT("R within 0.1 of G (gray, not red)"),
+                FMath::IsNearlyEqual(L->Text.Color.R, L->Text.Color.G, 0.1f));
+            TestTrue(TEXT("R within 0.1 of B (gray, not red)"),
+                FMath::IsNearlyEqual(L->Text.Color.R, L->Text.Color.B, 0.1f));
+
+            // D-13 double-render guard: RouteTextEffects must clear the flag so
+            // the generator's image-only FX-03 block does not emit the "non-image
+            // layer ignored" warning. Mirrors stroke + shadow routing.
+            TestFalse(TEXT("Effects.bHasColorOverlay was cleared by RouteTextEffects"),
+                L->Effects.bHasColorOverlay);
+        });
     });
 }
 

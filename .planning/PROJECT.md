@@ -2,24 +2,11 @@
 
 ## Current State
 
-**v1.0 shipped 2026-04-15.**
+**v1.0.1 shipped 2026-04-17.**
 
-The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirely in C++20. It delivers a complete one-click PSD-to-Widget-Blueprint import pipeline: a native PhotoshopAPI-backed parser (FPsdParser), a pluggable layer-mapper registry with 15 widget types, full typography support including Layer-Style stroke and drop shadow routing, layer effects with flatten fallback, 9-slice borders, Smart Object recursive import, row/column anchor heuristics, an SPsdImportPreviewDialog, non-destructive reimport, CommonUI/animation interop, a comprehensive automation spec suite, and a unified `@`-tag grammar replacing all ad-hoc prefix/suffix dispatch. All 75 v1 requirements are satisfied. ~170 commits, 161 files changed, +25128/-365 LOC.
+The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirely in C++20. It delivers a complete one-click PSD-to-Widget-Blueprint import pipeline: a native PhotoshopAPI-backed parser (FPsdParser), a pluggable layer-mapper registry with 15 widget types, full typography support including Layer-Style stroke and drop shadow routing, layer effects with flatten fallback, 9-slice borders, Smart Object recursive import, row/column anchor heuristics, an SPsdImportPreviewDialog, non-destructive reimport, CommonUI/animation interop, a comprehensive automation spec suite, and a unified `@`-tag grammar. Non-canvas panel child attachment (`@vbox`, `@hbox`, `@scrollbox`, `@overlay`) now correctly dispatches via `UPanelWidget::AddChild` — the v1.0 silent-drop bug is fixed. All 75 v1 + 7 v1.0.1 requirements satisfied.
 
-See `.planning/milestones/v1.0-ROADMAP.md` for the full phase-by-phase archive and `.planning/milestones/v1.0-MILESTONE-AUDIT.md` for the final audit.
-
-## Current Milestone: v1.0.1 Panel Child Attachment Hotfix
-
-**Goal:** Close the v1.0 gap where non-canvas group tags (`@vbox`, `@hbox`, `@scrollbox`, `@overlay`) silently drop all children. The generator's recursion is hard-cast to `UCanvasPanel`; the mapper creates the correct panel widget but no children are ever attached.
-
-**Target features:**
-- Child attachment dispatches on parent panel type (`AddChildToCanvas` for Canvas; `UPanelWidget::AddChild` for VBox/HBox/ScrollBox/Overlay).
-- VBox / HBox children stack by PSD z-order; no PSD position applied.
-- ScrollBox / Overlay children added in order with default slot properties.
-- Fixture PSD with nested non-canvas groups; spec asserts child counts > 0.
-- Diagnostic warning on any unattached child (no more silent drops).
-
-**Out of scope:** configurable slot properties (alignment, padding, orientation), image-layer stroke rendering, other v1.0 tech-debt.
+See `.planning/milestones/v1.0.1-ROADMAP.md` for the v1.0.1 archive.
 
 ## Next Milestone Goals (v1.1+)
 
@@ -32,6 +19,7 @@ _Candidate scope:_
 - URichTextBlock mixed-style runs (TEXT-V2-01)
 - Configurable panel slot properties (HBox alignment, Overlay padding, ScrollBox orientation)
 - Fab/Marketplace submission packaging (MKT-03)
+- Overlay/Canvas/Nested spec coverage (test-coverage gap; implementation complete)
 
 ---
 
@@ -59,6 +47,16 @@ A designer drops a PSD into Unreal Editor and gets a correctly structured, immed
 - ✓ Layer images exported as PNG and imported as UTexture2D assets — existing
 - ✓ Font mapping system (Photoshop font name → UE font asset) via DeveloperSettings — existing
 - ✓ Plugin enable/disable toggle via Project Settings — existing
+
+<!-- v1.0.1 — Panel Child Attachment Hotfix -->
+
+- ✓ `@vbox` group layers generate UVerticalBox with children attached via UPanelWidget::AddChild in PSD z-order — v1.0.1
+- ✓ `@hbox` group layers generate UHorizontalBox with children in PSD z-order — v1.0.1
+- ✓ `@scrollbox` group layers generate UScrollBox with children in PSD z-order — v1.0.1
+- ✓ `@overlay` group layers generate UOverlay with children in PSD z-order — v1.0.1
+- ✓ Canvas group behavior (`@canvas` / default) byte-identical to v1.0 — no regression — v1.0.1
+- ✓ Unattached children emit UE_LOG Warning (no silent drops) — v1.0.1
+- ✓ `Panels.psd` fixture + `FPanelAttachmentSpec` covering VBox/HBox/ScrollBox — v1.0.1
 
 ### Active
 
@@ -163,14 +161,17 @@ Each stage is independently testable and replaceable.
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Fork AutoPSDUI as base | Proven concept, existing C++ UE wrappers reusable, MIT license | — Pending |
-| PhotoshopAPI for C++ PSD parsing | 327 stars, actively maintained, MIT, handles all PSD features including 32-bit | — Pending |
-| Pre-build PhotoshopAPI as static lib | CMake + UBT integration is painful; pre-built .lib links cleanly via Build.cs | — Pending |
-| Pluggable IPsdLayerMapper strategy | Allows user-registered mappers for custom layer→widget rules without modifying core | — Pending |
-| Layer name prefix convention | Designer-controlled (Button_, Progress_, etc.) — zero config required for common widgets | — Pending |
-| Anchor heuristics from position | Automatic reasonable defaults; override via name suffixes for precision | — Pending |
-| Flatten fallback for complex effects | Full material-based effect fidelity is complex and fragile; rasterize is always correct | — Pending |
-| CommonUI as opt-in | CommonUI requires extra project setup; don't force it on projects that don't use it | — Pending |
+| Fork AutoPSDUI as base | Proven concept, existing C++ UE wrappers reusable, MIT license | ✓ Good |
+| PhotoshopAPI for C++ PSD parsing | 327 stars, actively maintained, MIT, handles all PSD features including 32-bit | ✓ Good |
+| Pre-build PhotoshopAPI as static lib | CMake + UBT integration is painful; pre-built .lib links cleanly via Build.cs | ✓ Good |
+| Pluggable IPsdLayerMapper strategy | Allows user-registered mappers for custom layer→widget rules without modifying core | ✓ Good |
+| Layer name prefix convention | Designer-controlled (Button_, Progress_, etc.) — zero config required for common widgets | ✓ Good — evolved to @-tag grammar in Phase 9 |
+| Anchor heuristics from position | Automatic reasonable defaults; override via name suffixes for precision | ✓ Good |
+| Flatten fallback for complex effects | Full material-based effect fidelity is complex and fragile; rasterize is always correct | ✓ Good |
+| CommonUI as opt-in | CommonUI requires extra project setup; don't force it on projects that don't use it | ✓ Good |
+| UPanelWidget::AddChild for non-canvas groups | PopulateCanvas hard-cast to UCanvasPanel silently dropped all non-canvas children; UPanelWidget dispatch fixes this generically | ✓ Good — v1.0.1 |
+| Clear-and-rebuild for non-canvas reimport | Non-canvas slots carry no PSD state; ClearChildren+PopulateChildren is simpler and correct vs diff-and-patch | ✓ Good — v1.0.1 |
+| Defer Overlay/Canvas/Nested spec cases | Implementation is generic; test coverage gap only — triaged as v1.1+ work | ⚠ Revisit in v1.1 |
 
 ## Evolution
 
@@ -190,4 +191,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-15 after Phase 9 completion (unified tag-based layer naming — hard cutover)*
+*Last updated: 2026-04-17 after v1.0.1 milestone (panel child attachment hotfix)*

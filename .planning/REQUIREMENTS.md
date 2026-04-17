@@ -32,13 +32,13 @@
 
 | REQ-ID | Assigned Phase | Status |
 |---|---|---|
-| HIDDEN-01 | TBD | Planned |
-| HIDDEN-02 | TBD | Planned |
-| FILTER-01 | TBD | Planned |
-| FILTER-02 | TBD | Planned |
-| TEXT-F-01 | TBD | Planned |
-| TEXT-F-02 | TBD | Planned |
-| TEXT-F-03 | TBD | Planned |
+| HIDDEN-01 | Phase 11 | Planned |
+| HIDDEN-02 | Phase 11 | Planned |
+| FILTER-01 | Phase 11 | Planned |
+| FILTER-02 | Phase 11 | Planned |
+| TEXT-F-01 | Phase 12 | Planned |
+| TEXT-F-02 | Phase 12 | Planned |
+| TEXT-F-03 | Phase 12 | Planned |
 
 ---
 

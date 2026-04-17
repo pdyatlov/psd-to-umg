@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: planning
-stopped_at: Defining requirements
+stopped_at: Roadmap created — ready to plan Phase 11
 last_updated: "2026-04-17T00:00:00.000Z"
 last_activity: 2026-04-17
 progress:
-  total_phases: 0
+  total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 10 — panel-child-attachment
+**Current focus:** Phase 11 — import dialog hidden-layer filtering
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 11 (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-17 — Milestone v1.1 started
+Status: Roadmap approved, ready to plan Phase 11
+Last activity: 2026-04-17 — v1.1 roadmap created (Phases 11-12)
 
 ## Performance Metrics
 
@@ -127,6 +127,7 @@ Recent decisions affecting current work:
 ### Roadmap Evolution
 
 - Phase 9 added: Unified layer naming convention (tag-based)
+- Phases 11-12 added: v1.1 Import Fidelity Fixes
 
 ### Pending Todos
 
@@ -134,12 +135,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 2 highest risk: PhotoshopAPI transitive dep linking (blosc2, libdeflate, zlib-ng, OpenImageIO). Must validate early.
-- Phase 3: Widget Blueprint ConstructWidget > compile > save sequence must be validated before building full mapper.
-- PhotoshopAPI text API is new (v0.9.0) -- edge cases with CJK, mixed-font runs unknown.
+- TEXT-F-01: pt→px formula needs verification. Decision log says "1:1" but user reports 24.45→30 inflation. Likely a 72/96 DPI ratio being applied somewhere (24.45 * 96/72 ≈ 32.6; 24.45 * 4/3 ≈ 32.6 — actual 30 suggests a different multiplier). Needs code inspection of FTextLayerMapper before planning.
+- TEXT-F-03: ARGB channel-order bug already documented for fill color (Phase 02-c-psd-parser P05 decision). Phase 12 must apply the same ARGB→RGBA swap confirmed empirically.
 
 ## Session Continuity
 
-Last session: 2026-04-15T13:00:00.000Z
-Stopped at: Completed 10-03-PLAN.md
+Last session: 2026-04-17T00:00:00.000Z
+Stopped at: Roadmap created for v1.1 (Phases 11-12)
 Resume file: None

@@ -27,11 +27,44 @@ See [milestones/v1.0.1-ROADMAP.md](milestones/v1.0.1-ROADMAP.md) for full phase 
 
 </details>
 
-## v1.1+ Backlog
+## v1.1 Import Fidelity Fixes (Phases 11-12)
 
-Phases for the next milestone will be planned here when v1.1 scope is defined.
+- [ ] **Phase 11: Import Dialog Hidden-Layer Filtering** - Hidden PSD layers appear unchecked in the import dialog and unchecked layers are excluded from WBP generation
+- [ ] **Phase 12: Text Property Fidelity** - Font size, alignment, and base color correctly preserved from PSD through to UTextBlock
 
-**Candidate work (from deferred registry):**
+## Phase Details
+
+### Phase 11: Import Dialog Hidden-Layer Filtering
+**Goal**: Users can see which PSD layers are hidden and control which layers are included in the generated Widget Blueprint via import dialog checkboxes
+**Depends on**: Nothing (targets existing SPsdImportPreviewDialog + FWidgetBlueprintGenerator)
+**Requirements**: HIDDEN-01, HIDDEN-02, FILTER-01, FILTER-02
+**Success Criteria** (what must be TRUE):
+  1. Importing a PSD with hidden layers shows those layers with their checkbox unchecked by default in the preview dialog
+  2. Hidden layers are visually distinct from visible layers in the dialog tree (dimmed row, eye-closed icon, or [hidden] label)
+  3. Unchecking a layer in the dialog results in that layer's widget not appearing in the generated WBP
+  4. Unchecking a group layer also excludes all of its children from the generated WBP
+**Plans**: TBD
+
+### Phase 12: Text Property Fidelity
+**Goal**: Text layers import with correct font size, paragraph alignment, and fill color — what the designer set in Photoshop is what appears in UMG
+**Depends on**: Nothing (targets existing FTextLayerMapper)
+**Requirements**: TEXT-F-01, TEXT-F-02, TEXT-F-03
+**Success Criteria** (what must be TRUE):
+  1. A text layer with 24.45 pt font in PSD produces a UTextBlock with the correct UMG font size (not inflated to 30)
+  2. A center-aligned paragraph in PSD produces a UTextBlock with ETextJustify::Center after compile+save
+  3. A gray text layer in PSD produces a UTextBlock with a gray ColorAndOpacity (not red or another corrupted color)
+**Plans**: TBD
+
+## Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 11. Import Dialog Hidden-Layer Filtering | 0/? | Not started | - |
+| 12. Text Property Fidelity | 0/? | Not started | - |
+
+## v1.2+ Backlog
+
+Candidate work (from deferred registry):
 - frameFXMulti VlLs stroke format (newer Photoshop)
 - Image-layer stroke rendering (D-12 — data already populated)
 - lrFX channel-order visual confirm for color overlay/shadow (needs host .uproject)

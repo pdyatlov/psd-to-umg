@@ -247,6 +247,20 @@ void FPsdParserTypographySpec::Define()
             TestFalse(TEXT("bHasExplicitWidth"), L->Text.bHasExplicitWidth);
         });
 
+        It("text_regular has SizePx equal to raw PhotoshopAPI font size (TEXT-F-01)", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_regular"));
+            if (!TestNotNull(TEXT("text_regular"), L)) return;
+            // TEXT-F-01 (Phase 12, 12-01): PhotoshopAPI returns style_run_font_size()
+            // = designer_pt * (4/3). The mapper applies * 0.75 to recover designer intent.
+            // This test pins the PARSER-side raw value independently of the mapper.
+            // Captured value (empirical, Typography.psd Verbose log): raw = 32.0000.
+            // If PhotoshopAPI changes its internal scaling this test will surface it.
+            constexpr float ExpectedRawSizePx = 32.0f;
+            TestEqual(TEXT("Text.SizePx is raw PhotoshopAPI value (32.0 = designer 24pt * 4/3)"),
+                L->Text.SizePx, ExpectedRawSizePx);
+        });
+
         It("text_bold has bBold=true", [this]()
         {
             const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_bold"));

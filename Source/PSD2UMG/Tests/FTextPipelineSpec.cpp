@@ -74,9 +74,16 @@ void FTextPipelineSpec::Define()
             UWidgetTree* Tree = WBP->WidgetTree;
 
             // text_regular — TEXT-01 DPI check + no wrap.
+            // TEXT-F-01 (Phase 12, 12-01 re-evaluation): PhotoshopAPI returns
+            // style_run_font_size() = designer_pt * (4/3). The mapper applies
+            // * 0.75 (= 3/4) to recover the designer intent. For text_regular:
+            //   raw SizePx = 32.0 (captured from Typography.psd Verbose log)
+            //   32.0 * 0.75 = 24  <-- the formula is CORRECT, not accidental.
+            // Do NOT remove the 0.75 factor; this assertion pins that contract.
             if (UTextBlock* T = FindText(Tree, TEXT("text_regular")))
             {
-                TestEqual(TEXT("regular size 24"), (int32)T->GetFont().Size, 24);
+                TestEqual(TEXT("regular size 24 (raw=32 * 0.75 = designer 24pt)"),
+                    (int32)T->GetFont().Size, 24);
                 TestFalse(TEXT("regular no wrap"), T->GetAutoWrapText());
             }
 

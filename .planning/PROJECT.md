@@ -8,9 +8,20 @@ The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirel
 
 See `.planning/milestones/v1.0.1-ROADMAP.md` for the v1.0.1 archive.
 
-## Next Milestone Goals (v1.1+)
+## Current Milestone: v1.1 Import Fidelity Fixes
 
-_Candidate scope:_
+**Goal:** Fix import dialog correctness (hidden layer filtering, checkbox exclusion) and text property fidelity (font size, alignment, base color).
+
+**Target fixes:**
+- Hidden PSD layers shown as unchecked by default in import dialog
+- Unchecked layers in import dialog actually excluded from WBP output
+- Font size: PSD pt value imported correctly into UMG (currently inflated)
+- Text alignment: PSD alignment preserved in UTextBlock after import
+- Text base color: correct color imported (currently corrupted to red)
+
+## Next Milestone Goals (v1.2+)
+
+_Candidate scope (deferred from earlier milestones):_
 
 - Human UAT pass against a host UE 5.7 project (lrFX visual confirms, 9s/SmartObj/CommonUI/anim runtime checks)
 - GitHub Actions CI pipeline (D-04)
@@ -191,4 +202,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 after v1.0.1 milestone (panel child attachment hotfix)*
+*Last updated: 2026-04-17 — v1.1 milestone started (import fidelity fixes)*

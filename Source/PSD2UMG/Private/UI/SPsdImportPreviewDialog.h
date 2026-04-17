@@ -104,7 +104,8 @@ private:
     static void BuildTreeRecursive(const TArray<FPsdLayer>& Layers,
                                    TArray<TSharedPtr<FPsdLayerTreeItem>>& OutItems,
                                    int32 Depth,
-                                   TWeakPtr<FPsdLayerTreeItem> Parent);
+                                   TWeakPtr<FPsdLayerTreeItem> Parent,
+                                   bool bParentChecked = true);
 
     // -------------------------------------------------------------------------
     // Member variables

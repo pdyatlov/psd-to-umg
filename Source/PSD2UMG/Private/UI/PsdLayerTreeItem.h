@@ -16,10 +16,12 @@ enum class EPsdChangeAnnotation : uint8
 /** Tree item for the SPsdImportPreviewDialog STreeView. One item per PSD layer. */
 struct FPsdLayerTreeItem
 {
-    FString LayerName;
-    FString WidgetTypeName;         // "Button", "Image", "TextBlock", "CanvasPanel", etc.
+    FString LayerName;           // raw PSD layer name — used as SkippedLayerNames key (D-07)
+    FString DisplayName;         // CleanName or raw Name — shown in tree row (Phase 11)
+    FString WidgetTypeName;      // "Button", "Image", "TextBlock", "CanvasPanel", etc.
     FLinearColor BadgeColor;
-    bool bChecked = true;
+    bool bChecked = true;        // user intent — mutable; initialized from bVisible at tree build
+    bool bLayerVisible = true;   // PSD source truth — read-only after BuildTreeRecursive (Phase 11)
     EPsdChangeAnnotation ChangeAnnotation = EPsdChangeAnnotation::None;
     int32 Depth = 0;
     TWeakPtr<FPsdLayerTreeItem> Parent;

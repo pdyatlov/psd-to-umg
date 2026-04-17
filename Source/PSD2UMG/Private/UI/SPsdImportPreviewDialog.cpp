@@ -240,23 +240,27 @@ void SPsdImportPreviewDialog::BuildTreeRecursive(
     const TArray<FPsdLayer>& Layers,
     TArray<TSharedPtr<FPsdLayerTreeItem>>& OutItems,
     int32 Depth,
-    TWeakPtr<FPsdLayerTreeItem> Parent)
+    TWeakPtr<FPsdLayerTreeItem> Parent,
+    bool bParentChecked)
 {
     for (const FPsdLayer& Layer : Layers)
     {
         TSharedPtr<FPsdLayerTreeItem> Item = MakeShared<FPsdLayerTreeItem>();
-        Item->LayerName = Layer.ParsedTags.CleanName.IsEmpty() ? Layer.Name : Layer.ParsedTags.CleanName;
+        Item->LayerName    = Layer.Name;                                                         // D-07: raw name as skip key
+        Item->DisplayName  = Layer.ParsedTags.CleanName.IsEmpty()                                // D-07: tag-free name for display
+                           ? Layer.Name : Layer.ParsedTags.CleanName;
+        Item->bLayerVisible = Layer.bVisible;                                                    // Phase 11: PSD source truth
+        Item->bChecked     = bParentChecked && Layer.bVisible;                                   // D-01 + D-02: inherit parent state
         Item->WidgetTypeName = InferWidgetTypeName(Layer);
-        Item->BadgeColor = BadgeColorForType(Item->WidgetTypeName);
-        Item->bChecked = true;
+        Item->BadgeColor   = BadgeColorForType(Item->WidgetTypeName);
         Item->ChangeAnnotation = EPsdChangeAnnotation::None;
-        Item->Depth = Depth;
-        Item->Parent = Parent;
-        Item->ParsedTags = Layer.ParsedTags;
+        Item->Depth        = Depth;
+        Item->Parent       = Parent;
+        Item->ParsedTags   = Layer.ParsedTags;
 
         if (Layer.Children.Num() > 0)
         {
-            BuildTreeRecursive(Layer.Children, Item->Children, Depth + 1, Item);
+            BuildTreeRecursive(Layer.Children, Item->Children, Depth + 1, Item, Item->bChecked); // D-02: propagate
         }
 
         OutItems.Add(Item);
@@ -582,7 +586,7 @@ TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
         .VAlign(VAlign_Center)
         [
             SNew(STextBlock)
-            .Text(FText::FromString(Item->LayerName))
+            .Text(FText::FromString(Item->DisplayName))
             .Font(FAppStyle::GetFontStyle(TEXT("NormalFont")))
         ]
 

@@ -302,9 +302,9 @@ namespace PSD2UMG::Parser::Internal
 				OutLayer.Text.Alignment = MapJustification(*J);
 				JustSource = TEXT("run[0]");
 			}
-			else if (auto J = Text->paragraph_normal_justification(); J.has_value())
+			else if (auto normalJustification = Text->paragraph_normal_justification(); normalJustification.has_value())
 			{
-				OutLayer.Text.Alignment = MapJustification(*J);
+				OutLayer.Text.Alignment = MapJustification(*normalJustification);
 				JustSource = TEXT("normal");
 			}
 			UE_LOG(LogPSD2UMG, Verbose,
@@ -457,31 +457,68 @@ namespace PSD2UMG::Parser::Internal
 					size_t EffectEnd = Pos + EffectSize;
 					if (EffectEnd > Data.size()) EffectEnd = Data.size();
 
+					// TEXT-F-03 / TEXT-04 byte-layout diagnostic: dump up to 40 bytes of the
+					// effect payload so the actual sofi/dsdw structure can be verified against
+					// the PSD spec without code edits. Position-zero is the first byte of the
+					// effect-specific payload (after sig/key/size header).
+					{
+						const size_t DumpLen = FMath::Min<size_t>(40, EffectEnd > Pos ? EffectEnd - Pos : 0);
+						FString HexDump;
+						for (size_t i = 0; i < DumpLen; ++i)
+						{
+							HexDump += FString::Printf(TEXT("%02X "), static_cast<uint8>(Data[Pos + i]));
+						}
+						UE_LOG(LogPSD2UMG, Verbose,
+							TEXT("Layer '%s' lrFX effect '%c%c%c%c' size=%u payload[0..%zu]= %s"),
+							*OutLayer.Name, Key[0], Key[1], Key[2], Key[3],
+							EffectSize, DumpLen, *HexDump);
+					}
+
 					if (FCStringAnsi::Strcmp(Key, "sofi") == 0)
 					{
-						// Color overlay / solid fill
+						// Color overlay / solid fill -- per Adobe PSD spec lrFX v0:
+						//   4 bytes Version
+						//   4 bytes Blend signature ("8BIM")   <-- previously skipped via
+						//   4 bytes Blend key                       a single ReadU32(BlendKey)
+						//   2 bytes Color space + 8 bytes color (R,G,B,_)
+						//   1 byte Opacity (0..255)
+						//   1 byte Enabled
 						uint32 SofiVer = ReadU32();
+						ReadU32(); // Blend signature ("8BIM") -- was missing, caused 4-byte slip
 						uint32 BlendKey = ReadU32();
 						uint16 ColorSpace = ReadU16();
-						// D-16: Parse as R,G,B and log for ARGB verification against fixtures.
-						// Phase 2 found ARGB in descriptor arrays; lrFX color sub-records may differ.
 						float C0 = static_cast<float>(ReadU16()) / 65535.f;
 						float C1 = static_cast<float>(ReadU16()) / 65535.f;
 						float C2 = static_cast<float>(ReadU16()) / 65535.f;
-						ReadU16(); // unused channel
+						ReadU16(); // unused 4th channel
 						uint8 OpacityByte = ReadU8();
 						uint8 Enabled = ReadU8();
 						float A = static_cast<float>(OpacityByte) / 255.f;
 
-						UE_LOG(LogPSD2UMG, Verbose, TEXT("Layer '%s' sofi color: C0=%.3f C1=%.3f C2=%.3f A=%.3f (assuming R,G,B order)"),
-							*OutLayer.Name, C0, C1, C2, A);
+						UE_LOG(LogPSD2UMG, Verbose,
+							TEXT("Layer '%s' sofi parsed: ver=%u blendKey=0x%08X colorSpace=%u "
+							     "C0=%.3f C1=%.3f C2=%.3f opacity=%u enabled=%u"),
+							*OutLayer.Name, SofiVer, BlendKey, ColorSpace,
+							C0, C1, C2, OpacityByte, Enabled);
 
 						OutLayer.Effects.bHasColorOverlay = (Enabled != 0);
 						OutLayer.Effects.ColorOverlayColor = Enabled ? FLinearColor(C0, C1, C2, A) : FLinearColor::White;
 					}
 					else if (FCStringAnsi::Strcmp(Key, "dsdw") == 0)
 					{
-						// Drop shadow
+						// Drop shadow -- per Adobe PSD spec lrFX v0:
+						//   4  Version (=2)
+						//   4  Blur (fixed 16.16)
+						//   4  Intensity
+						//   4  Angle (fixed 16.16, degrees)
+						//   4  Distance (fixed 16.16, pixels)
+						//   10 Color (2 colorSpace + 8 channel data)
+						//   4  Blend signature ("8BIM")     <-- previously read as a "Sign" byte
+						//   4  Blend key                         which corrupted the rest
+						//   1  Enabled
+						//   1  Use angle in all effects
+						//   1  Opacity (0..255)
+						//   10 Native color
 						uint32 DsdwVer = ReadU32();
 						uint32 BlurFixed = ReadU32();
 						uint32 IntensityFixed = ReadU32();
@@ -490,28 +527,39 @@ namespace PSD2UMG::Parser::Internal
 						float DistancePx = static_cast<float>(DistanceFixed) / 65536.f;
 						float AngleDeg = static_cast<float>(AngleFixed) / 65536.f;
 						float AngleRad = FMath::DegreesToRadians(AngleDeg);
-						float OffsetX = DistancePx * FMath::Cos(AngleRad);
-						float OffsetY = DistancePx * FMath::Sin(AngleRad);
+						// Photoshop convention: shadow drops in the OPPOSITE direction of the
+						// global light angle. Negate to get the visible offset on screen.
+						float OffsetX = -DistancePx * FMath::Cos(AngleRad);
+						float OffsetY =  DistancePx * FMath::Sin(AngleRad);
 
 						uint16 ColorSpace = ReadU16();
-						// D-16: Same channel order verification as sofi
 						float C0 = static_cast<float>(ReadU16()) / 65535.f;
 						float C1 = static_cast<float>(ReadU16()) / 65535.f;
 						float C2 = static_cast<float>(ReadU16()) / 65535.f;
-						ReadU16(); // unused channel
+						ReadU16(); // unused 4th channel
 
-						UE_LOG(LogPSD2UMG, Verbose, TEXT("Layer '%s' dsdw color: C0=%.3f C1=%.3f C2=%.3f (assuming R,G,B order)"),
-							*OutLayer.Name, C0, C1, C2);
+						ReadU32(); // Blend signature "8BIM" -- was misread as Sign byte
+						uint32 BlendKey = ReadU32();
 
-						uint8 Sign = ReadU8();
-						if (Sign != 0) OffsetY = -OffsetY;
-						OutLayer.Effects.DropShadowOffset = FVector2D(OffsetX, OffsetY);
-
-						uint8 ShadowOpacity = (Pos < EffectEnd) ? ReadU8() : 128;
 						uint8 ShadowEnabled = (Pos < EffectEnd) ? ReadU8() : 1;
+						uint8 UseAngle      = (Pos < EffectEnd) ? ReadU8() : 1;
+						uint8 ShadowOpacity = (Pos < EffectEnd) ? ReadU8() : 128;
+
 						float ShadowA = static_cast<float>(ShadowOpacity) / 255.f;
-						OutLayer.Effects.bHasDropShadow = (ShadowEnabled != 0);
-						OutLayer.Effects.DropShadowColor = ShadowEnabled ? FLinearColor(C0, C1, C2, ShadowA) : FLinearColor(0, 0, 0, 0);
+
+						UE_LOG(LogPSD2UMG, Verbose,
+							TEXT("Layer '%s' dsdw parsed: ver=%u blendKey=0x%08X colorSpace=%u "
+							     "C0=%.3f C1=%.3f C2=%.3f angle=%.1f dist=%.2fpx offset=(%.2f,%.2f) "
+							     "opacity=%u enabled=%u useAngle=%u"),
+							*OutLayer.Name, DsdwVer, BlendKey, ColorSpace,
+							C0, C1, C2, AngleDeg, DistancePx, OffsetX, OffsetY,
+							ShadowOpacity, ShadowEnabled, UseAngle);
+
+						OutLayer.Effects.DropShadowOffset = FVector2D(OffsetX, OffsetY);
+						OutLayer.Effects.bHasDropShadow   = (ShadowEnabled != 0);
+						OutLayer.Effects.DropShadowColor  = ShadowEnabled
+							? FLinearColor(C0, C1, C2, ShadowA)
+							: FLinearColor(0, 0, 0, 0);
 					}
 					else if (FCStringAnsi::Strcmp(Key, "isdw") == 0
 					      || FCStringAnsi::Strcmp(Key, "bevl") == 0)

@@ -254,11 +254,13 @@ void FPsdParserTypographySpec::Define()
             // TEXT-F-01 (Phase 12, 12-01): PhotoshopAPI returns style_run_font_size()
             // = designer_pt * (4/3). The mapper applies * 0.75 to recover designer intent.
             // This test pins the PARSER-side raw value independently of the mapper.
-            // Captured value (empirical, Typography.psd Verbose log): raw = 32.0000.
-            // If PhotoshopAPI changes its internal scaling this test will surface it.
+            // Captured value (empirical, Typography.psd Verbose log): raw ~= 32.0
+            // (PhotoshopAPI returns 31.9955 due to EngineData float round-trip).
+            // Tolerance 0.05 accommodates that precision loss; if PhotoshopAPI changes
+            // its internal scaling the value will drift far outside 0.05 and surface here.
             constexpr float ExpectedRawSizePx = 32.0f;
-            TestEqual(TEXT("Text.SizePx is raw PhotoshopAPI value (32.0 = designer 24pt * 4/3)"),
-                L->Text.SizePx, ExpectedRawSizePx);
+            TestTrue(TEXT("Text.SizePx is raw PhotoshopAPI value (~32.0 = designer 24pt * 4/3)"),
+                FMath::IsNearlyEqual(L->Text.SizePx, ExpectedRawSizePx, 0.05f));
         });
 
         It("text_bold has bBold=true", [this]()

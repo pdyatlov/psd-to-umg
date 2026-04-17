@@ -14,6 +14,8 @@
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/TextBlock.h"
+#include "Components/TextLayoutWidget.h"
+#include "UObject/UnrealType.h"
 #include "ObjectTools.h"
 
 BEGIN_DEFINE_SPEC(FTextPipelineSpec, "PSD2UMG.Typography.Pipeline",
@@ -98,12 +100,22 @@ void FTextPipelineSpec::Define()
                 TestTrue(TEXT("paragraph wraps"), T->GetAutoWrapText());
             }
 
-            // text_centered — TEXT-F-02.
+            // text_centered — TEXT-F-02. Justification is a protected UPROPERTY on
+            // UTextLayoutWidget — there is no GetJustification() accessor, so read it
+            // via reflection (BlueprintReadWrite makes the FProperty discoverable).
             if (UTextBlock* T = FindText(Tree, TEXT("text_centered")))
             {
-                TestEqual(TEXT("centered justification is Center"),
-                    (int32)T->GetJustification(),
-                    (int32)ETextJustify::Center);
+                if (FByteProperty* JustProp = FindFProperty<FByteProperty>(
+                        UTextLayoutWidget::StaticClass(), TEXT("Justification")))
+                {
+                    const uint8 J = JustProp->GetPropertyValue_InContainer(T);
+                    TestEqual(TEXT("centered justification is Center"),
+                        (int32)J, (int32)ETextJustify::Center);
+                }
+                else
+                {
+                    AddError(TEXT("Justification UPROPERTY not found via reflection"));
+                }
             }
             else
             {

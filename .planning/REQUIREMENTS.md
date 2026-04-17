@@ -18,7 +18,7 @@
 
 ### Text Fidelity — Font Size (TEXT-F-*)
 
-- [ ] **TEXT-F-01**: Font point size from PhotoshopAPI is converted to UMG font size using the correct formula so `FSlateFontInfo.Size` matches PSD design intent (24.45 pt PSD → correct UMG value, not inflated to 30).
+- [x] **TEXT-F-01**: Font point size from PhotoshopAPI is converted to UMG font size using the correct formula so `FSlateFontInfo.Size` matches PSD design intent (24.45 pt PSD → correct UMG value, not inflated to 30).
 
 ### Text Fidelity — Alignment (TEXT-F-*)
 

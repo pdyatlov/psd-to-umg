@@ -56,14 +56,17 @@ Plans:
   1. A text layer with 24.45 pt font in PSD produces a UTextBlock with the correct UMG font size (not inflated to 30)
   2. A center-aligned paragraph in PSD produces a UTextBlock with ETextJustify::Center after compile+save
   3. A gray text layer in PSD produces a UTextBlock with a gray ColorAndOpacity (not red or another corrupted color)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [x] 12-01-PLAN.md — Font size fidelity: confirm raw SizePx, remove * 0.75f, update test expectations (TEXT-F-01)
+- [ ] 12-02-PLAN.md — Alignment + fill color: fixture update, parser fallbacks, new spec assertions (TEXT-F-02, TEXT-F-03)
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 11. Import Dialog Hidden-Layer Filtering | 0/2 | Not started | - |
-| 12. Text Property Fidelity | 0/? | Not started | - |
+| 12. Text Property Fidelity | 1/2 | In Progress|  |
 
 ## v1.2+ Backlog
 

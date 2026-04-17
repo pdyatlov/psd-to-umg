@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: planning
-stopped_at: Completed 11-02-PLAN.md
-last_updated: "2026-04-17T09:22:48.983Z"
-last_activity: 2026-04-17 — v1.1 roadmap created (Phases 11-12)
+status: executing
+stopped_at: Completed 12-text-property-fidelity 12-01-PLAN.md
+last_updated: "2026-04-17T10:49:10.047Z"
+last_activity: 2026-04-17
 progress:
   total_phases: 2
   completed_phases: 1
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 11 — import dialog hidden-layer filtering
+**Current focus:** Phase 12 — Text Property Fidelity
 
 ## Current Position
 
-Phase: 11 (not started)
-Plan: —
-Status: Roadmap approved, ready to plan Phase 11
-Last activity: 2026-04-17 — v1.1 roadmap created (Phases 11-12)
+Phase: 12 (Text Property Fidelity) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-17
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Last activity: 2026-04-17 — v1.1 roadmap created (Phases 11-12)
 | Phase 10-panel-child-attachment P01 | 2m | 1 tasks | 1 files |
 | Phase 10-panel-child-attachment P02 | 2 | 1 tasks | 1 files |
 | Phase 10-panel-child-attachment P03 | human-in-the-loop + scope trim | 2 tasks | 2 files |
+| Phase 12-text-property-fidelity P01 | 45 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,7 @@ Recent decisions affecting current work:
 - [Phase 04.1-text-layer-effects-dispatch]: Hand-rolled lfx2 descriptor walker with std::function recursive skip for Objc/VlLs; FLinearColor::FromSRGBColor for RGBC channels (no ARGB swizzle)
 - [Phase 10-panel-child-attachment]: PopulateCanvas renamed to PopulateChildren(UPanelWidget*); double-guard pattern Cast<UCanvasPanel>+Cast<UCanvasPanelSlot>; FX-01/02/03 moved outside slot guard to apply on all parent types
 - [Phase 10-panel-child-attachment]: UpdateCanvas signature generalized to UPanelWidget*; D-11 clear-and-rebuild for non-canvas reimport via ClearChildren+PopulateChildren; canvas diff-update path byte-identical (PANEL-05)
+- [Phase 12-text-property-fidelity]: TEXT-F-01: * 0.75f formula confirmed correct — PhotoshopAPI returns designer_pt * 4/3 and mapper inverts it; formula removal skipped
 
 ### Roadmap Evolution
 
@@ -139,6 +141,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-17T09:22:48.980Z
-Stopped at: Completed 11-02-PLAN.md
+Last session: 2026-04-17T10:49:10.043Z
+Stopped at: Completed 12-text-property-fidelity 12-01-PLAN.md
 Resume file: None

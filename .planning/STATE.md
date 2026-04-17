@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: executing
-stopped_at: Completed 12-text-property-fidelity 12-01-PLAN.md
-last_updated: "2026-04-17T10:49:10.047Z"
+status: verifying
+stopped_at: Completed 12-text-property-fidelity/12-02-PLAN.md
+last_updated: "2026-04-17T10:59:37.669Z"
 last_activity: 2026-04-17
 progress:
   total_phases: 2
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 12 (Text Property Fidelity) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-17
 
 ## Performance Metrics
@@ -81,6 +81,7 @@ Last activity: 2026-04-17
 | Phase 10-panel-child-attachment P02 | 2 | 1 tasks | 1 files |
 | Phase 10-panel-child-attachment P03 | human-in-the-loop + scope trim | 2 tasks | 2 files |
 | Phase 12-text-property-fidelity P01 | 45 | 3 tasks | 3 files |
+| Phase 12-text-property-fidelity P02 | 30 | 6 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,8 @@ Recent decisions affecting current work:
 - [Phase 10-panel-child-attachment]: PopulateCanvas renamed to PopulateChildren(UPanelWidget*); double-guard pattern Cast<UCanvasPanel>+Cast<UCanvasPanelSlot>; FX-01/02/03 moved outside slot guard to apply on all parent types
 - [Phase 10-panel-child-attachment]: UpdateCanvas signature generalized to UPanelWidget*; D-11 clear-and-rebuild for non-canvas reimport via ClearChildren+PopulateChildren; canvas diff-update path byte-identical (PANEL-05)
 - [Phase 12-text-property-fidelity]: TEXT-F-01: * 0.75f formula confirmed correct — PhotoshopAPI returns designer_pt * 4/3 and mapper inverts it; formula removal skipped
+- [Phase 12-text-property-fidelity]: Overlay wins over fill: RouteTextEffects routes ColorOverlayColor onto Text.Color after fill is set, matching Photoshop render order
+- [Phase 12-text-property-fidelity]: D-13 guard extended to Color Overlay: bHasColorOverlay cleared after routing so FX-03 generator block never fires for text layers
 
 ### Roadmap Evolution
 
@@ -141,6 +144,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-17T10:49:10.043Z
-Stopped at: Completed 12-text-property-fidelity 12-01-PLAN.md
+Last session: 2026-04-17T10:59:37.665Z
+Stopped at: Completed 12-text-property-fidelity/12-02-PLAN.md
 Resume file: None

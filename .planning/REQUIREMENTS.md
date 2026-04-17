@@ -22,11 +22,11 @@
 
 ### Text Fidelity — Alignment (TEXT-F-*)
 
-- [ ] **TEXT-F-02**: PSD paragraph justification (left/center/right) maps to `ETextJustify::Left/Center/Right` on the generated `UTextBlock` and survives compile+save.
+- [x] **TEXT-F-02**: PSD paragraph justification (left/center/right) maps to `ETextJustify::Left/Center/Right` on the generated `UTextBlock` and survives compile+save.
 
 ### Text Fidelity — Base Color (TEXT-F-*)
 
-- [ ] **TEXT-F-03**: PSD text fill color is imported as the correct `FSlateColor` on `UTextBlock::ColorAndOpacity` — gray in PSD imports as gray (not red); channel order must be verified.
+- [x] **TEXT-F-03**: PSD text fill color is imported as the correct `FSlateColor` on `UTextBlock::ColorAndOpacity` — gray in PSD imports as gray (not red); channel order must be verified.
 
 ## Traceability
 

@@ -30,7 +30,7 @@ See [milestones/v1.0.1-ROADMAP.md](milestones/v1.0.1-ROADMAP.md) for full phase 
 ## v1.1 Import Fidelity Fixes (Phases 11-12)
 
 - [ ] **Phase 11: Import Dialog Hidden-Layer Filtering** - Hidden PSD layers appear unchecked in the import dialog and unchecked layers are excluded from WBP generation
-- [ ] **Phase 12: Text Property Fidelity** - Font size, alignment, and base color correctly preserved from PSD through to UTextBlock
+- [x] **Phase 12: Text Property Fidelity** - Font size, alignment, and base color correctly preserved from PSD through to UTextBlock (completed 2026-04-17)
 
 ## Phase Details
 
@@ -59,14 +59,14 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 12-01-PLAN.md — Font size fidelity: confirm raw SizePx, remove * 0.75f, update test expectations (TEXT-F-01)
-- [ ] 12-02-PLAN.md — Alignment + fill color: fixture update, parser fallbacks, new spec assertions (TEXT-F-02, TEXT-F-03)
+- [x] 12-02-PLAN.md — Alignment + fill color: fixture update, parser fallbacks, new spec assertions (TEXT-F-02, TEXT-F-03)
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 11. Import Dialog Hidden-Layer Filtering | 0/2 | Not started | - |
-| 12. Text Property Fidelity | 1/2 | In Progress|  |
+| 12. Text Property Fidelity | 2/2 | Complete   | 2026-04-17 |
 
 ## v1.2+ Backlog
 

@@ -561,6 +561,23 @@ TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
     [
         SNew(SHorizontalBox)
 
+        // Col 0: Eye-closed icon for hidden PSD layers (Phase 11, D-03/D-04)
+        + SHorizontalBox::Slot()
+        .AutoWidth()
+        .VAlign(VAlign_Center)
+        .Padding(FMargin(2.f, 0.f))
+        [
+            SNew(SBox)
+            .WidthOverride(20.f)
+            .HeightOverride(16.f)
+            [
+                SNew(SImage)
+                .Image(FAppStyle::GetBrush(TEXT("Layer.NotVisibleIcon16x")))
+                .Visibility(Item->bLayerVisible ? EVisibility::Hidden : EVisibility::Visible)
+                .ToolTipText(LOCTEXT("HiddenLayerTip", "This layer is hidden in Photoshop — unchecked by default."))
+            ]
+        ]
+
         // Col 1: Checkbox
         + SHorizontalBox::Slot()
         .AutoWidth()

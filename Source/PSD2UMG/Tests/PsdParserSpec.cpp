@@ -585,4 +585,99 @@ void FPsdParserEffectsSpec::Define()
     });
 }
 
+// ------------------------------------------------------------------
+// Phase 13: GradientLayers fixture (GRAD-01, GRAD-02)
+// RED stubs -- all four It() blocks MUST FAIL in this plan.
+// Plan 13-02 wires ConvertLayerRecursive dispatch; Plan 13-03 wires the
+// mapper + registration. When both plans are merged these assertions
+// turn green.
+// ------------------------------------------------------------------
+BEGIN_DEFINE_SPEC(FPsdParserGradientSpec, "PSD2UMG.Parser.GradientLayers",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FString FixturePath;
+    FPsdDocument Doc;
+    FPsdParseDiagnostics Diag;
+    bool bParsed = false;
+
+    static const FPsdLayer* FindGradLayer(const TArray<FPsdLayer>& Layers, const FString& Name)
+    {
+        for (const FPsdLayer& L : Layers)
+        {
+            if (L.Name.Equals(Name, ESearchCase::CaseSensitive))
+                return &L;
+        }
+        return nullptr;
+    }
+
+END_DEFINE_SPEC(FPsdParserGradientSpec)
+
+void FPsdParserGradientSpec::Define()
+{
+    BeforeEach([this]()
+    {
+        Doc = FPsdDocument();
+        Diag = FPsdParseDiagnostics();
+        bParsed = false;
+
+        TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"));
+        if (!Plugin.IsValid())
+        {
+            AddError(TEXT("PSD2UMG plugin not found via IPluginManager"));
+            return;
+        }
+
+        FixturePath = FPaths::Combine(
+            Plugin->GetBaseDir(),
+            TEXT("Source/PSD2UMG/Tests/Fixtures/GradientLayers.psd"));
+
+        if (!FPaths::FileExists(FixturePath))
+        {
+            AddError(FString::Printf(TEXT("GradientLayers fixture PSD missing: %s"), *FixturePath));
+            return;
+        }
+
+        bParsed = PSD2UMG::Parser::ParseFile(FixturePath, Doc, Diag);
+    });
+
+    Describe("GradientLayers fixture", [this]()
+    {
+        It("loads successfully with 3 root layers", [this]()
+        {
+            TestTrue(TEXT("bParsed"), bParsed);
+            TestFalse(TEXT("Diag.HasErrors()"), Diag.HasErrors());
+            TestEqual(TEXT("RootLayers.Num"), Doc.RootLayers.Num(), 3);
+        });
+
+        It("grad_linear has Type == EPsdLayerType::Gradient (GRAD-01)", [this]()
+        {
+            const FPsdLayer* L = FindGradLayer(Doc.RootLayers, TEXT("grad_linear"));
+            if (!TestNotNull(TEXT("grad_linear exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Gradient);
+        });
+
+        It("grad_radial has Type == EPsdLayerType::Gradient (GRAD-01)", [this]()
+        {
+            const FPsdLayer* L = FindGradLayer(Doc.RootLayers, TEXT("grad_radial"));
+            if (!TestNotNull(TEXT("grad_radial exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Gradient);
+        });
+
+        It("solid_gray has Type == EPsdLayerType::SolidFill (GRAD-01)", [this]()
+        {
+            const FPsdLayer* L = FindGradLayer(Doc.RootLayers, TEXT("solid_gray"));
+            if (!TestNotNull(TEXT("solid_gray exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::SolidFill);
+        });
+
+        It("solid_gray has Effects.bHasColorOverlay == true (GRAD-01 routing)", [this]()
+        {
+            const FPsdLayer* L = FindGradLayer(Doc.RootLayers, TEXT("solid_gray"));
+            if (!TestNotNull(TEXT("solid_gray exists in fixture"), L)) return;
+            TestTrue(TEXT("Effects.bHasColorOverlay set by ScanSolidFillColor"),
+                L->Effects.bHasColorOverlay);
+        });
+    });
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

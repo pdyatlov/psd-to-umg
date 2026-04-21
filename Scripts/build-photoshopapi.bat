@@ -83,12 +83,18 @@ copy /y "%VENDOR_INCLUDE%\PhotoshopAPI\LayeredFile\LayerTypes\SmartObjectLayer.h
     echo WARNING: SmartObjectLayer.h patch copy failed — smart object pixel data may be unavailable
 )
 
-REM Layer.h: adds unparsed_tagged_blocks() (Phase 12 — layer effects extraction) and
-REM get_channel(ChannelID) (Phase 13 — fill-layer pixel bake via AdjustmentLayer/ShapeLayer).
+REM Layer.h: adds unparsed_tagged_blocks() (Phase 12 — layer effects extraction).
 echo   Patching Layer.h...
 copy /y "%VENDOR_INCLUDE%\PhotoshopAPI\LayeredFile\LayerTypes\Layer.h" ^
      "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\src\LayeredFile\LayerTypes\Layer.h" || (
-    echo WARNING: Layer.h patch copy failed — layer effects and fill-layer pixel extraction will break
+    echo WARNING: Layer.h patch copy failed — layer effects extraction will break
+)
+
+REM AdjustmentLayer.h: adds get_channel(ChannelID) (Phase 13 — gradient fill pixel bake).
+echo   Patching AdjustmentLayer.h...
+copy /y "%VENDOR_INCLUDE%\PhotoshopAPI\LayeredFile\LayerTypes\AdjustmentLayer.h" ^
+     "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\src\LayeredFile\LayerTypes\AdjustmentLayer.h" || (
+    echo WARNING: AdjustmentLayer.h patch copy failed — gradient fill pixel extraction will break
 )
 
 REM ShapeLayer.h: no extra patch needed beyond Layer.h (get_channel moved to base).

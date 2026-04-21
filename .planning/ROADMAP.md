@@ -29,7 +29,7 @@ See [milestones/v1.0.1-ROADMAP.md](milestones/v1.0.1-ROADMAP.md) for full phase 
 
 ## v1.1 Import Fidelity Fixes (Phases 11-12)
 
-- [ ] **Phase 11: Import Dialog Hidden-Layer Filtering** - Hidden PSD layers appear unchecked in the import dialog and unchecked layers are excluded from WBP generation
+- [x] **Phase 11: Import Dialog Hidden-Layer Filtering** - Skipped/deferred (2026-04-21)
 - [x] **Phase 12: Text Property Fidelity** - Font size, alignment, and base color correctly preserved from PSD through to UTextBlock (completed 2026-04-17)
 
 ## Phase Details
@@ -61,14 +61,78 @@ Plans:
 - [x] 12-01-PLAN.md — Font size fidelity: confirm raw SizePx, remove * 0.75f, update test expectations (TEXT-F-01)
 - [x] 12-02-PLAN.md — Alignment + fill color: fixture update, parser fallbacks, new spec assertions (TEXT-F-02, TEXT-F-03)
 
+## v1.2 Layer Fidelity Expansion (Phases 13-17)
+
+- [ ] **Phase 13: Gradient Layers** - Photoshop gradient fill layers imported as UMG gradient widgets or pre-rendered textures
+- [ ] **Phase 14: Shape/Vector Layers** - Photoshop solid-color shape layers imported as UImage with solid-color brush
+- [ ] **Phase 15: Group Effects** - Effects applied to group layers (drop shadow, color overlay) propagated to the group's container widget
+- [ ] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions
+- [ ] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback
+
+## Phase Details
+
+### Phase 13: Gradient Layers
+**Goal**: Gradient fill layers from Photoshop import as usable UMG widgets — either pre-rendered as Texture2D or as a native gradient widget if available
+**Depends on**: Phase 2 (parser), Phase 3 (mapper pipeline)
+**Requirements**: GRAD-01, GRAD-02
+**Success Criteria** (what must be TRUE):
+  1. A linear gradient fill layer in PSD produces a valid UMG widget (UImage with pre-rendered texture or equivalent) after import
+  2. Gradient color stops and direction are preserved with no visible banding at standard resolutions
+**Plans**: 3 plans
+Plans:
+- [x] 13-01-PLAN.md — Fixture + RED spec stubs + EPsdLayerType::Gradient/SolidFill enum (Wave 1)
+- [x] 13-02-PLAN.md — ShapeLayer.h get_channel shim + ConvertLayerRecursive dispatch + ScanSolidFillColor (Wave 2)
+- [ ] 13-03-PLAN.md — FFillLayerMapper + FSolidFillLayerMapper + registry + TC_UserInterface2D + visual verify (Wave 3)
+
+### Phase 14: Shape/Vector Layers
+**Goal**: Photoshop solid-color vector/shape layers import as UImage widgets with a matching solid-color brush — preserving position, size, and color
+**Depends on**: Phase 2 (parser), Phase 3 (mapper pipeline)
+**Requirements**: SHAPE-01, SHAPE-02
+**Success Criteria** (what must be TRUE):
+  1. A solid-color rectangle shape layer in PSD produces a UImage with a solid SlateBrush of the correct color after import
+  2. Position and size of the shape widget match the PSD layer bounds within 1px
+**Plans**: TBD
+
+### Phase 15: Group Effects
+**Goal**: Layer effects (drop shadow, color overlay) applied to Photoshop group layers are reflected on the generated container widget
+**Depends on**: Phase 4.1 (effects dispatch), Phase 3 (group mapping)
+**Requirements**: GRPFX-01, GRPFX-02
+**Success Criteria** (what must be TRUE):
+  1. A group layer with a drop shadow effect produces a container widget with a matching drop shadow applied
+  2. A group layer with a color overlay produces a container widget with the overlay color applied
+**Plans**: TBD
+
+### Phase 16: Rich Text / Multiple Text Runs
+**Goal**: Text layers containing multiple style runs (mixed font size, weight, color within one layer) import as URichTextBlock with correct inline markup
+**Depends on**: Phase 12 (text property fidelity)
+**Requirements**: RICH-01, RICH-02
+**Success Criteria** (what must be TRUE):
+  1. A text layer with two differently-colored spans produces a URichTextBlock with both colors represented in inline markup
+  2. A text layer with bold and normal weight runs produces a URichTextBlock with correct weight styling per span
+**Plans**: TBD
+
+### Phase 17: Automated Font Matching
+**Goal**: Photoshop font family names are automatically resolved to UE font assets via a configurable mapping table, with fuzzy fallback for common name variants
+**Depends on**: Phase 12 (text pipeline)
+**Requirements**: FONT-01, FONT-02
+**Success Criteria** (what must be TRUE):
+  1. A font named "Roboto-Bold" in PSD resolves to the correct UE font asset without any manual configuration if the asset exists in the project
+  2. A font with no exact match logs a warning and falls back to the project default font rather than silently producing no font
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 11. Import Dialog Hidden-Layer Filtering | 0/2 | Not started | - |
+| 11. Import Dialog Hidden-Layer Filtering | 0/2 | Skipped | 2026-04-21 |
 | 12. Text Property Fidelity | 2/2 | Complete   | 2026-04-17 |
+| 13. Gradient Layers | 2/3 | In Progress|  |
+| 14. Shape/Vector Layers | 0/? | Not started | - |
+| 15. Group Effects | 0/? | Not started | - |
+| 16. Rich Text / Multiple Text Runs | 0/? | Not started | - |
+| 17. Automated Font Matching | 0/? | Not started | - |
 
-## v1.2+ Backlog
+## v1.3+ Backlog
 
 Candidate work (from deferred registry):
 - frameFXMulti VlLs stroke format (newer Photoshop)

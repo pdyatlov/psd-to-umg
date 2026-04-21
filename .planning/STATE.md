@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: verifying
-stopped_at: Completed 12-text-property-fidelity/12-02-PLAN.md
-last_updated: "2026-04-17T10:59:37.669Z"
-last_activity: 2026-04-17
+status: executing
+stopped_at: Completed 13-gradient-layers 13-02-PLAN.md
+last_updated: "2026-04-21T09:51:49.936Z"
+last_activity: 2026-04-21
 progress:
   total_phases: 2
   completed_phases: 1
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 12 — Text Property Fidelity
+**Current focus:** Phase 13 — gradient-layers
 
 ## Current Position
 
-Phase: 12 (Text Property Fidelity) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-04-17
+Phase: 13 (gradient-layers) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-04-21
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Last activity: 2026-04-17
 | Phase 10-panel-child-attachment P03 | human-in-the-loop + scope trim | 2 tasks | 2 files |
 | Phase 12-text-property-fidelity P01 | 45 | 3 tasks | 3 files |
 | Phase 12-text-property-fidelity P02 | 30 | 6 tasks | 4 files |
+| Phase 13-gradient-layers P02 | 15 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,9 @@ Recent decisions affecting current work:
 - [Phase 12-text-property-fidelity]: TEXT-F-01: * 0.75f formula confirmed correct — PhotoshopAPI returns designer_pt * 4/3 and mapper inverts it; formula removal skipped
 - [Phase 12-text-property-fidelity]: Overlay wins over fill: RouteTextEffects routes ColorOverlayColor onto Text.Color after fill is set, matching Photoshop render order
 - [Phase 12-text-property-fidelity]: D-13 guard extended to Color Overlay: bHasColorOverlay cleared after routing so FX-03 generator block never fires for text layers
+- [Phase 13-gradient-layers]: SoCo descriptor offset: TryParseAt(0) first, TryParseAt(8) fallback — mirrors Phase 04.1 lfx2 8-byte prefix discovery but defensive
+- [Phase 13-gradient-layers]: SolidFill layers get no pixel extraction — FSolidFillLayerMapper (Plan 13-03) produces zero-texture UImage; FX-03 tints via ColorOverlayColor
+- [Phase 13-gradient-layers]: get_channel shim iterates Layer<T>::m_UnparsedImageData — vendored-header patch following Phase 12 unparsed_tagged_blocks() precedent on Layer.h
 
 ### Roadmap Evolution
 
@@ -144,6 +148,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-17T10:59:37.665Z
-Stopped at: Completed 12-text-property-fidelity/12-02-PLAN.md
+Last session: 2026-04-21T09:51:49.932Z
+Stopped at: Completed 13-gradient-layers 13-02-PLAN.md
 Resume file: None

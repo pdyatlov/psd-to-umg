@@ -1130,6 +1130,278 @@ namespace PSD2UMG::Parser::Internal
 		}
 	}
 
+	/**
+	 * Phase 14 / SHAPE-01: Scan a vscg (vecStrokeContentData) tagged block
+	 * payload and, WHEN the fill-type enum is 'solidColorLayer', populate
+	 * OutLayer.Effects.ColorOverlayColor + bHasColorOverlay.
+	 *
+	 * The vscg payload is a Photoshop object descriptor (same format family
+	 * as SoCo). It carries both a Type enum discriminator and the fill color
+	 * in a single descriptor:
+	 *   - Item key "Type" with ostype "enum" -> enum value string, expected
+	 *     to be "solidColorLayer" for Phase 14's target path. "gradientFill"
+	 *     and any other value send the layer back to the Phase 13 Gradient
+	 *     fallthrough via a `return false`.
+	 *   - Item key "Clr " OR "FlCl" (research Pitfall 3: variants exist by
+	 *     Photoshop version) with ostype "Objc" -> RGBC sub-descriptor with
+	 *     "Rd  "/"Grn "/"Bl  " doubles in [0..255].
+	 *
+	 * Walker mirrors ScanSolidFillColor's lambda pattern verbatim; three
+	 * divergences annotated inline below.
+	 *
+	 * Returns:
+	 *   - true  iff vscg found AND Type == "solidColorLayer" AND Clr/FlCl
+	 *           successfully parsed. OutLayer.Effects updated.
+	 *   - false if vscg absent, Type != "solidColorLayer" (e.g. gradientFill),
+	 *           or descriptor parse failure. OutLayer.Effects unchanged.
+	 *
+	 * Caller (ConvertLayerRecursive ShapeLayer branch): uses the bool to
+	 * decide between EPsdLayerType::Shape (true) and Gradient fallthrough
+	 * (false). SoCo check is performed FIRST by the caller so SolidFill
+	 * layers with BOTH SoCo and vscg (rare) still dispatch as SolidFill.
+	 *
+	 * Research refs: 14-RESEARCH Pattern 1, Pattern 3, Common Pitfalls 1/2/3/4,
+	 * Open Questions 1 (offset), 2 (exact Type string), 3 (FlCl vs Clr).
+	 */
+	static bool ScanShapeFillColor(
+		const std::shared_ptr<PsdLayer>& InLayer,
+		FPsdLayer& OutLayer,
+		FPsdParseDiagnostics& OutDiag)
+	{
+		for (const auto& Block : InLayer->unparsed_tagged_blocks())
+		{
+			if (!Block || Block->getKey() != NAMESPACE_PSAPI::Enum::TaggedBlockKey::vecStrokeContentData)
+				continue;
+
+			const auto& Data = Block->m_Data;
+			if (Data.size() < 16)
+			{
+				OutDiag.AddWarning(OutLayer.Name,
+					TEXT("vscg block too small to contain a descriptor; treating as non-solid."));
+				return false;
+			}
+
+			// Diagnostic hex dump -- first 40 bytes so we can verify descriptor
+			// offset alignment and Type enum string from a single import run.
+			// Resolves research Open Questions 1 & 2.
+			{
+				const size_t DumpLen = FMath::Min<size_t>(40, Data.size());
+				FString HexDump;
+				for (size_t i = 0; i < DumpLen; ++i)
+				{
+					HexDump += FString::Printf(TEXT("%02X "), std::to_integer<uint32>(Data[i]));
+				}
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Layer '%s' vscg payload[0..%zu]= %s"),
+					*OutLayer.Name, DumpLen, *HexDump);
+			}
+
+			auto TryParseAt = [&](size_t StartPos) -> bool
+			{
+				size_t Pos = StartPos;
+
+				auto CheckRemaining = [&](size_t Need) -> bool {
+					return (Pos + Need) <= Data.size();
+				};
+				auto ReadU32BE = [&]() -> uint32 {
+					if (!CheckRemaining(4)) return 0;
+					uint32 V = (std::to_integer<uint32>(Data[Pos])   << 24)
+					         | (std::to_integer<uint32>(Data[Pos+1]) << 16)
+					         | (std::to_integer<uint32>(Data[Pos+2]) << 8)
+					         |  std::to_integer<uint32>(Data[Pos+3]);
+					Pos += 4;
+					return V;
+				};
+				auto ReadDoubleBE = [&]() -> double {
+					if (!CheckRemaining(8)) return 0.0;
+					uint8 Buf[8];
+					for (int i = 0; i < 8; ++i) Buf[i] = std::to_integer<uint8>(Data[Pos + i]);
+					Pos += 8;
+					uint8 Rev[8] = { Buf[7], Buf[6], Buf[5], Buf[4], Buf[3], Buf[2], Buf[1], Buf[0] };
+					double V;
+					FMemory::Memcpy(&V, Rev, 8);
+					return V;
+				};
+				auto ReadPsString = [&]() -> std::string {
+					uint32 Len = ReadU32BE();
+					if (Len == 0)
+					{
+						if (!CheckRemaining(4)) return {};
+						char Tag[5] = {};
+						for (int i = 0; i < 4; ++i) Tag[i] = std::to_integer<char>(Data[Pos + i]);
+						Pos += 4;
+						return std::string(Tag);
+					}
+					if (!CheckRemaining(Len)) return {};
+					std::string S;
+					S.resize(Len);
+					for (uint32 i = 0; i < Len; ++i) S[i] = std::to_integer<char>(Data[Pos + i]);
+					Pos += Len;
+					return S;
+				};
+				auto SkipUnicodeString = [&]() {
+					uint32 Len = ReadU32BE();
+					Pos += Len * 2;
+				};
+
+				std::function<void(const char*)> SkipValueAfterOsType;
+				SkipValueAfterOsType = [&](const char* OsType) {
+					if (FCStringAnsi::Strcmp(OsType, "bool") == 0) { Pos += 1; }
+					else if (FCStringAnsi::Strcmp(OsType, "long") == 0) { Pos += 4; }
+					else if (FCStringAnsi::Strcmp(OsType, "doub") == 0) { Pos += 8; }
+					else if (FCStringAnsi::Strcmp(OsType, "UntF") == 0) { Pos += 12; }
+					else if (FCStringAnsi::Strcmp(OsType, "enum") == 0) { ReadPsString(); ReadPsString(); }
+					else if (FCStringAnsi::Strcmp(OsType, "TEXT") == 0) { uint32 Len = ReadU32BE(); Pos += Len * 2; }
+					else if (FCStringAnsi::Strcmp(OsType, "tdta") == 0) { uint32 Len = ReadU32BE(); Pos += Len; }
+					else if (FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					{
+						SkipUnicodeString();
+						ReadPsString();
+						uint32 Count = ReadU32BE();
+						for (uint32 i = 0; i < Count && CheckRemaining(8); ++i)
+						{
+							ReadPsString();
+							char OT2[5] = {};
+							for (int k = 0; k < 4; ++k) OT2[k] = std::to_integer<char>(Data[Pos + k]);
+							Pos += 4;
+							SkipValueAfterOsType(OT2);
+						}
+					}
+					else if (FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
+					{
+						uint32 N = ReadU32BE();
+						for (uint32 i = 0; i < N && CheckRemaining(4); ++i)
+						{
+							char OT2[5] = {};
+							for (int k = 0; k < 4; ++k) OT2[k] = std::to_integer<char>(Data[Pos + k]);
+							Pos += 4;
+							SkipValueAfterOsType(OT2);
+						}
+					}
+					else
+					{
+						UE_LOG(LogPSD2UMG, Verbose,
+							TEXT("ScanShapeFillColor: unknown ostype '%.4hs' at pos %zu; aborting"),
+							OsType, Pos);
+						Pos = Data.size();
+					}
+				};
+
+				// Top-level descriptor header: unicode_class_name, ps_string classID, uint32 item_count.
+				SkipUnicodeString();
+				ReadPsString();
+				uint32 TopCount = ReadU32BE();
+
+				if (TopCount == 0 || TopCount > 256) return false;
+
+				// DIVERGENCE FROM ScanSolidFillColor #1 -- capture Type enum value
+				// (not just skip past it). Stored in TypeValue; the function only
+				// succeeds if TypeValue == "solidColorLayer".
+				bool bFoundColor = false;
+				bool bFoundType = false;
+				std::string TypeValue;
+				double Rd = 0.0, Grn = 0.0, Bl = 0.0;
+
+				for (uint32 i = 0; i < TopCount && CheckRemaining(8); ++i)
+				{
+					std::string ItemKey = ReadPsString();
+					if (!CheckRemaining(4)) break;
+					char OsType[5] = {};
+					for (int k = 0; k < 4; ++k) OsType[k] = std::to_integer<char>(Data[Pos + k]);
+					Pos += 4;
+
+					// DIVERGENCE #1 (capture Type):
+					if (ItemKey == "Type" && FCStringAnsi::Strcmp(OsType, "enum") == 0)
+					{
+						ReadPsString();             // type-id (e.g. "FlFl" or class)
+						TypeValue = ReadPsString(); // value ("solidColorLayer", "gradientFill", ...)
+						bFoundType = true;
+					}
+					// DIVERGENCE #2 (accept "Clr " OR "FlCl"):
+					else if ((ItemKey == "Clr " || ItemKey == "FlCl")
+					      && FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					{
+						SkipUnicodeString();
+						ReadPsString(); // "RGBC" classID
+						uint32 ClrCount = ReadU32BE();
+						for (uint32 j = 0; j < ClrCount && CheckRemaining(8); ++j)
+						{
+							std::string CKey = ReadPsString();
+							if (!CheckRemaining(4)) break;
+							char COT[5] = {};
+							for (int k = 0; k < 4; ++k) COT[k] = std::to_integer<char>(Data[Pos + k]);
+							Pos += 4;
+
+							if (FCStringAnsi::Strcmp(COT, "doub") == 0)
+							{
+								double V = ReadDoubleBE();
+								// Named-key assignment ONLY -- no ARGB swizzle
+								// (research Pitfall 4).
+								if (CKey == "Rd  ") Rd = V;
+								else if (CKey == "Grn ") Grn = V;
+								else if (CKey == "Bl  ") Bl = V;
+							}
+							else
+							{
+								SkipValueAfterOsType(COT);
+							}
+						}
+						bFoundColor = true;
+					}
+					else
+					{
+						SkipValueAfterOsType(OsType);
+					}
+				}
+
+				// DIVERGENCE #3 (solid-only acceptance):
+				if (!bFoundType || !bFoundColor)
+				{
+					UE_LOG(LogPSD2UMG, Verbose,
+						TEXT("ScanShapeFillColor: vscg at startPos=%zu missing Type(%d) or Color(%d); reject"),
+						StartPos, (int)bFoundType, (int)bFoundColor);
+					return false;
+				}
+
+				if (TypeValue != "solidColorLayer")
+				{
+					UE_LOG(LogPSD2UMG, Verbose,
+						TEXT("Layer '%s' vscg at startPos=%zu Type='%hs' (not solidColorLayer); fall through to Gradient"),
+						*OutLayer.Name, StartPos, TypeValue.c_str());
+					return false;
+				}
+
+				const uint8 R8 = static_cast<uint8>(FMath::Clamp(Rd,  0.0, 255.0));
+				const uint8 G8 = static_cast<uint8>(FMath::Clamp(Grn, 0.0, 255.0));
+				const uint8 B8 = static_cast<uint8>(FMath::Clamp(Bl,  0.0, 255.0));
+				OutLayer.Effects.ColorOverlayColor = FLinearColor::FromSRGBColor(FColor(R8, G8, B8, 255));
+				OutLayer.Effects.bHasColorOverlay = true;
+
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Layer '%s' vscg parsed at startPos=%zu: type='%hs' R=%.1f G=%.1f B=%.1f => linear(%.4f,%.4f,%.4f)"),
+					*OutLayer.Name, StartPos, TypeValue.c_str(), Rd, Grn, Bl,
+					OutLayer.Effects.ColorOverlayColor.R,
+					OutLayer.Effects.ColorOverlayColor.G,
+					OutLayer.Effects.ColorOverlayColor.B);
+
+				return true;
+			};
+
+			// PSD spec: vscg (like SoCo) starts with a 4-byte version prefix.
+			// Try offset 4 first (matches Phase 13 empirically-confirmed SoCo
+			// winner); fall back to 0 and 8 defensively (research Open Q2).
+			if (TryParseAt(4)) return true;
+			if (TryParseAt(0)) return true;
+			if (TryParseAt(8)) return true;
+
+			OutDiag.AddWarning(OutLayer.Name,
+				TEXT("vscg descriptor parse failed at offsets 4, 0, and 8; treating as non-solid (Gradient fallthrough)."));
+			return false; // only one vscg block per layer
+		}
+
+		return false; // vscg block not present in this layer
+	}
+
 	// ---------------------------------------------------------------------------
 	// Raw PSD lfx2 scanner
 	//
@@ -1471,12 +1743,30 @@ namespace PSD2UMG::Parser::Internal
 				}
 			}
 
+			// 3-way dispatch:
+			//   SoCo present    -> SolidFill (Phase 13, unchanged)
+			//   vscg Type=solid -> Shape     (Phase 14, NEW)
+			//   else            -> Gradient  (Phase 13 fallthrough, unchanged)
+			// SoCo check MUST be first so layers carrying BOTH SoCo and vscg
+			// (rare but possible) still dispatch as SolidFill (Phase 13
+			// regression guard via FPsdParserGradientSpec::solid_gray).
+			const TCHAR* DispatchTag = TEXT("Gradient");
 			if (bIsSolidFill)
 			{
 				OutLayer.Type = EPsdLayerType::SolidFill;
 				ScanSolidFillColor(InLayer, OutLayer, OutDiag);
+				DispatchTag = TEXT("SolidFill");
 				// No pixel extraction: FSolidFillLayerMapper produces a zero-texture
 				// UImage and FX-03 tints it.
+			}
+			else if (ScanShapeFillColor(InLayer, OutLayer, OutDiag))
+			{
+				// Phase 14: drawn vector shape with solid fill (vscg Type==solidColorLayer).
+				// ScanShapeFillColor already populated Effects.ColorOverlayColor +
+				// bHasColorOverlay. No pixel extraction: FShapeLayerMapper (Plan
+				// 14-03) produces a zero-texture UImage and FX-03 tints it.
+				OutLayer.Type = EPsdLayerType::Shape;
+				DispatchTag = TEXT("Shape");
 			}
 			else
 			{
@@ -1485,8 +1775,7 @@ namespace PSD2UMG::Parser::Internal
 			}
 			UE_LOG(LogPSD2UMG, Log,
 				TEXT("Layer '%s' dispatched as %s (ShapeLayer branch)"),
-				*OutLayer.Name,
-				bIsSolidFill ? TEXT("SolidFill") : TEXT("Gradient"));
+				*OutLayer.Name, DispatchTag);
 			return;
 		}
 

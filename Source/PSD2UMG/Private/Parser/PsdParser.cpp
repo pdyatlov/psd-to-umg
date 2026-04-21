@@ -51,6 +51,7 @@ THIRD_PARTY_INCLUDES_START
 #undef OUT
 #undef check
 #include <PhotoshopAPI.h>
+#include <PhotoshopAPI/LayeredFile/LayerTypes/ArtboardLayer.h>
 #pragma pop_macro("check")
 #pragma pop_macro("OUT")
 #pragma pop_macro("IN")
@@ -201,44 +202,91 @@ namespace PSD2UMG::Parser::Internal
 				OutLayer.Text.Content = Utf8ToFString(*Content);
 			}
 
-			// Multi-run detection: if there's more than one style run, flatten
-			// to the first run's style and emit a warning per 02-CONTEXT.md.
-			if (auto RunLengths = Text->style_run_lengths(); RunLengths.has_value() && RunLengths->size() > 1)
+			// Multi-run detection: find dominant run by character length. When runs differ
+			// in color, the dominant run's color wins (best approximates designer intent for
+			// a single UTextBlock). All other run colors are logged as warnings.
+			size_t DominantRunIdx = 0;
 			{
-				OutDiag.AddWarning(OutLayer.Name,
-					TEXT("Multi-run text flattened to first run's style. Multi-run support arrives in Phase 4."));
+				auto RunLengths = Text->style_run_lengths();
+				if (RunLengths.has_value() && RunLengths->size() > 1)
+				{
+					size_t MaxLen = 0;
+					for (size_t ri = 0; ri < RunLengths->size(); ++ri)
+					{
+						if ((*RunLengths)[ri] > MaxLen)
+						{
+							MaxLen = (*RunLengths)[ri];
+							DominantRunIdx = ri;
+						}
+					}
+					if (DominantRunIdx != 0)
+					{
+						UE_LOG(LogPSD2UMG, Log,
+							TEXT("Text layer '%s': %d runs, dominant run[%zu] (%zu chars) chosen for color/style."),
+							*OutLayer.Name, (int32)RunLengths->size(), DominantRunIdx, MaxLen);
+					}
+				}
 			}
 
-			// Font (first run).
-			if (auto Font = Text->font_postscript_name(0); Font.has_value())
+			// Font (dominant run): style_run_font() returns the FontSet index the run
+			// uses; font_postscript_name() takes a FontSet index — these are NOT the
+			// same value. Passing 0 to font_postscript_name always reads FontSet[0]
+			// regardless of which font the run actually references.
 			{
-				OutLayer.Text.FontName = Utf8ToFString(*Font);
+				int32_t RunFontIdx = 0;
+				if (auto Idx = Text->style_run_font(DominantRunIdx); Idx.has_value() && *Idx >= 0)
+					RunFontIdx = *Idx;
+				if (auto Font = Text->font_postscript_name(static_cast<size_t>(RunFontIdx)); Font.has_value())
+				{
+					OutLayer.Text.FontName = Utf8ToFString(*Font);
+					UE_LOG(LogPSD2UMG, Log,
+						TEXT("Text layer '%s' font: FontSet[%d] = '%s'"),
+						*OutLayer.Name, RunFontIdx, *OutLayer.Text.FontName);
+				}
 			}
 
 			// Size in points -> pixels. At 72 DPI one pt equals one px, the
 			// standard PSD assumption. The UMG-DPI conversion (x0.75) is
 			// deliberately NOT applied here; it belongs to Phase 4 TEXT-01.
-			if (auto FontSize = Text->style_run_font_size(0); FontSize.has_value())
+			// Fallback mirrors the fill-color strategy: dominant run first, then normal style.
 			{
-				OutLayer.Text.SizePx = static_cast<float>(*FontSize);
-				UE_LOG(LogPSD2UMG, Verbose,
-					TEXT("Text layer '%s' style_run_font_size(0) raw=%.4f stored=%.4f"),
-					*OutLayer.Name, *FontSize, OutLayer.Text.SizePx);
-			}
-			else
-			{
-				UE_LOG(LogPSD2UMG, Verbose,
-					TEXT("Text layer '%s' style_run_font_size(0) returned nullopt"),
-					*OutLayer.Name);
+				std::optional<double> FontSize = Text->style_run_font_size(DominantRunIdx);
+				const TCHAR* SizeSource = TEXT("run[dominant]");
+				if (!FontSize.has_value())
+				{
+					FontSize = Text->style_normal_font_size();
+					SizeSource = TEXT("normal");
+				}
+				if (FontSize.has_value())
+				{
+					// Apply TySh transform scale: effective size = base * scale_y.
+					// If designer used Free Transform to resize text, FontSize stays at
+					// the base value but scale_y captures the visual scaling. Identity=1.0.
+					double EffectiveSize = *FontSize;
+					if (const auto ScaleY = Text->scale_y(); ScaleY.has_value() && *ScaleY > 0.01)
+					{
+						EffectiveSize *= *ScaleY;
+					}
+					OutLayer.Text.SizePx = static_cast<float>(EffectiveSize);
+					UE_LOG(LogPSD2UMG, Log,
+						TEXT("Text layer '%s' font size source=%s raw=%.4f scale_y=%.4f effective=%.4f"),
+						*OutLayer.Name, SizeSource, *FontSize,
+						Text->scale_y().value_or(1.0), EffectiveSize);
+				}
+				else
+				{
+					UE_LOG(LogPSD2UMG, Warning,
+						TEXT("Text layer '%s' font size not found in dominant run or normal style; leaving default."),
+						*OutLayer.Name);
+				}
 			}
 
-			// Fill colour. Try every color source PhotoshopAPI exposes and log
-			// each attempt so we can diagnose fixture-specific storage paths.
+			// Fill colour. Use dominant run first, then normal style fallback.
 			const TCHAR* FillSource = TEXT("none");
-			std::optional<std::vector<double>> Fill = Text->style_run_fill_color(0);
+			std::optional<std::vector<double>> Fill = Text->style_run_fill_color(DominantRunIdx);
 			if (Fill.has_value() && Fill->size() >= 3)
 			{
-				FillSource = TEXT("run[0]");
+				FillSource = DominantRunIdx == 0 ? TEXT("run[0]") : TEXT("run[dominant]");
 			}
 			else
 			{
@@ -311,13 +359,13 @@ namespace PSD2UMG::Parser::Internal
 				TEXT("Text layer '%s' justification source=%s value=%d"),
 				*OutLayer.Name, JustSource, (int32)OutLayer.Text.Alignment.GetValue());
 
-			// Phase 4 -- weight / style flags (first run).
+			// Phase 4 -- weight / style flags (dominant run).
 			// Check Faux Bold/Italic flags from Photoshop character panel.
-			if (auto Bold = Text->style_run_faux_bold(0); Bold.has_value())
+			if (auto Bold = Text->style_run_faux_bold(DominantRunIdx); Bold.has_value())
 			{
 				OutLayer.Text.bBold = *Bold;
 			}
-			if (auto Italic = Text->style_run_faux_italic(0); Italic.has_value())
+			if (auto Italic = Text->style_run_faux_italic(DominantRunIdx); Italic.has_value())
 			{
 				OutLayer.Text.bItalic = *Italic;
 			}
@@ -422,22 +470,22 @@ namespace PSD2UMG::Parser::Internal
 				size_t Pos = 0;
 				auto ReadU16 = [&]() -> uint16 {
 					if (Pos + 2 > Data.size()) return 0;
-					uint16 Val = (static_cast<uint8>(Data[Pos]) << 8) | static_cast<uint8>(Data[Pos + 1]);
+					uint16 Val = (std::to_integer<uint16>(Data[Pos]) << 8) | std::to_integer<uint16>(Data[Pos + 1]);
 					Pos += 2;
 					return Val;
 				};
 				auto ReadU32 = [&]() -> uint32 {
 					if (Pos + 4 > Data.size()) return 0;
-					uint32 Val = (static_cast<uint8>(Data[Pos]) << 24)
-					           | (static_cast<uint8>(Data[Pos + 1]) << 16)
-					           | (static_cast<uint8>(Data[Pos + 2]) << 8)
-					           | static_cast<uint8>(Data[Pos + 3]);
+					uint32 Val = (std::to_integer<uint32>(Data[Pos]) << 24)
+					           | (std::to_integer<uint32>(Data[Pos + 1]) << 16)
+					           | (std::to_integer<uint32>(Data[Pos + 2]) << 8)
+					           | std::to_integer<uint32>(Data[Pos + 3]);
 					Pos += 4;
 					return Val;
 				};
 				auto ReadU8 = [&]() -> uint8 {
 					if (Pos + 1 > Data.size()) return 0;
-					return static_cast<uint8>(Data[Pos++]);
+					return std::to_integer<uint8>(Data[Pos++]);
 				};
 
 				uint16 Version = ReadU16();
@@ -451,7 +499,7 @@ namespace PSD2UMG::Parser::Internal
 
 					char Key[5] = {};
 					for (int k = 0; k < 4; ++k)
-						Key[k] = static_cast<char>(Data[Pos++]);
+						Key[k] = std::to_integer<char>(Data[Pos++]);
 
 					uint32 EffectSize = ReadU32();
 					size_t EffectEnd = Pos + EffectSize;
@@ -466,7 +514,7 @@ namespace PSD2UMG::Parser::Internal
 						FString HexDump;
 						for (size_t i = 0; i < DumpLen; ++i)
 						{
-							HexDump += FString::Printf(TEXT("%02X "), static_cast<uint8>(Data[Pos + i]));
+							HexDump += FString::Printf(TEXT("%02X "), std::to_integer<uint32>(Data[Pos + i]));
 						}
 						UE_LOG(LogPSD2UMG, Verbose,
 							TEXT("Layer '%s' lrFX effect '%c%c%c%c' size=%u payload[0..%zu]= %s"),
@@ -858,6 +906,229 @@ namespace PSD2UMG::Parser::Internal
 		return bFoundStroke && Out.bEnabled;
 	}
 
+	/**
+	 * Phase 13 / GRAD-01: Scan a SoCo (solid color fill) tagged block payload
+	 * and populate OutLayer.Effects.ColorOverlayColor + bHasColorOverlay.
+	 *
+	 * The SoCo payload is a Photoshop object descriptor with an "Objc" item
+	 * keyed "Clr " containing a "RGBC" sub-descriptor with "Rd  "/"Grn "/"Bl  "
+	 * doubles in [0..255]. Walker mirrors ParseFrFXDescriptor's lambda pattern
+	 * (see that function above) with three differences:
+	 *   - No 8-byte prefix expected (unlike lfx2/FrFX). We try Pos=0 first;
+	 *     if TopCount is absurd we retry at Pos=8 as a defensive fallback.
+	 *   - No enabled/opacity/size fields -- solid fill is always enabled by
+	 *     Photoshop spec.
+	 *   - Output lands in Effects.ColorOverlayColor with bHasColorOverlay=true
+	 *     so FWidgetBlueprintGenerator.cpp FX-03 (lines 326-340) tints the
+	 *     UImage built by Phase 13 Plan 03 FSolidFillLayerMapper.
+	 *
+	 * Research refs: 13-RESEARCH Pattern 4, Open Question 1.
+	 */
+	static void ScanSolidFillColor(
+		const std::shared_ptr<PsdLayer>& InLayer,
+		FPsdLayer& OutLayer,
+		FPsdParseDiagnostics& OutDiag)
+	{
+		for (const auto& Block : InLayer->unparsed_tagged_blocks())
+		{
+			if (!Block || Block->getKey() != NAMESPACE_PSAPI::Enum::TaggedBlockKey::adjSolidColor)
+				continue;
+
+			const auto& Data = Block->m_Data;
+			if (Data.size() < 16)
+			{
+				OutDiag.AddWarning(OutLayer.Name,
+					TEXT("SoCo block too small to contain a descriptor; skipping."));
+				return;
+			}
+
+			// Diagnostic hex dump -- first 40 bytes so planner/implementer can
+			// verify descriptor offset alignment from a single import run.
+			{
+				const size_t DumpLen = FMath::Min<size_t>(40, Data.size());
+				FString HexDump;
+				for (size_t i = 0; i < DumpLen; ++i)
+				{
+					HexDump += FString::Printf(TEXT("%02X "), std::to_integer<uint32>(Data[i]));
+				}
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Layer '%s' SoCo payload[0..%zu]= %s"),
+					*OutLayer.Name, DumpLen, *HexDump);
+			}
+
+			auto TryParseAt = [&](size_t StartPos) -> bool
+			{
+				size_t Pos = StartPos;
+
+				auto CheckRemaining = [&](size_t Need) -> bool {
+					return (Pos + Need) <= Data.size();
+				};
+				auto ReadU32BE = [&]() -> uint32 {
+					if (!CheckRemaining(4)) return 0;
+					uint32 V = (std::to_integer<uint32>(Data[Pos])   << 24)
+					         | (std::to_integer<uint32>(Data[Pos+1]) << 16)
+					         | (std::to_integer<uint32>(Data[Pos+2]) << 8)
+					         |  std::to_integer<uint32>(Data[Pos+3]);
+					Pos += 4;
+					return V;
+				};
+				auto ReadDoubleBE = [&]() -> double {
+					if (!CheckRemaining(8)) return 0.0;
+					uint8 Buf[8];
+					for (int i = 0; i < 8; ++i) Buf[i] = std::to_integer<uint8>(Data[Pos + i]);
+					Pos += 8;
+					uint8 Rev[8] = { Buf[7], Buf[6], Buf[5], Buf[4], Buf[3], Buf[2], Buf[1], Buf[0] };
+					double V;
+					FMemory::Memcpy(&V, Rev, 8);
+					return V;
+				};
+				auto ReadPsString = [&]() -> std::string {
+					uint32 Len = ReadU32BE();
+					if (Len == 0)
+					{
+						if (!CheckRemaining(4)) return {};
+						char Tag[5] = {};
+						for (int i = 0; i < 4; ++i) Tag[i] = std::to_integer<char>(Data[Pos + i]);
+						Pos += 4;
+						return std::string(Tag);
+					}
+					if (!CheckRemaining(Len)) return {};
+					std::string S;
+					S.resize(Len);
+					for (uint32 i = 0; i < Len; ++i) S[i] = std::to_integer<char>(Data[Pos + i]);
+					Pos += Len;
+					return S;
+				};
+				auto SkipUnicodeString = [&]() {
+					uint32 Len = ReadU32BE();
+					Pos += Len * 2;
+				};
+
+				std::function<void(const char*)> SkipValueAfterOsType;
+				SkipValueAfterOsType = [&](const char* OsType) {
+					if (FCStringAnsi::Strcmp(OsType, "bool") == 0) { Pos += 1; }
+					else if (FCStringAnsi::Strcmp(OsType, "long") == 0) { Pos += 4; }
+					else if (FCStringAnsi::Strcmp(OsType, "doub") == 0) { Pos += 8; }
+					else if (FCStringAnsi::Strcmp(OsType, "UntF") == 0) { Pos += 12; }
+					else if (FCStringAnsi::Strcmp(OsType, "enum") == 0) { ReadPsString(); ReadPsString(); }
+					else if (FCStringAnsi::Strcmp(OsType, "TEXT") == 0) { uint32 Len = ReadU32BE(); Pos += Len * 2; }
+					else if (FCStringAnsi::Strcmp(OsType, "tdta") == 0) { uint32 Len = ReadU32BE(); Pos += Len; }
+					else if (FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					{
+						SkipUnicodeString();
+						ReadPsString();
+						uint32 Count = ReadU32BE();
+						for (uint32 i = 0; i < Count && CheckRemaining(8); ++i)
+						{
+							ReadPsString();
+							char OT2[5] = {};
+							for (int k = 0; k < 4; ++k) OT2[k] = std::to_integer<char>(Data[Pos + k]);
+							Pos += 4;
+							SkipValueAfterOsType(OT2);
+						}
+					}
+					else if (FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
+					{
+						uint32 N = ReadU32BE();
+						for (uint32 i = 0; i < N && CheckRemaining(4); ++i)
+						{
+							char OT2[5] = {};
+							for (int k = 0; k < 4; ++k) OT2[k] = std::to_integer<char>(Data[Pos + k]);
+							Pos += 4;
+							SkipValueAfterOsType(OT2);
+						}
+					}
+					else
+					{
+						UE_LOG(LogPSD2UMG, Verbose,
+							TEXT("ScanSolidFillColor: unknown ostype '%.4hs' at pos %zu; aborting"),
+							OsType, Pos);
+						Pos = Data.size();
+					}
+				};
+
+				// Top-level descriptor header: unicode_class_name, ps_string classID, uint32 item_count.
+				SkipUnicodeString();
+				ReadPsString();
+				uint32 TopCount = ReadU32BE();
+
+				// Sanity: reject this offset when TopCount is nonsensical.
+				if (TopCount == 0 || TopCount > 256) return false;
+
+				bool bFoundColor = false;
+				double Rd = 0.0, Grn = 0.0, Bl = 0.0;
+
+				for (uint32 i = 0; i < TopCount && CheckRemaining(8) && !bFoundColor; ++i)
+				{
+					std::string ItemKey = ReadPsString();
+					if (!CheckRemaining(4)) break;
+					char OsType[5] = {};
+					for (int k = 0; k < 4; ++k) OsType[k] = std::to_integer<char>(Data[Pos + k]);
+					Pos += 4;
+
+					if (ItemKey == "Clr " && FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					{
+						SkipUnicodeString();
+						ReadPsString(); // "RGBC" classID
+						uint32 ClrCount = ReadU32BE();
+						for (uint32 j = 0; j < ClrCount && CheckRemaining(8); ++j)
+						{
+							std::string CKey = ReadPsString();
+							if (!CheckRemaining(4)) break;
+							char COT[5] = {};
+							for (int k = 0; k < 4; ++k) COT[k] = std::to_integer<char>(Data[Pos + k]);
+							Pos += 4;
+
+							if (FCStringAnsi::Strcmp(COT, "doub") == 0)
+							{
+								double V = ReadDoubleBE();
+								if (CKey == "Rd  ") Rd = V;
+								else if (CKey == "Grn ") Grn = V;
+								else if (CKey == "Bl  ") Bl = V;
+							}
+							else
+							{
+								SkipValueAfterOsType(COT);
+							}
+						}
+						bFoundColor = true;
+					}
+					else
+					{
+						SkipValueAfterOsType(OsType);
+					}
+				}
+
+				if (!bFoundColor) return false;
+
+				const uint8 R8 = static_cast<uint8>(FMath::Clamp(Rd,  0.0, 255.0));
+				const uint8 G8 = static_cast<uint8>(FMath::Clamp(Grn, 0.0, 255.0));
+				const uint8 B8 = static_cast<uint8>(FMath::Clamp(Bl,  0.0, 255.0));
+				OutLayer.Effects.ColorOverlayColor = FLinearColor::FromSRGBColor(FColor(R8, G8, B8, 255));
+				OutLayer.Effects.bHasColorOverlay = true;
+
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Layer '%s' SoCo parsed at startPos=%zu: R=%.1f G=%.1f B=%.1f => linear(%.4f,%.4f,%.4f)"),
+					*OutLayer.Name, StartPos, Rd, Grn, Bl,
+					OutLayer.Effects.ColorOverlayColor.R,
+					OutLayer.Effects.ColorOverlayColor.G,
+					OutLayer.Effects.ColorOverlayColor.B);
+
+				return true;
+			};
+
+			if (!TryParseAt(0))
+			{
+				if (!TryParseAt(8))
+				{
+					OutDiag.AddWarning(OutLayer.Name,
+						TEXT("SoCo descriptor parse failed at both Pos=0 and Pos=8; solid fill colour will default to white."));
+				}
+			}
+			return; // Only one SoCo block per layer.
+		}
+	}
+
 	// ---------------------------------------------------------------------------
 	// Raw PSD lfx2 scanner
 	//
@@ -1079,6 +1350,21 @@ namespace PSD2UMG::Parser::Internal
 		ExtractLfx2Stroke(OutLayer.Name, Lfx2Map, OutLayer);
 
 		// Layer-type dispatch via RTTI. bUseRTTI=true is set in PSD2UMG.Build.cs.
+		//
+		// ArtboardLayer inherits from Layer<T> directly (NOT GroupLayer), so
+		// dynamic_pointer_cast<GroupLayer> fails for artboards. In PhotoshopAPI,
+		// artboard children are siblings of the ArtboardLayer in the parent's
+		// layers() vector — the artboard is a section-divider marker only.
+		// We detect it early, log it, and treat it as an empty group container
+		// (ParsedTags will default it to Canvas so the generator places a CanvasPanel).
+		if (auto Artboard = std::dynamic_pointer_cast<ArtboardLayer<PsdPixelType>>(InLayer))
+		{
+			OutLayer.Type = EPsdLayerType::Group; // treated as group container
+			UE_LOG(LogPSD2UMG, Log, TEXT("Layer '%s' is an ArtboardLayer — children appear as siblings in parent"), *OutLayer.Name);
+			// ArtboardLayer has no layers() — children are siblings; no recursion here.
+			return;
+		}
+
 		if (auto Group = std::dynamic_pointer_cast<GroupLayer<PsdPixelType>>(InLayer))
 		{
 			OutLayer.Type = EPsdLayerType::Group;
@@ -1116,6 +1402,50 @@ namespace PSD2UMG::Parser::Internal
 		{
 			OutLayer.Type = EPsdLayerType::Image;
 			ExtractImagePixels(Image, OutLayer, OutDiag);
+			return;
+		}
+
+		// Phase 13 / GRAD-01: ShapeLayer dispatch (gradient fill AND solid color fill).
+		// Must come AFTER ImageLayer/SmartObject/Group (they are distinct types; the
+		// dynamic_pointer_cast<ImageLayer> fails on ShapeLayer so this branch is
+		// reached only for actual ShapeLayer instances). Safe to come before
+		// TextLayer: fill layers are never text.
+		//
+		// Detection: scan unparsed_tagged_blocks for SoCo (TaggedBlockKey::adjSolidColor).
+		// Present -> solid color fill: call ScanSolidFillColor to populate Effects.
+		//   The generator's FX-03 block will tint the UImage built by
+		//   FSolidFillLayerMapper (Plan 13-03). No pixel extraction.
+		// Absent -> gradient fill (or any other fill subtype -- pattern fill is OOS
+		//   per 13-CONTEXT Deferred, but baked pixels are still correct because
+		//   PhotoshopAPI composites the layer before we see it).
+		if (auto Shape = std::dynamic_pointer_cast<ShapeLayer<PsdPixelType>>(InLayer))
+		{
+			bool bIsSolidFill = false;
+			for (const auto& Block : InLayer->unparsed_tagged_blocks())
+			{
+				if (Block && Block->getKey() == NAMESPACE_PSAPI::Enum::TaggedBlockKey::adjSolidColor)
+				{
+					bIsSolidFill = true;
+					break;
+				}
+			}
+
+			if (bIsSolidFill)
+			{
+				OutLayer.Type = EPsdLayerType::SolidFill;
+				ScanSolidFillColor(InLayer, OutLayer, OutDiag);
+				// No pixel extraction: FSolidFillLayerMapper produces a zero-texture
+				// UImage and FX-03 tints it.
+			}
+			else
+			{
+				OutLayer.Type = EPsdLayerType::Gradient;
+				ExtractImagePixels(Shape, OutLayer, OutDiag);
+			}
+			UE_LOG(LogPSD2UMG, Log,
+				TEXT("Layer '%s' dispatched as %s (ShapeLayer branch)"),
+				*OutLayer.Name,
+				bIsSolidFill ? TEXT("SolidFill") : TEXT("Gradient"));
 			return;
 		}
 
@@ -1166,6 +1496,42 @@ namespace PSD2UMG::Parser::Internal
 
 namespace PSD2UMG::Parser
 {
+	// Post-pass: PhotoshopAPI always returns (0,0)-(0,0) for GroupLayer bounds.
+	// Walk bottom-up and compute each group's bounds as the union of its children.
+	static void ComputeGroupBoundsFromChildren(FPsdLayer& Layer)
+	{
+		for (FPsdLayer& Child : Layer.Children)
+			ComputeGroupBoundsFromChildren(Child);
+
+		if (Layer.Type != EPsdLayerType::Group)
+			return;
+		if (!Layer.Bounds.IsEmpty())
+			return;
+
+		FIntRect Union(INT_MAX, INT_MAX, INT_MIN, INT_MIN);
+		bool bAny = false;
+		for (const FPsdLayer& Child : Layer.Children)
+		{
+			if (!Child.Bounds.IsEmpty())
+			{
+				if (!bAny) { Union = Child.Bounds; bAny = true; }
+				else
+				{
+					Union.Min.X = FMath::Min(Union.Min.X, Child.Bounds.Min.X);
+					Union.Min.Y = FMath::Min(Union.Min.Y, Child.Bounds.Min.Y);
+					Union.Max.X = FMath::Max(Union.Max.X, Child.Bounds.Max.X);
+					Union.Max.Y = FMath::Max(Union.Max.Y, Child.Bounds.Max.Y);
+				}
+			}
+		}
+		if (bAny)
+		{
+			UE_LOG(LogPSD2UMG, Log, TEXT("Group '%s' bounds from children: (%d,%d)-(%d,%d)"),
+				*Layer.Name, Union.Min.X, Union.Min.Y, Union.Max.X, Union.Max.Y);
+			Layer.Bounds = Union;
+		}
+	}
+
 	bool ParseFile(const FString& Path, FPsdDocument& OutDoc, FPsdParseDiagnostics& OutDiag)
 	{
 		OutDoc = FPsdDocument();
@@ -1214,6 +1580,11 @@ namespace PSD2UMG::Parser
 			{
 				Internal::PopulateParsedTagsRecursive(OutDoc.RootLayers[i], i, FString(), OutDiag);
 			}
+
+			// Post-pass: compute group bounds bottom-up from children.
+			// PhotoshopAPI always returns (0,0)-(0,0) for GroupLayer bounds.
+			for (FPsdLayer& Layer : OutDoc.RootLayers)
+				ComputeGroupBoundsFromChildren(Layer);
 		}
 		catch (const std::exception& e)
 		{

@@ -82,7 +82,7 @@ Plans:
 Plans:
 - [x] 13-01-PLAN.md — Fixture + RED spec stubs + EPsdLayerType::Gradient/SolidFill enum (Wave 1)
 - [x] 13-02-PLAN.md — ShapeLayer.h get_channel shim + ConvertLayerRecursive dispatch + ScanSolidFillColor (Wave 2)
-- [ ] 13-03-PLAN.md — FFillLayerMapper + FSolidFillLayerMapper + registry + TC_UserInterface2D + visual verify (Wave 3)
+- [x] 13-03-PLAN.md — FFillLayerMapper + FSolidFillLayerMapper + registry + TC_BC7 + visual verify (Wave 3)
 
 ### Phase 14: Shape/Vector Layers
 **Goal**: Photoshop solid-color vector/shape layers import as UImage widgets with a matching solid-color brush — preserving position, size, and color
@@ -126,7 +126,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 11. Import Dialog Hidden-Layer Filtering | 0/2 | Skipped | 2026-04-21 |
 | 12. Text Property Fidelity | 2/2 | Complete   | 2026-04-17 |
-| 13. Gradient Layers | 2/3 | In Progress|  |
+| 13. Gradient Layers | 3/3 | Complete | 2026-04-21 |
 | 14. Shape/Vector Layers | 0/? | Not started | - |
 | 15. Group Effects | 0/? | Not started | - |
 | 16. Rich Text / Multiple Text Runs | 0/? | Not started | - |

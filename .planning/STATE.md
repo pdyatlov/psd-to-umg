@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: Completed 13-gradient-layers 13-02-PLAN.md
-last_updated: "2026-04-21T09:51:49.936Z"
+stopped_at: Completed 13-gradient-layers 13-03-PLAN.md
+last_updated: "2026-04-21T14:00:00.000Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 5
+  completed_plans: 5
 ---
 
 # Project State
@@ -24,9 +24,9 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 13 (gradient-layers) — EXECUTING
-Plan: 2 of 3
-Status: Ready to execute
+Phase: 13 (gradient-layers) — COMPLETE
+Plan: 3 of 3
+Status: Phase complete — all 3 plans done, visual verify passed
 Last activity: 2026-04-21
 
 ## Performance Metrics
@@ -83,6 +83,7 @@ Last activity: 2026-04-21
 | Phase 12-text-property-fidelity P01 | 45 | 3 tasks | 3 files |
 | Phase 12-text-property-fidelity P02 | 30 | 6 tasks | 4 files |
 | Phase 13-gradient-layers P02 | 15 | 3 tasks | 3 files |
+| Phase 13-gradient-layers P03 | ~90m | 6 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -128,9 +129,10 @@ Recent decisions affecting current work:
 - [Phase 12-text-property-fidelity]: TEXT-F-01: * 0.75f formula confirmed correct — PhotoshopAPI returns designer_pt * 4/3 and mapper inverts it; formula removal skipped
 - [Phase 12-text-property-fidelity]: Overlay wins over fill: RouteTextEffects routes ColorOverlayColor onto Text.Color after fill is set, matching Photoshop render order
 - [Phase 12-text-property-fidelity]: D-13 guard extended to Color Overlay: bHasColorOverlay cleared after routing so FX-03 generator block never fires for text layers
-- [Phase 13-gradient-layers]: SoCo descriptor offset: TryParseAt(0) first, TryParseAt(8) fallback — mirrors Phase 04.1 lfx2 8-byte prefix discovery but defensive
+- [Phase 13-gradient-layers]: SoCo descriptor offset confirmed as 4 (PSD spec: 4-byte version=16 prefix precedes the descriptor). TryParseAt(4) first; TryParseAt(0) and TryParseAt(8) as fallbacks. Empirically verified: solid_gray renders correct gray tint.
 - [Phase 13-gradient-layers]: SolidFill layers get no pixel extraction — FSolidFillLayerMapper (Plan 13-03) produces zero-texture UImage; FX-03 tints via ColorOverlayColor
 - [Phase 13-gradient-layers]: get_channel shim iterates Layer<T>::m_UnparsedImageData — vendored-header patch following Phase 12 unparsed_tagged_blocks() precedent on Layer.h
+- [Phase 13-gradient-layers]: PhotoshopAPI classifies gradient and solid-color fill layers as AdjustmentLayer<T>, NOT ShapeLayer<T>. RTTI-only dispatch silently fails. Tag-based detection (adjSolidColor/adjGradient from unparsed_tagged_blocks()) must precede all dynamic_pointer_cast calls. get_channel added to AdjustmentLayer<T> only to avoid C2385 ambiguity on SmartObjectLayer (inherits both Layer<T> and ImageDataMixin).
 
 ### Roadmap Evolution
 
@@ -148,6 +150,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T09:51:49.932Z
-Stopped at: Completed 13-gradient-layers 13-02-PLAN.md
+Last session: 2026-04-21T14:00:00.000Z
+Stopped at: Completed 13-gradient-layers 13-03-PLAN.md (phase complete)
 Resume file: None

@@ -78,12 +78,11 @@ UTexture2D* FTextureImporter::ImportLayer(const FPsdLayer& Layer, const FString&
     Tex->PreEditChange(nullptr);
     Tex->Source.Init(Layer.PixelWidth, Layer.PixelHeight, 1, 1, TSF_BGRA8, BGRAPixels.GetData());
     Tex->SRGB = true;
-    // Phase 13 / GRAD-02: gradient layers use TC_UserInterface2D so BC1/DXT1
-    // compression does not introduce visible banding at UI resolutions. All
-    // other layer types (Image, SmartObject) retain the existing TC_Default
-    // behaviour used since Phase 3.
+    // Phase 13 / GRAD-02: gradient layers use TC_BC7 (high-quality block
+    // compression) to eliminate BC1/DXT1 banding at UI resolutions. All
+    // other layer types (Image, SmartObject) retain TC_Default (BC1/BC3).
     Tex->CompressionSettings = (Layer.Type == EPsdLayerType::Gradient)
-        ? TC_UserInterface2D
+        ? TC_BC7
         : TC_Default;
     Tex->PostEditChange();
 

@@ -73,6 +73,35 @@ echo === [1/3] Cloning PhotoshopAPI @ %PSAPI_TAG% (with submodules) ===
 REM core.longpaths=true bypasses Windows MAX_PATH=260 inside git checkout/submodule.
 git -c core.longpaths=true clone -c core.longpaths=true --recurse-submodules --branch %PSAPI_TAG% https://github.com/EmilDohne/PhotoshopAPI.git "%WORK_DIR%\PhotoshopAPI" || exit /b 1
 
+echo === Applying PSD2UMG patches to cloned source (before build) ===
+REM All patches: copy our vendored (already-patched) header over the upstream clone
+REM so CMake compiles the patched version into the .lib and robocopy carries it back.
+
+REM SmartObjectLayer.h: cache RGBA channels in constructor so evaluate_channel()
+REM returns the PSD's pre-rendered composite instead of throwing when the linked
+REM .ai file is absent.
+echo   Patching SmartObjectLayer.h...
+copy /y "%VENDOR_INCLUDE%\PhotoshopAPI\LayeredFile\LayerTypes\SmartObjectLayer.h" ^
+     "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\src\LayeredFile\LayerTypes\SmartObjectLayer.h" || (
+    echo WARNING: SmartObjectLayer.h patch copy failed — smart object pixel data may be unavailable
+)
+
+REM Layer.h: adds unparsed_tagged_blocks() (Phase 12 — layer effects extraction) and
+REM get_channel(ChannelID) (Phase 13 — fill-layer pixel bake via AdjustmentLayer/ShapeLayer).
+echo   Patching Layer.h...
+copy /y "%VENDOR_INCLUDE%\PhotoshopAPI\LayeredFile\LayerTypes\Layer.h" ^
+     "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\src\LayeredFile\LayerTypes\Layer.h" || (
+    echo WARNING: Layer.h patch copy failed — layer effects and fill-layer pixel extraction will break
+)
+
+REM ShapeLayer.h: no extra patch needed beyond Layer.h (get_channel moved to base).
+REM Copy anyway so robocopy round-trips the canonical vendored version.
+echo   Patching ShapeLayer.h...
+copy /y "%VENDOR_INCLUDE%\PhotoshopAPI\LayeredFile\LayerTypes\ShapeLayer.h" ^
+     "%WORK_DIR%\PhotoshopAPI\PhotoshopAPI\src\LayeredFile\LayerTypes\ShapeLayer.h" || (
+    echo WARNING: ShapeLayer.h patch copy failed — vendored copy may drift from upstream
+)
+
 pushd "%WORK_DIR%\PhotoshopAPI"
 
 echo === [2/3] CMake configure (uses bundled vcpkg submodule) ===

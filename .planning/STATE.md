@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: executing
-stopped_at: Completed 14-01-PLAN.md — RED state confirmed 3 pass / 3 fail; ready for 14-02
-last_updated: "2026-04-21T14:29:39.243Z"
+status: verifying
+stopped_at: Completed 14-02-PLAN.md — ScanShapeFillColor + 3-way dispatch; 3 RED assertions GREEN; ready for 14-03 FShapeLayerMapper
+last_updated: "2026-04-21T14:36:28.017Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 2
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 14 (shape-vector-layers) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-21
 
 ## Performance Metrics
@@ -86,6 +86,7 @@ Last activity: 2026-04-21
 | Phase 13-gradient-layers P03 | ~90m | 6 tasks | 8 files |
 | Phase 14-shape-vector-layers P01 | 15 | 3 tasks | 3 files |
 | Phase 14-shape-vector-layers P01 | 30 | 4 tasks | 3 files |
+| Phase 14-shape-vector-layers P02 | 4 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,9 @@ Recent decisions affecting current work:
 - [Phase 14-shape-vector-layers]: Shape enum value is distinct from SolidFill (D-03) for semantic clarity; drawn vector shapes (ShapeLayer+vscg) are separate from fill-layer solid-color fills (AdjustmentLayer+SoCo)
 - [Phase 14-shape-vector-layers]: FindShapeLayer declared as static member inside FPsdParserShapeSpec BEGIN block -- not reusing Phase 13 FindGradLayer which is scoped to FPsdParserGradientSpec
 - [Phase 14-shape-vector-layers]: ShapeLayer PSD layer record bounds = full canvas extent; actual shape geometry in vogk/vscg descriptor — SHAPE-02 Bounds assertion deferred to Plan 14-02
+- [Phase 14-shape-vector-layers]: vscg offset confirmed as 4 (identical to SoCo per PSD spec 4-byte version prefix); TryParseAt(4) first, resolves Open Question 1
+- [Phase 14-shape-vector-layers]: Type enum value string is 'solidColorLayer'; 'gradientFill' and any other value short-circuit to false, resolves Open Question 2
+- [Phase 14-shape-vector-layers]: Dual Clr/FlCl acceptance in ScanShapeFillColor handles all known Photoshop version variants per Pitfall 3
 
 ### Roadmap Evolution
 
@@ -155,6 +159,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T14:29:39.239Z
-Stopped at: Completed 14-01-PLAN.md — RED state confirmed 3 pass / 3 fail; ready for 14-02
+Last session: 2026-04-21T14:36:28.013Z
+Stopped at: Completed 14-02-PLAN.md — ScanShapeFillColor + 3-way dispatch; 3 RED assertions GREEN; ready for 14-03 FShapeLayerMapper
 Resume file: None

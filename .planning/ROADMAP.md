@@ -92,7 +92,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 14-01-PLAN.md — ShapeLayers.psd fixture + EPsdLayerType::Shape enum + RED FPsdParserShapeSpec stubs (Wave 1)
-- [ ] 14-02-PLAN.md — ScanShapeFillColor vscg byte-walker + 3-way ShapeLayer dispatch (SoCo / vscg / Gradient) (Wave 2)
+- [x] 14-02-PLAN.md — ScanShapeFillColor vscg byte-walker + 3-way ShapeLayer dispatch (SoCo / vscg / Gradient) (Wave 2)
 - [ ] 14-03-PLAN.md — FShapeLayerMapper + registry registration + SPsdImportPreviewDialog label + visual verify (Wave 3)
 
 ### Phase 15: Group Effects
@@ -129,7 +129,7 @@ Plans:
 | 11. Import Dialog Hidden-Layer Filtering | 0/2 | Skipped | 2026-04-21 |
 | 12. Text Property Fidelity | 2/2 | Complete   | 2026-04-17 |
 | 13. Gradient Layers | 3/3 | Complete | 2026-04-21 |
-| 14. Shape/Vector Layers | 1/3 | In Progress|  |
+| 14. Shape/Vector Layers | 2/3 | In Progress|  |
 | 15. Group Effects | 0/? | Not started | - |
 | 16. Rich Text / Multiple Text Runs | 0/? | Not started | - |
 | 17. Automated Font Matching | 0/? | Not started | - |

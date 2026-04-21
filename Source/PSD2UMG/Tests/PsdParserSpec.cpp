@@ -677,6 +677,51 @@ void FPsdParserGradientSpec::Define()
             TestTrue(TEXT("Effects.bHasColorOverlay set by ScanSolidFillColor"),
                 L->Effects.bHasColorOverlay);
         });
+
+        It("grad_linear has baked RGBAPixels matching bounds (GRAD-02)", [this]()
+        {
+            const FPsdLayer* L = FindGradLayer(Doc.RootLayers, TEXT("grad_linear"));
+            if (!TestNotNull(TEXT("grad_linear exists"), L)) return;
+            TestTrue(TEXT("PixelWidth > 0"), L->PixelWidth > 0);
+            TestTrue(TEXT("PixelHeight > 0"), L->PixelHeight > 0);
+            TestEqual(TEXT("RGBAPixels.Num == PixelWidth * PixelHeight * 4"),
+                L->RGBAPixels.Num(),
+                L->PixelWidth * L->PixelHeight * 4);
+        });
+
+        It("grad_radial has baked RGBAPixels matching bounds (GRAD-02)", [this]()
+        {
+            const FPsdLayer* L = FindGradLayer(Doc.RootLayers, TEXT("grad_radial"));
+            if (!TestNotNull(TEXT("grad_radial exists"), L)) return;
+            TestTrue(TEXT("PixelWidth > 0"), L->PixelWidth > 0);
+            TestTrue(TEXT("PixelHeight > 0"), L->PixelHeight > 0);
+            TestEqual(TEXT("RGBAPixels.Num == PixelWidth * PixelHeight * 4"),
+                L->RGBAPixels.Num(),
+                L->PixelWidth * L->PixelHeight * 4);
+        });
+
+        It("solid_gray has NO baked pixels (SolidFill uses tint, not texture)", [this]()
+        {
+            const FPsdLayer* L = FindGradLayer(Doc.RootLayers, TEXT("solid_gray"));
+            if (!TestNotNull(TEXT("solid_gray exists"), L)) return;
+            TestEqual(TEXT("RGBAPixels.Num == 0"), L->RGBAPixels.Num(), 0);
+        });
+
+        It("solid_gray ColorOverlayColor is approximately gray (GRAD-01 colour)", [this]()
+        {
+            const FPsdLayer* L = FindGradLayer(Doc.RootLayers, TEXT("solid_gray"));
+            if (!TestNotNull(TEXT("solid_gray exists"), L)) return;
+
+            const FLinearColor C = L->Effects.ColorOverlayColor;
+            // sRGB #808080 (128/255) linearises to ~0.2159 per channel via
+            // the sRGB EOTF used by FLinearColor::FromSRGBColor.
+            TestTrue(TEXT("R within 0.1 of G (gray, not red)"),
+                FMath::IsNearlyEqual(C.R, C.G, 0.1f));
+            TestTrue(TEXT("R within 0.1 of B (gray, not red)"),
+                FMath::IsNearlyEqual(C.R, C.B, 0.1f));
+            TestTrue(TEXT("R >= 0.1 (not black)"), C.R >= 0.1f);
+            TestTrue(TEXT("R <= 0.5 (not white)"), C.R <= 0.5f);
+        });
     });
 }
 

@@ -14,35 +14,20 @@ struct ShapeLayer : Layer<T>
 	using Layer<T>::Layer;
 	ShapeLayer() = default;
 
-	/// PSD2UMG patch (Phase 13 / GRAD-01, GRAD-02): expose get_channel on
-	/// ShapeLayer so ExtractImagePixels<ShapeLayer<T>> can bake composited
-	/// gradient pixels to Texture2D. ShapeLayer inherits only from Layer<T>
-	/// and NOT from ImageDataMixin, so the usual ImageDataMixin::get_channel
-	/// is unreachable here. This accessor iterates the protected
-	/// m_UnparsedImageData map populated by the LayerRecord constructor
-	/// and returns the decoded channel as std::vector<T>. Throws
-	/// std::runtime_error when the channel is absent so callers can probe
-	/// via try/catch (mirrors ExtractImagePixels alpha-probe in
-	/// Source/PSD2UMG/Private/Parser/PsdParser.cpp lines 144-152).
-	/// Precedent: Phase 12 unparsed_tagged_blocks() patch on Layer.h line 183.
+	/// PSD2UMG patch (Phase 13 / GRAD-02): expose get_channel on ShapeLayer.
+	/// ShapeLayer does not inherit ImageDataMixin so has no get_channel;
+	/// iterate m_UnparsedImageData directly and decompress via get_data<T>().
 	std::vector<T> get_channel(Enum::ChannelID id) const
 	{
 		for (const auto& [info, channel_ptr] : Layer<T>::m_UnparsedImageData)
 		{
 			if (info.id == id && channel_ptr)
 			{
-				std::vector<T> result;
-				result.reserve(static_cast<size_t>(Layer<T>::m_Width) * static_cast<size_t>(Layer<T>::m_Height));
-				for (const auto& pixel : *channel_ptr)
-				{
-					result.push_back(pixel);
-				}
-				return result;
+				return channel_ptr->get_data<T>();
 			}
 		}
 		throw std::runtime_error("ShapeLayer::get_channel: channel not found");
 	}
-
 
 	// ---------------------------------------------------------------------
 	// These methods are only here to allow for clean roundtripping, they

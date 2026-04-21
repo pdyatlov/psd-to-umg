@@ -51,6 +51,7 @@ THIRD_PARTY_INCLUDES_START
 #undef OUT
 #undef check
 #include <PhotoshopAPI.h>
+#include <PhotoshopAPI/LayeredFile/LayerTypes/AdjustmentLayer.h>
 #include <PhotoshopAPI/LayeredFile/LayerTypes/ArtboardLayer.h>
 #include <PhotoshopAPI/LayeredFile/LayerTypes/ShapeLayer.h>
 #pragma pop_macro("check")

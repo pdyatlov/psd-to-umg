@@ -16,7 +16,7 @@ struct AdjustmentLayer : Layer<T>
 	AdjustmentLayer() = default;
 
 	/// PSD2UMG patch (Phase 13 / GRAD-02): decompress a single channel.
-	/// AdjustmentLayer has no ImageDataMixin, so get_channel is not inherited.
+	/// AdjustmentLayer has no ImageDataMixin so get_channel is not inherited.
 	std::vector<T> get_channel(Enum::ChannelID id) const
 	{
 		for (const auto& [info, channel_ptr] : Layer<T>::m_UnparsedImageData)

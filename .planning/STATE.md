@@ -1,7 +1,7 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Import Fidelity Fixes
+milestone: v1.2
+milestone_name: Layer Fidelity Expansion
 status: executing
 stopped_at: Completed 13-gradient-layers 13-03-PLAN.md
 last_updated: "2026-04-21T14:00:00.000Z"

@@ -69,8 +69,6 @@ Plans:
 - [ ] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions
 - [ ] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback
 
-## Phase Details
-
 ### Phase 13: Gradient Layers
 **Goal**: Gradient fill layers from Photoshop import as usable UMG widgets — either pre-rendered as Texture2D or as a native gradient widget if available
 **Depends on**: Phase 2 (parser), Phase 3 (mapper pipeline)

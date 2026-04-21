@@ -107,16 +107,16 @@ struct Layer : public MaskMixin<T>
 	/// Clipping mask toggle of the layer, clips it to the layer below
 	void clipping_mask(bool is_clipped) noexcept { m_IsClippingMask = is_clipped; }
 
-	/// The layers' opacity.
-	///
-	/// In photoshop this is stored as a `uint8_t` from 0-255 but access and write is
+	/// The layers' opacity. 
+	/// 
+	/// In photoshop this is stored as a `uint8_t` from 0-255 but access and write is 
 	/// in terms of a float for better consistency.
 	float opacity() const noexcept { return static_cast<float>(m_Opacity) / 255; }
 
-	/// Returns the unparsed tagged blocks for this layer (e.g., lrFX effects block).
-	/// Added by PSD2UMG for layer effects extraction.
+	/// PSD2UMG patch (Phase 12): returns unparsed tagged blocks for layer effects extraction.
 	const std::vector<std::shared_ptr<TaggedBlock>>& unparsed_tagged_blocks() const noexcept { return m_UnparsedBlocks; }
-	/// The layers' opacity. 
+
+	/// The layers' opacity.
 	/// 
 	/// In photoshop this is stored as a `uint8_t` from 0-255 but access and write is 
 	/// in terms of a float for better consistency.

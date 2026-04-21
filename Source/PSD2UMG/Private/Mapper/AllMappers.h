@@ -25,6 +25,24 @@ public:
     UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
 };
 
+// Defined in FFillLayerMapper.cpp  (Phase 13 / GRAD-01, GRAD-02 -- gradient fill)
+class FFillLayerMapper : public IPsdLayerMapper
+{
+public:
+    int32 GetPriority() const override;
+    bool CanMap(const FPsdLayer& Layer) const override;
+    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
+};
+
+// Defined in FSolidFillLayerMapper.cpp  (Phase 13 / GRAD-01 -- solid color fill)
+class FSolidFillLayerMapper : public IPsdLayerMapper
+{
+public:
+    int32 GetPriority() const override;
+    bool CanMap(const FPsdLayer& Layer) const override;
+    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
+};
+
 // --- Fallback group mapper (priority 50) ---
 // Defined in FGroupLayerMapper.cpp
 class FGroupLayerMapper : public IPsdLayerMapper

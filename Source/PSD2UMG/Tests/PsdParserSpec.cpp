@@ -725,4 +725,124 @@ void FPsdParserGradientSpec::Define()
     });
 }
 
+// ------------------------------------------------------------------
+// Phase 14: ShapeLayers fixture (SHAPE-01, SHAPE-02)
+// RED stubs -- the 3 shape_rect assertions MUST FAIL in this plan.
+// Plan 14-02 wires ScanShapeFillColor + vscg-check in ConvertLayerRecursive;
+// Plan 14-03 wires FShapeLayerMapper + registry. After Plan 14-02 lands,
+// the 3 RED assertions turn GREEN. The grad_shape regression guard
+// MUST PASS immediately (Phase 13 fallthrough already handles it).
+// ------------------------------------------------------------------
+BEGIN_DEFINE_SPEC(FPsdParserShapeSpec, "PSD2UMG.Parser.ShapeLayers",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FString FixturePath;
+    FPsdDocument Doc;
+    FPsdParseDiagnostics Diag;
+    bool bParsed = false;
+
+    static const FPsdLayer* FindShapeLayer(const TArray<FPsdLayer>& Layers, const FString& Name)
+    {
+        for (const FPsdLayer& L : Layers)
+        {
+            if (L.Name.Equals(Name, ESearchCase::CaseSensitive))
+                return &L;
+        }
+        return nullptr;
+    }
+
+END_DEFINE_SPEC(FPsdParserShapeSpec)
+
+void FPsdParserShapeSpec::Define()
+{
+    BeforeEach([this]()
+    {
+        Doc = FPsdDocument();
+        Diag = FPsdParseDiagnostics();
+        bParsed = false;
+
+        TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"));
+        if (!Plugin.IsValid())
+        {
+            AddError(TEXT("PSD2UMG plugin not found via IPluginManager"));
+            return;
+        }
+
+        FixturePath = FPaths::Combine(
+            Plugin->GetBaseDir(),
+            TEXT("Source/PSD2UMG/Tests/Fixtures/ShapeLayers.psd"));
+
+        if (!FPaths::FileExists(FixturePath))
+        {
+            AddError(FString::Printf(TEXT("ShapeLayers fixture PSD missing: %s"), *FixturePath));
+            return;
+        }
+
+        bParsed = PSD2UMG::Parser::ParseFile(FixturePath, Doc, Diag);
+    });
+
+    Describe("ShapeLayers fixture", [this]()
+    {
+        It("loads successfully with 2 root layers", [this]()
+        {
+            TestTrue(TEXT("bParsed"), bParsed);
+            TestFalse(TEXT("Diag.HasErrors()"), Diag.HasErrors());
+            TestEqual(TEXT("RootLayers.Num"), Doc.RootLayers.Num(), 2);
+        });
+
+        It("shape_rect has Type == EPsdLayerType::Shape (SHAPE-01)", [this]()
+        {
+            const FPsdLayer* L = FindShapeLayer(Doc.RootLayers, TEXT("shape_rect"));
+            if (!TestNotNull(TEXT("shape_rect exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Shape);
+        });
+
+        It("shape_rect has Effects.bHasColorOverlay == true (SHAPE-01 routing)", [this]()
+        {
+            const FPsdLayer* L = FindShapeLayer(Doc.RootLayers, TEXT("shape_rect"));
+            if (!TestNotNull(TEXT("shape_rect exists in fixture"), L)) return;
+            TestTrue(TEXT("Effects.bHasColorOverlay set by ScanShapeFillColor"),
+                L->Effects.bHasColorOverlay);
+        });
+
+        It("shape_rect ColorOverlayColor is approximately red (SHAPE-01 colour)", [this]()
+        {
+            const FPsdLayer* L = FindShapeLayer(Doc.RootLayers, TEXT("shape_rect"));
+            if (!TestNotNull(TEXT("shape_rect exists in fixture"), L)) return;
+
+            const FLinearColor C = L->Effects.ColorOverlayColor;
+            // sRGB #FF0000 (255,0,0) linearises to approximately (1.0, 0.0, 0.0)
+            // via FLinearColor::FromSRGBColor. Use a loose envelope so the
+            // assertion survives minor Photoshop rounding (e.g. 254 vs 255).
+            TestTrue(TEXT("R >= 0.7 (strongly red)"), C.R >= 0.7f);
+            TestTrue(TEXT("G <= 0.1 (green near zero)"), C.G <= 0.1f);
+            TestTrue(TEXT("B <= 0.1 (blue near zero)"), C.B <= 0.1f);
+        });
+
+        It("shape_rect Bounds are 128x64 (SHAPE-02)", [this]()
+        {
+            const FPsdLayer* L = FindShapeLayer(Doc.RootLayers, TEXT("shape_rect"));
+            if (!TestNotNull(TEXT("shape_rect exists in fixture"), L)) return;
+            // Tolerance: SHAPE-02 spec calls for within 1px. Use Abs(delta) <= 1
+            // rather than exact equality because Photoshop may expand bounds by
+            // 1px when anti-aliasing is on at shape creation.
+            TestTrue(TEXT("Bounds.Width within 1px of 128"),
+                FMath::Abs(L->Bounds.Width() - 128) <= 1);
+            TestTrue(TEXT("Bounds.Height within 1px of 64"),
+                FMath::Abs(L->Bounds.Height() - 64) <= 1);
+        });
+
+        It("grad_shape has Type == EPsdLayerType::Gradient (Phase 13 regression guard)", [this]()
+        {
+            const FPsdLayer* L = FindShapeLayer(Doc.RootLayers, TEXT("grad_shape"));
+            if (!TestNotNull(TEXT("grad_shape exists in fixture"), L)) return;
+            // Drawn shape with a gradient Fill has vscg Type != solidColorLayer
+            // (or no vscg at all for certain Photoshop emitters). Phase 13's
+            // existing Gradient fallthrough handles it; Phase 14's new vscg
+            // check must NOT steal this case.
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Gradient);
+        });
+    });
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

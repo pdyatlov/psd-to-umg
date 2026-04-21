@@ -1119,13 +1119,12 @@ namespace PSD2UMG::Parser::Internal
 				return true;
 			};
 
-			if (!TryParseAt(0))
+			// PSD spec: SoCo additional-layer-info data starts with a 4-byte version (= 16)
+			// followed by the descriptor. Try offset 4 first, then 0 and 8 as fallbacks.
+			if (!TryParseAt(4) && !TryParseAt(0) && !TryParseAt(8))
 			{
-				if (!TryParseAt(8))
-				{
-					OutDiag.AddWarning(OutLayer.Name,
-						TEXT("SoCo descriptor parse failed at both Pos=0 and Pos=8; solid fill colour will default to white."));
-				}
+				OutDiag.AddWarning(OutLayer.Name,
+					TEXT("SoCo descriptor parse failed at offsets 4, 0, and 8; solid fill colour will default to white."));
 			}
 			return; // Only one SoCo block per layer.
 		}

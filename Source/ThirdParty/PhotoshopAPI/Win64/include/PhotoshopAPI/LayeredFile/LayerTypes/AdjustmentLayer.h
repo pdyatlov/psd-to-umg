@@ -7,15 +7,16 @@
 PSAPI_NAMESPACE_BEGIN
 
 /// This struct holds no data, we just use it to identify its type
+/// This will probably be split into multiple files later on
 template <typename T>
 	requires concepts::bit_depth<T>
-struct ShapeLayer : Layer<T>
+struct AdjustmentLayer : Layer<T>
 {
 	using Layer<T>::Layer;
-	ShapeLayer() = default;
+	AdjustmentLayer() = default;
 
 	/// PSD2UMG patch (Phase 13 / GRAD-02): decompress a single channel.
-	/// ShapeLayer has no ImageDataMixin, so get_channel is not inherited.
+	/// AdjustmentLayer has no ImageDataMixin, so get_channel is not inherited.
 	std::vector<T> get_channel(Enum::ChannelID id) const
 	{
 		for (const auto& [info, channel_ptr] : Layer<T>::m_UnparsedImageData)
@@ -23,7 +24,7 @@ struct ShapeLayer : Layer<T>
 			if (info.id == id && channel_ptr)
 				return channel_ptr->get_data<T>();
 		}
-		throw std::runtime_error("ShapeLayer::get_channel: channel not found");
+		throw std::runtime_error("AdjustmentLayer::get_channel: channel not found");
 	}
 
 	// ---------------------------------------------------------------------
@@ -32,7 +33,7 @@ struct ShapeLayer : Layer<T>
 	// for this layer type is in place.
 	// ---------------------------------------------------------------------
 
-	ShapeLayer(const LayerRecord& layer_record, ChannelImageData& channel_image_data, const FileHeader& header)
+	AdjustmentLayer(const LayerRecord& layer_record, ChannelImageData& channel_image_data, const FileHeader& header)
 		: Layer<T>(layer_record, channel_image_data, header)
 	{
 		// Move the layers into our own layer representation
@@ -52,6 +53,7 @@ struct ShapeLayer : Layer<T>
 			Layer<T>::m_UnparsedImageData[channel_info.m_ChannelID] = std::move(channelPtr);
 		}
 	}
+
 
 	std::tuple<LayerRecord, ChannelImageData> to_photoshop() override
 	{
@@ -99,8 +101,8 @@ struct ShapeLayer : Layer<T>
 		return std::make_tuple(std::move(lr_record), std::move(channel_img_data));
 	}
 
-
 private:
+
 
 	size_t num_channels(bool include_mask) const
 	{
@@ -139,8 +141,8 @@ private:
 	}
 };
 
-extern template struct ShapeLayer<bpp8_t>;
-extern template struct ShapeLayer<bpp16_t>;
-extern template struct ShapeLayer<bpp32_t>;
+extern template struct AdjustmentLayer<bpp8_t>;
+extern template struct AdjustmentLayer<bpp16_t>;
+extern template struct AdjustmentLayer<bpp32_t>;
 
 PSAPI_NAMESPACE_END

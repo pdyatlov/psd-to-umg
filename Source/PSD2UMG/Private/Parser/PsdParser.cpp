@@ -1375,7 +1375,15 @@ namespace PSD2UMG::Parser::Internal
 			if (bIsGradientFill)
 			{
 				OutLayer.Type = EPsdLayerType::Gradient;
-				ExtractImagePixels(InLayer, OutLayer, OutDiag);
+				// Must cast to AdjustmentLayer (the concrete type PhotoshopAPI uses for
+				// gradient fill layers) so ExtractImagePixels resolves get_channel
+				// on AdjustmentLayer, not the ambiguous Layer<T>/ImageDataMixin base.
+				if (auto Adj = std::dynamic_pointer_cast<AdjustmentLayer<PsdPixelType>>(InLayer))
+					ExtractImagePixels(Adj, OutLayer, OutDiag);
+				else if (auto Shape = std::dynamic_pointer_cast<ShapeLayer<PsdPixelType>>(InLayer))
+					ExtractImagePixels(Shape, OutLayer, OutDiag);
+				else
+					OutDiag.AddWarning(OutLayer.Name, TEXT("Gradient fill: unknown concrete type, pixel extraction skipped."));
 				UE_LOG(LogPSD2UMG, Log,
 					TEXT("Layer '%s' dispatched as Gradient (fill tag branch)"), *OutLayer.Name);
 				return;

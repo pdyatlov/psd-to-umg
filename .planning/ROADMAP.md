@@ -63,7 +63,7 @@ Plans:
 
 ## v1.2 Layer Fidelity Expansion (Phases 13-17)
 
-- [ ] **Phase 13: Gradient Layers** - Photoshop gradient fill layers imported as UMG gradient widgets or pre-rendered textures
+- [x] **Phase 13: Gradient Layers** - Gradient fill layers imported as pre-rendered TC_BC7 UImage widgets; solid fills as zero-texture UImage tinted via FX-03 (completed 2026-04-21)
 - [ ] **Phase 14: Shape/Vector Layers** - Photoshop solid-color shape layers imported as UImage with solid-color brush
 - [ ] **Phase 15: Group Effects** - Effects applied to group layers (drop shadow, color overlay) propagated to the group's container widget
 - [ ] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions

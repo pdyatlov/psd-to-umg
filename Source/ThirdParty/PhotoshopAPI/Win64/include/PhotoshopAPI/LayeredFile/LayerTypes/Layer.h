@@ -116,6 +116,20 @@ struct Layer : public MaskMixin<T>
 	/// PSD2UMG patch (Phase 12): returns unparsed tagged blocks for layer effects extraction.
 	const std::vector<std::shared_ptr<TaggedBlock>>& unparsed_tagged_blocks() const noexcept { return m_UnparsedBlocks; }
 
+	/// PSD2UMG patch (Phase 13 / GRAD-02): decompress a single channel from m_UnparsedImageData.
+	/// Works on any Layer<T> subtype (AdjustmentLayer, ShapeLayer, ImageLayer, etc.).
+	std::vector<T> get_channel(Enum::ChannelID id) const
+	{
+		for (const auto& [info, channel_ptr] : m_UnparsedImageData)
+		{
+			if (info.id == id && channel_ptr)
+			{
+				return channel_ptr->get_data<T>();
+			}
+		}
+		throw std::runtime_error("Layer::get_channel: channel not found");
+	}
+
 	/// The layers' opacity.
 	/// 
 	/// In photoshop this is stored as a `uint8_t` from 0-255 but access and write is 

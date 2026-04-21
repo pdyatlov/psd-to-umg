@@ -1350,6 +1350,38 @@ namespace PSD2UMG::Parser::Internal
 		// (PhotoshopAPI v0.9 silently drops lfx2 blocks -- scanned from raw bytes in ParseFile)
 		ExtractLfx2Stroke(OutLayer.Name, Lfx2Map, OutLayer);
 
+		// Phase 13 / GRAD-01: fill-layer detection via tagged blocks.
+		// PhotoshopAPI classifies gradient and solid-color fill layers as AdjustmentLayer
+		// (not ShapeLayer), so dynamic_pointer_cast<ShapeLayer> fails for them. Detect by
+		// tagged-block presence instead — type-agnostic and robust across PhotoshopAPI versions.
+		// adjSolidColor = "SoCo", adjGradient = "GdFl" per Enum.h TaggedBlockKey.
+		{
+			bool bIsSolidFill = false, bIsGradientFill = false;
+			for (const auto& Block : InLayer->unparsed_tagged_blocks())
+			{
+				if (!Block) continue;
+				const auto Key = Block->getKey();
+				if (Key == NAMESPACE_PSAPI::Enum::TaggedBlockKey::adjSolidColor) bIsSolidFill = true;
+				if (Key == NAMESPACE_PSAPI::Enum::TaggedBlockKey::adjGradient)   bIsGradientFill = true;
+			}
+			if (bIsSolidFill)
+			{
+				OutLayer.Type = EPsdLayerType::SolidFill;
+				ScanSolidFillColor(InLayer, OutLayer, OutDiag);
+				UE_LOG(LogPSD2UMG, Log,
+					TEXT("Layer '%s' dispatched as SolidFill (fill tag branch)"), *OutLayer.Name);
+				return;
+			}
+			if (bIsGradientFill)
+			{
+				OutLayer.Type = EPsdLayerType::Gradient;
+				ExtractImagePixels(InLayer, OutLayer, OutDiag);
+				UE_LOG(LogPSD2UMG, Log,
+					TEXT("Layer '%s' dispatched as Gradient (fill tag branch)"), *OutLayer.Name);
+				return;
+			}
+		}
+
 		// Layer-type dispatch via RTTI. bUseRTTI=true is set in PSD2UMG.Build.cs.
 		//
 		// ArtboardLayer inherits from Layer<T> directly (NOT GroupLayer), so

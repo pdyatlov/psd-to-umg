@@ -43,6 +43,15 @@ public:
     UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
 };
 
+// Defined in FShapeLayerMapper.cpp  (Phase 14 / SHAPE-01 -- drawn vector shape, solid-color fill via vscg)
+class FShapeLayerMapper : public IPsdLayerMapper
+{
+public:
+    int32 GetPriority() const override;
+    bool CanMap(const FPsdLayer& Layer) const override;
+    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
+};
+
 // --- Fallback group mapper (priority 50) ---
 // Defined in FGroupLayerMapper.cpp
 class FGroupLayerMapper : public IPsdLayerMapper

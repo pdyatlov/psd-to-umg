@@ -35,7 +35,13 @@ UTexture2D* FTextureImporter::ImportLayer(const FPsdLayer& Layer, const FString&
         }
     }
 
-    const FString PackagePath = PackageBasePath / AssetName;
+    // Deduplicate: two layers with identical sanitized names (e.g. "background @anchor:fill"
+    // in different groups) must not share a package — CreatePackage returns the same in-memory
+    // package on the second call and NewObject reinitializes the existing UTexture2D, leaving
+    // the first UImage's brush stale (white box).  We must check inside the loaded package
+    // with FindObject, not StaticFindObject with a package-path string (wrong UE path format).
+    FString UniqueAssetName = AssetName;
+    FString PackagePath = PackageBasePath / UniqueAssetName;
 
     UPackage* Pkg = CreatePackage(*PackagePath);
     if (!Pkg)
@@ -45,7 +51,24 @@ UTexture2D* FTextureImporter::ImportLayer(const FPsdLayer& Layer, const FString&
     }
     Pkg->FullyLoad();
 
-    UTexture2D* Tex = NewObject<UTexture2D>(Pkg, FName(*AssetName), RF_Public | RF_Standalone);
+    if (FindObject<UTexture2D>(Pkg, *UniqueAssetName) != nullptr)
+    {
+        for (int32 Suffix = 1; ; ++Suffix)
+        {
+            UniqueAssetName = FString::Printf(TEXT("%s_%d"), *AssetName, Suffix);
+            PackagePath = PackageBasePath / UniqueAssetName;
+            Pkg = CreatePackage(*PackagePath);
+            if (Pkg)
+            {
+                Pkg->FullyLoad();
+                if (FindObject<UTexture2D>(Pkg, *UniqueAssetName) == nullptr)
+                    break;
+            }
+        }
+        UE_LOG(LogPSD2UMG, Log, TEXT("FTextureImporter: Asset name '%s' already taken — using '%s'"), *AssetName, *UniqueAssetName);
+    }
+
+    UTexture2D* Tex = NewObject<UTexture2D>(Pkg, FName(*UniqueAssetName), RF_Public | RF_Standalone);
     if (!Tex)
     {
         UE_LOG(LogPSD2UMG, Warning, TEXT("FTextureImporter: Failed to create UTexture2D for layer '%s'"), *Layer.Name);
@@ -55,7 +78,13 @@ UTexture2D* FTextureImporter::ImportLayer(const FPsdLayer& Layer, const FString&
     Tex->PreEditChange(nullptr);
     Tex->Source.Init(Layer.PixelWidth, Layer.PixelHeight, 1, 1, TSF_BGRA8, BGRAPixels.GetData());
     Tex->SRGB = true;
-    Tex->CompressionSettings = TC_Default;
+    // Phase 13 / GRAD-02: gradient layers use TC_UserInterface2D so BC1/DXT1
+    // compression does not introduce visible banding at UI resolutions. All
+    // other layer types (Image, SmartObject) retain the existing TC_Default
+    // behaviour used since Phase 3.
+    Tex->CompressionSettings = (Layer.Type == EPsdLayerType::Gradient)
+        ? TC_UserInterface2D
+        : TC_Default;
     Tex->PostEditChange();
 
     Pkg->MarkPackageDirty();

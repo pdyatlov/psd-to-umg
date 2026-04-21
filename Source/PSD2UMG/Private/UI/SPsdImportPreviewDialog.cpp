@@ -210,6 +210,9 @@ FString SPsdImportPreviewDialog::InferWidgetTypeName(const FPsdLayer& Layer)
         case EPsdLayerType::Group:       return TEXT("CanvasPanel");
         case EPsdLayerType::Image:       return TEXT("Image");
         case EPsdLayerType::SmartObject: return TEXT("Image");
+        case EPsdLayerType::Gradient:    return TEXT("Image"); // Phase 13 (catch-up label for completeness)
+        case EPsdLayerType::SolidFill:   return TEXT("Image"); // Phase 13 (catch-up label for completeness)
+        case EPsdLayerType::Shape:       return TEXT("Image"); // Phase 14 / SHAPE-01
         default:                         return TEXT("Unknown");
         }
     }

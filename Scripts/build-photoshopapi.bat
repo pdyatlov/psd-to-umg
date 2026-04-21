@@ -27,20 +27,17 @@ REM ============================================================================
 
 setlocal enableextensions enabledelayedexpansion
 
-REM If launched directly (double-click), re-launch ourselves piping all output
-REM to a log file and a console that stays open. The %PSAPI_LOGGED% guard
-REM prevents infinite recursion.
+REM If launched directly (double-click), re-launch ourselves via PowerShell
+REM Tee-Object so output streams to the console in real time AND to a log file.
+REM The %PSAPI_LOGGED% guard prevents infinite recursion.
 if "%PSAPI_LOGGED%"=="" (
     set "PSAPI_LOG=%~dp0..\build-photoshopapi.log"
     set "PSAPI_LOGGED=1"
-    call "%~f0" %* > "!PSAPI_LOG!" 2>&1
+    powershell -NoProfile -Command "& cmd /c \"\"%~f0\"\" %* 2>&1 | Tee-Object -FilePath '!PSAPI_LOG!'"
     set "RC=!ERRORLEVEL!"
     echo.
     echo === Build script finished with exit code !RC! ===
     echo Full log: !PSAPI_LOG!
-    echo.
-    echo --- last 40 lines ---
-    powershell -NoProfile -Command "Get-Content -Tail 40 '!PSAPI_LOG!'"
     echo.
     pause
     exit /b !RC!

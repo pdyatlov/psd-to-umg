@@ -14,21 +14,6 @@ struct ShapeLayer : Layer<T>
 	using Layer<T>::Layer;
 	ShapeLayer() = default;
 
-	/// PSD2UMG patch (Phase 13 / GRAD-02): expose get_channel on ShapeLayer.
-	/// ShapeLayer does not inherit ImageDataMixin so has no get_channel;
-	/// iterate m_UnparsedImageData directly and decompress via get_data<T>().
-	std::vector<T> get_channel(Enum::ChannelID id) const
-	{
-		for (const auto& [info, channel_ptr] : Layer<T>::m_UnparsedImageData)
-		{
-			if (info.id == id && channel_ptr)
-			{
-				return channel_ptr->get_data<T>();
-			}
-		}
-		throw std::runtime_error("ShapeLayer::get_channel: channel not found");
-	}
-
 	// ---------------------------------------------------------------------
 	// These methods are only here to allow for clean roundtripping, they
 	// should not be used directly and will be replaced once proper support

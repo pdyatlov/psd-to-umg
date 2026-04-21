@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Layer Fidelity Expansion
+milestone: v1.1
+milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: Completed 13-gradient-layers 13-03-PLAN.md
-last_updated: "2026-04-21T14:00:00.000Z"
+stopped_at: Completed 14-01-PLAN.md — RED state confirmed 3 pass / 3 fail; ready for 14-02
+last_updated: "2026-04-21T14:29:39.243Z"
 last_activity: 2026-04-21
 progress:
   total_phases: 2
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
 ---
 
 # Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 13 — gradient-layers
+**Current focus:** Phase 14 — shape-vector-layers
 
 ## Current Position
 
-Phase: 13 (gradient-layers) — COMPLETE
+Phase: 14 (shape-vector-layers) — EXECUTING
 Plan: 3 of 3
-Status: Phase complete — all 3 plans done, visual verify passed
+Status: Ready to execute
 Last activity: 2026-04-21
 
 ## Performance Metrics
@@ -84,6 +84,8 @@ Last activity: 2026-04-21
 | Phase 12-text-property-fidelity P02 | 30 | 6 tasks | 4 files |
 | Phase 13-gradient-layers P02 | 15 | 3 tasks | 3 files |
 | Phase 13-gradient-layers P03 | ~90m | 6 tasks | 8 files |
+| Phase 14-shape-vector-layers P01 | 15 | 3 tasks | 3 files |
+| Phase 14-shape-vector-layers P01 | 30 | 4 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -133,6 +135,9 @@ Recent decisions affecting current work:
 - [Phase 13-gradient-layers]: SolidFill layers get no pixel extraction — FSolidFillLayerMapper (Plan 13-03) produces zero-texture UImage; FX-03 tints via ColorOverlayColor
 - [Phase 13-gradient-layers]: get_channel shim iterates Layer<T>::m_UnparsedImageData — vendored-header patch following Phase 12 unparsed_tagged_blocks() precedent on Layer.h
 - [Phase 13-gradient-layers]: PhotoshopAPI classifies gradient and solid-color fill layers as AdjustmentLayer<T>, NOT ShapeLayer<T>. RTTI-only dispatch silently fails. Tag-based detection (adjSolidColor/adjGradient from unparsed_tagged_blocks()) must precede all dynamic_pointer_cast calls. get_channel added to AdjustmentLayer<T> only to avoid C2385 ambiguity on SmartObjectLayer (inherits both Layer<T> and ImageDataMixin).
+- [Phase 14-shape-vector-layers]: Shape enum value is distinct from SolidFill (D-03) for semantic clarity; drawn vector shapes (ShapeLayer+vscg) are separate from fill-layer solid-color fills (AdjustmentLayer+SoCo)
+- [Phase 14-shape-vector-layers]: FindShapeLayer declared as static member inside FPsdParserShapeSpec BEGIN block -- not reusing Phase 13 FindGradLayer which is scoped to FPsdParserGradientSpec
+- [Phase 14-shape-vector-layers]: ShapeLayer PSD layer record bounds = full canvas extent; actual shape geometry in vogk/vscg descriptor — SHAPE-02 Bounds assertion deferred to Plan 14-02
 
 ### Roadmap Evolution
 
@@ -150,6 +155,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T14:00:00.000Z
-Stopped at: Completed 13-gradient-layers 13-03-PLAN.md (phase complete)
+Last session: 2026-04-21T14:29:39.239Z
+Stopped at: Completed 14-01-PLAN.md — RED state confirmed 3 pass / 3 fail; ready for 14-02
 Resume file: None

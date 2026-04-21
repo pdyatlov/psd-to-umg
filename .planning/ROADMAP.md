@@ -83,13 +83,17 @@ Plans:
 - [x] 13-03-PLAN.md — FFillLayerMapper + FSolidFillLayerMapper + registry + TC_BC7 + visual verify (Wave 3)
 
 ### Phase 14: Shape/Vector Layers
-**Goal**: Photoshop solid-color vector/shape layers import as UImage widgets with a matching solid-color brush — preserving position, size, and color
-**Depends on**: Phase 2 (parser), Phase 3 (mapper pipeline)
+**Goal**: Photoshop drawn vector/shape layers (Rectangle/Ellipse/Pen Tool) with solid-color fill import as UImage widgets with a matching solid SlateBrush — preserving position, size, and fill color. Refines the Phase 13 ShapeLayer dispatch with a vscg (vecStrokeContentData) Type-field byte-walk to distinguish solid-fill drawn shapes from gradient-fill drawn shapes; stroke rendering and pattern fills deferred to later phases.
+**Depends on**: Phase 2 (parser), Phase 3 (mapper pipeline), Phase 13 (ShapeLayer branch + FSolidFillLayerMapper template)
 **Requirements**: SHAPE-01, SHAPE-02
 **Success Criteria** (what must be TRUE):
   1. A solid-color rectangle shape layer in PSD produces a UImage with a solid SlateBrush of the correct color after import
   2. Position and size of the shape widget match the PSD layer bounds within 1px
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [x] 14-01-PLAN.md — ShapeLayers.psd fixture + EPsdLayerType::Shape enum + RED FPsdParserShapeSpec stubs (Wave 1)
+- [ ] 14-02-PLAN.md — ScanShapeFillColor vscg byte-walker + 3-way ShapeLayer dispatch (SoCo / vscg / Gradient) (Wave 2)
+- [ ] 14-03-PLAN.md — FShapeLayerMapper + registry registration + SPsdImportPreviewDialog label + visual verify (Wave 3)
 
 ### Phase 15: Group Effects
 **Goal**: Layer effects (drop shadow, color overlay) applied to Photoshop group layers are reflected on the generated container widget
@@ -125,7 +129,7 @@ Plans:
 | 11. Import Dialog Hidden-Layer Filtering | 0/2 | Skipped | 2026-04-21 |
 | 12. Text Property Fidelity | 2/2 | Complete   | 2026-04-17 |
 | 13. Gradient Layers | 3/3 | Complete | 2026-04-21 |
-| 14. Shape/Vector Layers | 0/? | Not started | - |
+| 14. Shape/Vector Layers | 1/3 | In Progress|  |
 | 15. Group Effects | 0/? | Not started | - |
 | 16. Rich Text / Multiple Text Runs | 0/? | Not started | - |
 | 17. Automated Font Matching | 0/? | Not started | - |
@@ -147,3 +151,4 @@ Candidate work (from deferred registry):
 - Fab/Epic Marketplace submission packaging (MKT-03)
 - Configurable non-canvas slot properties (alignment, padding, orientation) — deferred from v1.0.1
 - Overlay/Canvas/Nested spec coverage — test-coverage gap only (implementation is complete)
+- Phase 14 deferred: Stroke rendering (`vstk` -> UMG border/outline effect); Pattern fill layers (`PtFl`); Vector path export (SVG / UMG custom shape widget)

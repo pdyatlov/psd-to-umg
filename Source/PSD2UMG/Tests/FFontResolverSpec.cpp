@@ -163,6 +163,38 @@ void FFontResolverSpec::Define()
             TestTrue(TEXT("italic from suffix"), R.bItalicRequested);
             TestEqual(TEXT("typeface"), R.TypefaceName, FName(TEXT("Bold Italic")));
         });
+
+        It("resolves engine Roboto via AutoDiscovered when FontMap empty", [this]()
+        {
+            // FONT-01 happy path: Phase 17 CONTEXT.md specifics section pins this exact scenario.
+            // Empty FontMap + no DefaultFont forces the resolver into the AutoDiscovered step.
+            // StockFont == /Engine/EngineFonts/Roboto.Roboto (loaded in BeforeEach), so the
+            // AssetRegistry scan MUST find it when resolving base name "Roboto" (after ParseSuffix
+            // strips -Bold). Case-insensitive match on lowercase asset name per D-02.
+            UPSD2UMGSettings* Settings = UPSD2UMGSettings::Get();
+            Settings->FontMap.Empty();
+            Settings->DefaultFont = TSoftObjectPtr<UFont>();
+
+            auto R = PSD2UMG::FFontResolver::Resolve(TEXT("Roboto-Bold"), false, false, Settings);
+            TestEqual(TEXT("source"), static_cast<uint8>(R.Source), static_cast<uint8>(PSD2UMG::EFontResolutionSource::AutoDiscovered));
+            TestNotNull(TEXT("font"), R.Font);
+            TestEqual(TEXT("font matches StockFont"), R.Font, StockFont);
+            TestTrue(TEXT("bold from suffix"), R.bBoldRequested);
+        });
+
+        It("falls back past AutoDiscovered to DefaultFont on miss", [this]()
+        {
+            // FONT-02 chain order guard: a name that cannot exist as an engine or /Game asset
+            // MUST fall through AutoDiscovered to the DefaultFont step (D-05 chain). If this
+            // ever regresses to AutoDiscovered (e.g. wildcard match bug), the test catches it.
+            UPSD2UMGSettings* Settings = UPSD2UMGSettings::Get();
+            Settings->FontMap.Empty();
+            Settings->DefaultFont = TSoftObjectPtr<UFont>(StockFont);
+
+            auto R = PSD2UMG::FFontResolver::Resolve(TEXT("Garbage-Bogus-12345-Regular"), false, false, Settings);
+            TestEqual(TEXT("source"), static_cast<uint8>(R.Source), static_cast<uint8>(PSD2UMG::EFontResolutionSource::Default));
+            TestNotNull(TEXT("font"), R.Font);
+        });
     });
 }
 

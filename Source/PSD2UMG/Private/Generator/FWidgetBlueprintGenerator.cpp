@@ -356,19 +356,30 @@ static void PopulateChildren(
             Widget->SetVisibility(ESlateVisibility::Collapsed);
         }
 
-        // FX-03: Color Overlay (per D-04, D-05) — image layers only
+        // FX-03: Color Overlay
+        // Phase 15 GRPFX-02 (D-04, D-05, D-06, D-07): image branch immediate; group branch
+        // deferred to after recursion so the overlay lands as the LAST child (Pitfall 1).
+        UPanelWidget* DeferredOverlayPanel = nullptr;
         if (LayerPtr->Effects.bHasColorOverlay)
         {
             if (UImage* Img = Cast<UImage>(Widget))
             {
+                // Existing image path — tint brush in place
                 FSlateBrush Brush = Img->GetBrush();
                 Brush.TintColor = FSlateColor(LayerPtr->Effects.ColorOverlayColor);
                 Img->SetBrush(Brush);
             }
+            else if (UPanelWidget* Panel = Cast<UPanelWidget>(Widget))
+            {
+                // D-04/D-07: defer overlay insertion until after PSD children recurse,
+                // so overlay is the LAST child (Pitfall 1).
+                DeferredOverlayPanel = Panel;
+            }
             else
             {
                 UE_LOG(LogPSD2UMG, Warning,
-                    TEXT("Color overlay on non-image layer '%s' ignored (per D-05)."), *LayerPtr->Name);
+                    TEXT("Color overlay on layer '%s' (type=%d) — no UImage or UPanelWidget; ignored."),
+                    *LayerPtr->Name, static_cast<int32>(LayerPtr->Type));
             }
         }
 
@@ -395,6 +406,48 @@ static void PopulateChildren(
                 UE_LOG(LogPSD2UMG, Error,
                     TEXT("Group layer '%s' mapped to non-panel widget '%s' (class %s); %d children dropped"),
                     *Layer.Name, *Widget->GetName(), *Widget->GetClass()->GetName(), Layer.Children.Num());
+            }
+        }
+
+        // FX-03 deferred: group-panel color overlay — insert overlay UImage as LAST child
+        // (after PSD children recursion completes). D-05/D-06/D-07 per CONTEXT.md.
+        if (DeferredOverlayPanel)
+        {
+            const FString OverlayBaseName = !LayerPtr->ParsedTags.CleanName.IsEmpty()
+                ? LayerPtr->ParsedTags.CleanName
+                : LayerPtr->Name;
+            const FName OverlayFName = MakeUniqueObjectName(
+                Tree, UImage::StaticClass(),
+                FName(*FString::Printf(TEXT("%s_ColorOverlay"), *OverlayBaseName)));
+            UImage* OverlayImg = Tree->ConstructWidget<UImage>(UImage::StaticClass(), OverlayFName);
+
+            FSlateBrush OverlayBrush;
+            OverlayBrush.DrawAs = ESlateBrushDrawType::NoDrawType;
+            OverlayBrush.TintColor = FSlateColor(LayerPtr->Effects.ColorOverlayColor);
+            OverlayImg->SetBrush(OverlayBrush);
+            OverlayImg->SetRenderOpacity(LayerPtr->Effects.ColorOverlayColor.A);
+
+            if (UCanvasPanel* CanvasGroup = Cast<UCanvasPanel>(DeferredOverlayPanel))
+            {
+                // D-05: fill anchors so overlay covers the entire canvas group
+                UCanvasPanelSlot* OverlaySlot = CanvasGroup->AddChildToCanvas(OverlayImg);
+                if (OverlaySlot)
+                {
+                    FAnchorData FillData;
+                    FillData.Anchors   = FAnchors(0.f, 0.f, 1.f, 1.f);
+                    FillData.Offsets   = FMargin(0.f, 0.f, 0.f, 0.f);
+                    FillData.Alignment = FVector2D(0.f, 0.f);
+                    OverlaySlot->SetLayout(FillData);
+                    // Open Question 1 resolution: ZOrder = current child count - 1
+                    // (overlay's own index after AddChildToCanvas, which is already
+                    // past all PSD children since recursion completed).
+                    OverlaySlot->SetZOrder(CanvasGroup->GetChildrenCount() - 1);
+                }
+            }
+            else
+            {
+                // D-06: non-canvas panel — best-effort AddChild, no slot config available
+                DeferredOverlayPanel->AddChild(OverlayImg);
             }
         }
     }

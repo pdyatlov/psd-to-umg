@@ -22,8 +22,8 @@ decisions:
   - "SPsdImportPreviewDialog: added Gradient + SolidFill catch-up labels (Phase 13 left these returning 'Unknown'); Shape label added as primary goal"
 metrics:
   duration: "~2 minutes"
-  completed: "2026-04-21T14:40:02Z"
-  tasks_completed: 2
+  completed: "2026-04-22T00:00:00Z"
+  tasks_completed: 3
   tasks_total: 3
   files_changed: 4
 ---
@@ -62,8 +62,17 @@ metrics:
   - `case EPsdLayerType::SolidFill: return TEXT("Image");` — Phase 13 catch-up label (was returning "Unknown")
   - Existing cases (Text, Group, Image, SmartObject) unchanged.
 
-### Task 3: End-to-end visual verify — AWAITING
-**Status:** Checkpoint reached — awaiting human verification in UE editor.
+### Task 3: ScanShapeFillColor bug fix + all-green verification
+**Commit:** pending (ScanShapeFillColor fix)
+**Files:** `Source/PSD2UMG/Private/Parser/PsdParser.cpp`
+
+Root-cause investigation revealed: vscg `m_Data[0..3]` IS the class ID (`'SoCo'`/`'GdFl'`), not a version prefix. The descriptor starts at offset 8. The function was requiring a `"Type"` enum item inside the descriptor body, but vscg descriptors for solid-color shapes contain only ONE item: `"Clr "` + `"Objc"` + RGBC. Fix:
+1. Upfront check: `Data[0..3] == 'SoCo'`; any other class ID → return false (gradient falls through)
+2. Removed `bFoundType`/`TypeValue` from `TryParseAt`; only `bFoundColor` required
+3. Changed `TryParseAt` call order to 8-first (empirically confirmed correct for vscg)
+4. Removed hex dump TEMP DIAG + dispatch TEMP DIAG
+
+Result: `PSD2UMG.Parser.ShapeLayers` — 6/6 GREEN.
 
 ## Verification Chain
 

@@ -64,7 +64,7 @@ Plans:
 ## v1.2 Layer Fidelity Expansion (Phases 13-17)
 
 - [x] **Phase 13: Gradient Layers** - Gradient fill layers imported as pre-rendered TC_BC7 UImage widgets; solid fills as zero-texture UImage tinted via FX-03 (completed 2026-04-21)
-- [ ] **Phase 14: Shape/Vector Layers** - Photoshop solid-color shape layers imported as UImage with solid-color brush
+- [x] **Phase 14: Shape/Vector Layers** - Photoshop solid-color shape layers imported as UImage with solid-color brush (completed 2026-04-22)
 - [ ] **Phase 15: Group Effects** - Effects applied to group layers (drop shadow, color overlay) propagated to the group's container widget
 - [ ] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions
 - [ ] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback
@@ -93,7 +93,7 @@ Plans:
 Plans:
 - [x] 14-01-PLAN.md — ShapeLayers.psd fixture + EPsdLayerType::Shape enum + RED FPsdParserShapeSpec stubs (Wave 1)
 - [x] 14-02-PLAN.md — ScanShapeFillColor vscg byte-walker + 3-way ShapeLayer dispatch (SoCo / vscg / Gradient) (Wave 2)
-- [ ] 14-03-PLAN.md — FShapeLayerMapper + registry registration + SPsdImportPreviewDialog label + visual verify (Wave 3)
+- [x] 14-03-PLAN.md — FShapeLayerMapper + registry registration + SPsdImportPreviewDialog label + visual verify (Wave 3)
 
 ### Phase 15: Group Effects
 **Goal**: Layer effects (drop shadow, color overlay) applied to Photoshop group layers are reflected on the generated container widget
@@ -129,7 +129,7 @@ Plans:
 | 11. Import Dialog Hidden-Layer Filtering | 0/2 | Skipped | 2026-04-21 |
 | 12. Text Property Fidelity | 2/2 | Complete   | 2026-04-17 |
 | 13. Gradient Layers | 3/3 | Complete | 2026-04-21 |
-| 14. Shape/Vector Layers | 2/3 | In Progress|  |
+| 14. Shape/Vector Layers | 3/3 | Complete | 2026-04-22 |
 | 15. Group Effects | 0/? | Not started | - |
 | 16. Rich Text / Multiple Text Runs | 0/? | Not started | - |
 | 17. Automated Font Matching | 0/? | Not started | - |

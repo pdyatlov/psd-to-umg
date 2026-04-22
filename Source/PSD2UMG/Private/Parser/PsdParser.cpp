@@ -1181,19 +1181,19 @@ namespace PSD2UMG::Parser::Internal
 				return false;
 			}
 
-			// Diagnostic hex dump -- first 40 bytes so we can verify descriptor
-			// offset alignment and Type enum string from a single import run.
-			// Resolves research Open Questions 1 & 2.
+			// Bytes [0..3] of vscg m_Data are the class ID: 'SoCo' = solid fill,
+			// 'GdFl' = gradient fill. This is the type discriminator; only solid
+			// shapes should produce EPsdLayerType::Shape.
+			if (Data.size() < 4
+				|| std::to_integer<char>(Data[0]) != 'S'
+				|| std::to_integer<char>(Data[1]) != 'o'
+				|| std::to_integer<char>(Data[2]) != 'C'
+				|| std::to_integer<char>(Data[3]) != 'o')
 			{
-				const size_t DumpLen = FMath::Min<size_t>(40, Data.size());
-				FString HexDump;
-				for (size_t i = 0; i < DumpLen; ++i)
-				{
-					HexDump += FString::Printf(TEXT("%02X "), std::to_integer<uint32>(Data[i]));
-				}
 				UE_LOG(LogPSD2UMG, Verbose,
-					TEXT("Layer '%s' vscg payload[0..%zu]= %s"),
-					*OutLayer.Name, DumpLen, *HexDump);
+					TEXT("Layer '%s' vscg classID is not 'SoCo'; treating as non-solid shape."),
+					*OutLayer.Name);
+				return false;
 			}
 
 			auto TryParseAt = [&](size_t StartPos) -> bool
@@ -1294,12 +1294,7 @@ namespace PSD2UMG::Parser::Internal
 
 				if (TopCount == 0 || TopCount > 256) return false;
 
-				// DIVERGENCE FROM ScanSolidFillColor #1 -- capture Type enum value
-				// (not just skip past it). Stored in TypeValue; the function only
-				// succeeds if TypeValue == "solidColorLayer".
 				bool bFoundColor = false;
-				bool bFoundType = false;
-				std::string TypeValue;
 				double Rd = 0.0, Grn = 0.0, Bl = 0.0;
 
 				for (uint32 i = 0; i < TopCount && CheckRemaining(8); ++i)
@@ -1310,15 +1305,8 @@ namespace PSD2UMG::Parser::Internal
 					for (int k = 0; k < 4; ++k) OsType[k] = std::to_integer<char>(Data[Pos + k]);
 					Pos += 4;
 
-					// DIVERGENCE #1 (capture Type):
-					if (ItemKey == "Type" && FCStringAnsi::Strcmp(OsType, "enum") == 0)
-					{
-						ReadPsString();             // type-id (e.g. "FlFl" or class)
-						TypeValue = ReadPsString(); // value ("solidColorLayer", "gradientFill", ...)
-						bFoundType = true;
-					}
-					// DIVERGENCE #2 (accept "Clr " OR "FlCl"):
-					else if ((ItemKey == "Clr " || ItemKey == "FlCl")
+					// Accept "Clr " OR "FlCl" for the color object:
+					if ((ItemKey == "Clr " || ItemKey == "FlCl")
 					      && FCStringAnsi::Strcmp(OsType, "Objc") == 0)
 					{
 						SkipUnicodeString();
@@ -1354,20 +1342,11 @@ namespace PSD2UMG::Parser::Internal
 					}
 				}
 
-				// DIVERGENCE #3 (solid-only acceptance):
-				if (!bFoundType || !bFoundColor)
+				if (!bFoundColor)
 				{
 					UE_LOG(LogPSD2UMG, Verbose,
-						TEXT("ScanShapeFillColor: vscg at startPos=%zu missing Type(%d) or Color(%d); reject"),
-						StartPos, (int)bFoundType, (int)bFoundColor);
-					return false;
-				}
-
-				if (TypeValue != "solidColorLayer")
-				{
-					UE_LOG(LogPSD2UMG, Verbose,
-						TEXT("Layer '%s' vscg at startPos=%zu Type='%hs' (not solidColorLayer); fall through to Gradient"),
-						*OutLayer.Name, StartPos, TypeValue.c_str());
+						TEXT("ScanShapeFillColor: vscg at startPos=%zu missing Color; reject"),
+						StartPos);
 					return false;
 				}
 
@@ -1378,8 +1357,8 @@ namespace PSD2UMG::Parser::Internal
 				OutLayer.Effects.bHasColorOverlay = true;
 
 				UE_LOG(LogPSD2UMG, Verbose,
-					TEXT("Layer '%s' vscg parsed at startPos=%zu: type='%hs' R=%.1f G=%.1f B=%.1f => linear(%.4f,%.4f,%.4f)"),
-					*OutLayer.Name, StartPos, TypeValue.c_str(), Rd, Grn, Bl,
+					TEXT("Layer '%s' vscg parsed at startPos=%zu: R=%.1f G=%.1f B=%.1f => linear(%.4f,%.4f,%.4f)"),
+					*OutLayer.Name, StartPos, Rd, Grn, Bl,
 					OutLayer.Effects.ColorOverlayColor.R,
 					OutLayer.Effects.ColorOverlayColor.G,
 					OutLayer.Effects.ColorOverlayColor.B);
@@ -1387,12 +1366,12 @@ namespace PSD2UMG::Parser::Internal
 				return true;
 			};
 
-			// PSD spec: vscg (like SoCo) starts with a 4-byte version prefix.
-			// Try offset 4 first (matches Phase 13 empirically-confirmed SoCo
-			// winner); fall back to 0 and 8 defensively (research Open Q2).
+			// vscg layout: bytes[0..3]=classID('SoCo'), bytes[4..7]=version(16),
+			// descriptor at offset 8. Try 8 first (empirically confirmed); fall
+			// back to 4 and 0 defensively.
+			if (TryParseAt(8)) return true;
 			if (TryParseAt(4)) return true;
 			if (TryParseAt(0)) return true;
-			if (TryParseAt(8)) return true;
 
 			OutDiag.AddWarning(OutLayer.Name,
 				TEXT("vscg descriptor parse failed at offsets 4, 0, and 8; treating as non-solid (Gradient fallthrough)."));

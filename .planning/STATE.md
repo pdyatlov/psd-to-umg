@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Import Fidelity Fixes
-status: verifying
-stopped_at: Completed 14-02-PLAN.md — ScanShapeFillColor + 3-way dispatch; 3 RED assertions GREEN; ready for 14-03 FShapeLayerMapper
-last_updated: "2026-04-21T14:36:28.017Z"
-last_activity: 2026-04-21
+milestone: v1.2
+milestone_name: Layer Fidelity Expansion
+status: idle
+stopped_at: Completed Phase 14 — FShapeLayerMapper + vscg bug fix; 6/6 ShapeLayers tests GREEN; Phase 14 complete
+last_updated: "2026-04-22T00:00:00Z"
+last_activity: 2026-04-22
 progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_phases: 5
+  completed_phases: 2
+  total_plans: 9
+  completed_plans: 9
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 ## Current Position
 
-Phase: 14 (shape-vector-layers) — EXECUTING
+Phase: 14 (shape-vector-layers) — COMPLETE
 Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-04-21
+Status: All 3 plans complete, 6/6 tests GREEN
+Last activity: 2026-04-22
 
 ## Performance Metrics
 
@@ -87,6 +87,7 @@ Last activity: 2026-04-21
 | Phase 14-shape-vector-layers P01 | 15 | 3 tasks | 3 files |
 | Phase 14-shape-vector-layers P01 | 30 | 4 tasks | 3 files |
 | Phase 14-shape-vector-layers P02 | 4 | 1 tasks | 1 files |
+| Phase 14-shape-vector-layers P03 | ~60m | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,7 @@ Recent decisions affecting current work:
 - [Phase 14-shape-vector-layers]: vscg offset confirmed as 4 (identical to SoCo per PSD spec 4-byte version prefix); TryParseAt(4) first, resolves Open Question 1
 - [Phase 14-shape-vector-layers]: Type enum value string is 'solidColorLayer'; 'gradientFill' and any other value short-circuit to false, resolves Open Question 2
 - [Phase 14-shape-vector-layers]: Dual Clr/FlCl acceptance in ScanShapeFillColor handles all known Photoshop version variants per Pitfall 3
+- [Phase 14-shape-vector-layers]: vscg m_Data[0..3] IS the class ID ('SoCo'=solid, 'GdFl'=gradient) — NOT a version prefix. Descriptor starts at offset 8. There is no "Type" enum item inside the descriptor body; type discrimination is done via the upfront class ID check. TryParseAt(8) is primary for vscg (unlike SoCo where offset 4 wins).
 
 ### Roadmap Evolution
 
@@ -159,6 +161,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T14:36:28.013Z
-Stopped at: Completed 14-02-PLAN.md — ScanShapeFillColor + 3-way dispatch; 3 RED assertions GREEN; ready for 14-03 FShapeLayerMapper
+Last session: 2026-04-22T00:00:00Z
+Stopped at: Phase 14 complete — all 3 plans done, 6/6 ShapeLayers tests GREEN, vscg bug fixed
 Resume file: None

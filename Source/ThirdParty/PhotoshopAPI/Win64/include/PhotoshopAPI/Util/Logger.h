@@ -11,15 +11,17 @@
 #include <cstdarg>
 #include <stdexcept>
 
-// PSD2UMG patch: always use the __VA_OPT__ branch. Upstream gates this on
-// !_MSC_VER assuming MSVC needs the legacy preprocessor, but UE 5.7 builds
-// the legacy-preprocessor branch with empty __VA_ARGS__ and produces a
-// trailing-comma syntax error at every call site. C++20 __VA_OPT__ works
-// under both UE's legacy and conforming MSVC preprocessor modes.
-#define PSAPI_LOG(task, format, ...)						NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Info, task, format __VA_OPT__(,) __VA_ARGS__)
-#define PSAPI_LOG_ERROR(task, format, ...)					NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Error, task, format __VA_OPT__(,) __VA_ARGS__)
-#define PSAPI_LOG_WARNING(task, format, ...)				NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Warning, task, format __VA_OPT__(,) __VA_ARGS__)
-#define PSAPI_LOG_DEBUG(task, format, ...)					NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Debug, task, format __VA_OPT__(,) __VA_ARGS__)
+#if 0  /* PSD2UMG patch: force __VA_OPT__ branch */
+    #define PSAPI_LOG(task, format, ...)						NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Info, task, format, __VA_ARGS__)
+    #define PSAPI_LOG_ERROR(task, format, ...)					NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Error, task, format, __VA_ARGS__)
+    #define PSAPI_LOG_WARNING(task, format, ...)				NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Warning, task, format, __VA_ARGS__)
+    #define PSAPI_LOG_DEBUG(task, format, ...)					NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Debug, task, format, __VA_ARGS__)
+#else
+    #define PSAPI_LOG(task, format, ...)						NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Info, task, format __VA_OPT__(,) __VA_ARGS__)
+    #define PSAPI_LOG_ERROR(task, format, ...)					NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Error, task, format __VA_OPT__(,) __VA_ARGS__)
+    #define PSAPI_LOG_WARNING(task, format, ...)				NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Warning, task, format __VA_OPT__(,) __VA_ARGS__)
+    #define PSAPI_LOG_DEBUG(task, format, ...)					NAMESPACE_PSAPI::Logger::getInstance().log(NAMESPACE_PSAPI::Enum::Severity::Debug, task, format __VA_OPT__(,) __VA_ARGS__)
+#endif
 
 #define PSAPI_SET_SEVERITY_INFO								NAMESPACE_PSAPI::Logger::getInstance().setSeverity(NAMESPACE_PSAPI::Enum::Severity::Info)
 #define PSAPI_SET_SEVERITY_WARNING							NAMESPACE_PSAPI::Logger::getInstance().setSeverity(NAMESPACE_PSAPI::Enum::Severity::Warning)

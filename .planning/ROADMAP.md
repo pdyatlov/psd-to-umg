@@ -155,7 +155,7 @@ Plans:
 | 15. Group Effects | 1/1 | Complete    | 2026-04-22 |
 | 16. Rich Text / Multiple Text Runs | 3/3 | Complete    | 2026-04-22 |
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
-| 17. Automated Font Matching | 2/2 | Complete   | 2026-04-22 |
+| 17. Automated Font Matching | 2/2 | Complete    | 2026-04-22 |
 
 ## v1.3+ Backlog
 

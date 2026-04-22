@@ -55,8 +55,8 @@
 
 ### Button State Wiring (BTN-STATE-*)
 
-- [ ] **BTN-STATE-01**: A PSD layer tagged `@button @variants` resolves deterministically to `FButtonLayerMapper` (produces `UButton`), never to `FVariantsSuffixMapper` (`UWidgetSwitcher`). `FVariantsSuffixMapper::CanMap` returns `false` when `Layer.ParsedTags.HasType()` is `true` — an explicit type tag always beats the `@variants` modifier (D-01). No warning or error is emitted when `@button` and `@variants` coexist on one layer (D-02, silent accept consistent with `@9s` on non-image layers).
-- [ ] **BTN-STATE-02**: Child layers `@state:normal`, `@state:hover`, `@state:pressed`, `@state:disabled` on a `@button` group wire to `FButtonStyle::Normal/Hovered/Pressed/Disabled` via `FLayerTagParser::FindChildByState` (D-12 explicit match, D-13 Normal fallback to first untagged image child). When fewer than four slots are populated, `FButtonLayerMapper::Map` emits one aggregate `UE_LOG(LogPSD2UMG, Warning, ...)` naming the layer and listing missing slots (D-03); import does NOT abort and unfilled slots retain the default `FButtonStyle` brush.
+- [x] **BTN-STATE-01**: A PSD layer tagged `@button @variants` resolves deterministically to `FButtonLayerMapper` (produces `UButton`), never to `FVariantsSuffixMapper` (`UWidgetSwitcher`). `FVariantsSuffixMapper::CanMap` returns `false` when `Layer.ParsedTags.HasType()` is `true` — an explicit type tag always beats the `@variants` modifier (D-01). No warning or error is emitted when `@button` and `@variants` coexist on one layer (D-02, silent accept consistent with `@9s` on non-image layers).
+- [x] **BTN-STATE-02**: Child layers `@state:normal`, `@state:hover`, `@state:pressed`, `@state:disabled` on a `@button` group wire to `FButtonStyle::Normal/Hovered/Pressed/Disabled` via `FLayerTagParser::FindChildByState` (D-12 explicit match, D-13 Normal fallback to first untagged image child). When fewer than four slots are populated, `FButtonLayerMapper::Map` emits one aggregate `UE_LOG(LogPSD2UMG, Warning, ...)` naming the layer and listing missing slots (D-03); import does NOT abort and unfilled slots retain the default `FButtonStyle` brush.
 
 ## Traceability
 
@@ -79,8 +79,8 @@
 | RICH-02 | Phase 16 | Complete (verified 2026-04-22) |
 | FONT-01 | Phase 17 | Complete (verified 2026-04-22 — AssetRegistry scan cache lands in 17-02 Task 1; cache lifecycle hook in 17-02 Task 2) |
 | FONT-02 | Phase 17 | Complete (already implemented in FontResolver.cpp DefaultFont fallback; D-06 marks it closed) |
-| BTN-STATE-01 | Phase 17.1 | Pending |
-| BTN-STATE-02 | Phase 17.1 | Pending |
+| BTN-STATE-01 | Phase 17.1 | Complete (verified 2026-04-22 via PSD2UMG.Mapper.ButtonLayerMapper BTN-STATE-01 — FVariantsSuffixMapper::CanMap HasType guard lands in 17.1-02) |
+| BTN-STATE-02 | Phase 17.1 | Complete (verified 2026-04-22 via PSD2UMG.Mapper.ButtonLayerMapper BTN-STATE-02 — D-03 aggregate missing-slots warning in FButtonLayerMapper::Map lands in 17.1-02) |
 
 ---
 

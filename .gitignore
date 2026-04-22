@@ -9,3 +9,12 @@ DerivedDataCache/
 
 # PhotoshopAPI bootstrap log
 build-photoshopapi.log
+
+# IDE
+.idea/
+
+# Claude Code internals
+.claude/worktrees/
+
+# Scratch files
+bLayerVisible

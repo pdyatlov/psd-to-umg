@@ -202,4 +202,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 — v1.1 milestone started (import fidelity fixes)*
+*Last updated: 2026-04-22 — Phase 16.1 complete: FLayerTagParser D-02 fix (Gradient/SolidFill/Shape → Image), HIDDEN-02 row dimming with child propagation, REQUIREMENTS.md traceability closed (GRAD-01/02, SHAPE-01/02, HIDDEN-02)*

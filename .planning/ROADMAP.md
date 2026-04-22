@@ -66,7 +66,7 @@ Plans:
 - [x] **Phase 13: Gradient Layers** - Gradient fill layers imported as pre-rendered TC_BC7 UImage widgets; solid fills as zero-texture UImage tinted via FX-03 (completed 2026-04-21)
 - [x] **Phase 14: Shape/Vector Layers** - Photoshop solid-color shape layers imported as UImage with solid-color brush (completed 2026-04-22)
 - [x] **Phase 15: Group Effects** - Effects applied to group layers (drop shadow, color overlay) propagated to the group's container widget (completed 2026-04-22)
-- [ ] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions
+- [x] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions (completed 2026-04-22)
 - [ ] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback
 
 ### Phase 13: Gradient Layers
@@ -117,7 +117,7 @@ Plans:
 Plans:
 - [x] 16-01-PLAN.md — RichText.psd fixture + FPsdTextRunSpan struct + FPsdTextRun::Spans field + RED parser/mapper spec stubs (Wave 1)
 - [x] 16-02-PLAN.md — ExtractSingleRunText multi-run extraction loop populating OutLayer.Text.Spans with sentinel stripping (Wave 2)
-- [ ] 16-03-PLAN.md — FRichTextLayerMapper at priority 110 + persistent UDataTable companion asset + FTextLayerMapper predicate narrowing (Wave 3)
+- [x] 16-03-PLAN.md — FRichTextLayerMapper at priority 110 + persistent UDataTable companion asset + FTextLayerMapper predicate narrowing (Wave 3)
 
 ### Phase 17: Automated Font Matching
 **Goal**: Photoshop font family names are automatically resolved to UE font assets via a configurable mapping table, with fuzzy fallback for common name variants
@@ -137,7 +137,7 @@ Plans:
 | 13. Gradient Layers | 3/3 | Complete | 2026-04-21 |
 | 14. Shape/Vector Layers | 3/3 | Complete | 2026-04-22 |
 | 15. Group Effects | 1/1 | Complete    | 2026-04-22 |
-| 16. Rich Text / Multiple Text Runs | 2/3 | In Progress|  |
+| 16. Rich Text / Multiple Text Runs | 3/3 | Complete   | 2026-04-22 |
 | 17. Automated Font Matching | 0/? | Not started | - |
 
 ## v1.3+ Backlog

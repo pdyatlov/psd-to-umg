@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: executing
-stopped_at: Completed 16-02-PLAN.md
-last_updated: "2026-04-22T11:29:13.023Z"
+status: verifying
+stopped_at: Completed 16-03-PLAN.md — Phase 16 Rich Text Multiple Text Runs DONE
+last_updated: "2026-04-22T11:50:11.223Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 2
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 16 (rich-text-multiple-text-runs) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-22
 
 ## Performance Metrics
@@ -149,6 +149,8 @@ Recent decisions affecting current work:
 - [Phase 15]: D-01/D-02: Group shadow uses null brush (NoDrawType) — no texture asset, solid tint, sized to bounds; ZOrder = main - 1
 - [Phase 15]: D-04/D-05/D-06: Canvas group overlay uses fill anchors (0,0)-(1,1); non-canvas group uses AddChild best-effort; deferred via DeferredOverlayPanel local to ensure LAST child placement after recursion
 - [Phase 16-rich-text-multiple-text-runs]: Multi-run block placed after stroke block inside existing try{} scope; RawSpans.Num() > 1 threshold after sentinel strip required to commit to Spans; ASCII-only FString::Mid slicing documented as TODO for non-ASCII
+- [Phase 16-rich-text-multiple-text-runs]: FRichTextLayerMapper at priority 110; FTextLayerMapper::CanMap narrowed to Spans.Num() <= 1 for compile-time mutual exclusion
+- [Phase 16-rich-text-multiple-text-runs]: DataTable persisted at {WbpPath}/{CleanName}_RichStyles/DT_{CleanName}_RichStyles to avoid Pitfall 6 package conflicts with WBP
 
 ### Roadmap Evolution
 
@@ -166,6 +168,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T11:29:13.019Z
-Stopped at: Completed 16-02-PLAN.md
+Last session: 2026-04-22T11:50:11.219Z
+Stopped at: Completed 16-03-PLAN.md — Phase 16 Rich Text Multiple Text Runs DONE
 Resume file: None

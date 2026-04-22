@@ -113,7 +113,11 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. A text layer with two differently-colored spans produces a URichTextBlock with both colors represented in inline markup
   2. A text layer with bold and normal weight runs produces a URichTextBlock with correct weight styling per span
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [x] 16-01-PLAN.md — RichText.psd fixture + FPsdTextRunSpan struct + FPsdTextRun::Spans field + RED parser/mapper spec stubs (Wave 1)
+- [ ] 16-02-PLAN.md — ExtractSingleRunText multi-run extraction loop populating OutLayer.Text.Spans with sentinel stripping (Wave 2)
+- [ ] 16-03-PLAN.md — FRichTextLayerMapper at priority 110 + persistent UDataTable companion asset + FTextLayerMapper predicate narrowing (Wave 3)
 
 ### Phase 17: Automated Font Matching
 **Goal**: Photoshop font family names are automatically resolved to UE font assets via a configurable mapping table, with fuzzy fallback for common name variants
@@ -133,7 +137,7 @@ Plans:
 | 13. Gradient Layers | 3/3 | Complete | 2026-04-21 |
 | 14. Shape/Vector Layers | 3/3 | Complete | 2026-04-22 |
 | 15. Group Effects | 1/1 | Complete    | 2026-04-22 |
-| 16. Rich Text / Multiple Text Runs | 0/? | Not started | - |
+| 16. Rich Text / Multiple Text Runs | 1/3 | Executing | - |
 | 17. Automated Font Matching | 0/? | Not started | - |
 
 ## v1.3+ Backlog

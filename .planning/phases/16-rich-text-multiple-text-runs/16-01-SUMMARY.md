@@ -30,10 +30,11 @@ decisions:
   - "FPsdTextRunSpan declared above FPsdTextRun so TArray<FPsdTextRunSpan> compiles without forward-declaration hacks"
   - "Spans.Num()==0 preserves legacy single-run path; Plans 16-02/16-03 populate/consume Spans"
   - "Reuse existing FTextPipelineSpec class (same test namespace) rather than new spec — keeps Source.PSD2UMG.Typography.Pipeline single"
+requirements-completed: [RICH-01, RICH-02]
 metrics:
   duration: ~15m
   completed: "2026-04-22"
-  tasks_completed: 3
+  tasks_completed: 4
   tasks_total: 4
   files_modified: 3
 ---
@@ -49,7 +50,7 @@ metrics:
 | 1 | Author RichText.psd fixture | 6f8df5a | Source/PSD2UMG/Tests/Fixtures/RichText.psd |
 | 2 | Add FPsdTextRunSpan struct + Spans field | fd3233b | Source/PSD2UMG/Public/Parser/PsdTypes.h |
 | 3 | Add RichText.psd Describe blocks (RED stubs) | 5c90491 | Source/PSD2UMG/Tests/FTextPipelineSpec.cpp |
-| 4 | Confirm RED state in UE Session Frontend | PENDING | (human-verify checkpoint) |
+| 4 | Confirm RED state in UE Session Frontend | confirmed | (human-verify checkpoint) |
 
 ## Fixture Details
 
@@ -102,21 +103,28 @@ bool bItalic       — faux-italic or true-italic face flag
 
 **Total Describe blocks:** 1 → 3. Total It() blocks: 2 → 9 (2 existing + 1 sanity + 3 parser RED + 3 mapper RED).
 
-## Task 4: Human-Verify Checkpoint (PENDING)
+## Task 4: Human-Verify Checkpoint (COMPLETE)
 
-Task 4 is a `checkpoint:human-verify` gate. The user must:
-1. Build plugin (UE 5.7 Build.bat PSD2UMGEditor Win64 Development)
-2. Open PSD2UMG.uproject in UE Editor
-3. Run `Source.PSD2UMG.Typography.Pipeline` in Session Frontend Automation
-4. Confirm: 3 pass (Typography x2 + RichText sanity), 6 fail (3 parser RED + 3 mapper RED)
-5. Confirm no regression in `Source.PSD2UMG` full suite
+User confirmed UE Session Frontend result for `Source.PSD2UMG.Typography.Pipeline`:
+**3 pass / 6 fail** — matches the expected RED baseline exactly.
 
-Expected pass/fail matrix:
-- Typography.psd -> WBP: 2 PASS
-- RichText.psd -> Spans: 1 PASS (sanity), 3 FAIL (Spans empty)
-- RichText.psd -> URichTextBlock: 3 FAIL (FindRichText returns null)
+**Actual UE Session Frontend output:**
 
-Resume signal: `RED confirmed: 6 expected failures visible; Typography + all other specs still green`
+| Test | Suite | Result |
+|------|-------|--------|
+| parses RichText.psd | RichText.psd -> Spans | PASS |
+| text_two_colors Spans.Num() >= 2 | RichText.psd -> Spans | FAIL (expected) |
+| text_two_colors span colors | RichText.psd -> Spans | FAIL (expected) |
+| text_bold_normal bold check | RichText.psd -> Spans | FAIL (expected) |
+| generates URichTextBlock | RichText.psd -> URichTextBlock | FAIL (expected) |
+| TextStyleSet non-null | RichText.psd -> URichTextBlock | FAIL (expected) |
+| markup style tags | RichText.psd -> URichTextBlock | FAIL (expected) |
+| parses with no errors | Typography.psd -> WBP | PASS |
+| generates UTextBlocks | Typography.psd -> WBP | PASS |
+
+**Full suite regression check:** All other suites (Panels, TextEffects, Parser.*) remain GREEN. No regression from FPsdTextRunSpan addition.
+
+**RED baseline confirmed:** Spans parser assertions fail because no multi-run extraction loop exists yet (Plan 16-02 target). URichTextBlock mapper assertions fail because mapper still emits UTextBlock (Plan 16-03 target). The sanity It() passes — fixture is found and parsed correctly by the parser (0 errors, 2 root layers). This is the correct input contract for Plans 16-02 and 16-03.
 
 ## Deviations from Plan
 
@@ -126,6 +134,10 @@ None — plan executed exactly as written. All three auto tasks completed in seq
 
 None — this plan is purely additive (new struct, empty field, RED test stubs). No data-flow stubs that block the plan's goal; the RED state IS the intended output.
 
-## Self-Check: PENDING
+## Self-Check: PASSED
 
-Task 4 human-verify checkpoint not yet completed. Self-check will be recorded after RED confirmation.
+- `Source/PSD2UMG/Tests/Fixtures/RichText.psd` — FOUND (112,835 bytes)
+- `Source/PSD2UMG/Public/Parser/PsdTypes.h` — FPsdTextRunSpan USTRUCT present, TArray<FPsdTextRunSpan> Spans present
+- `Source/PSD2UMG/Tests/FTextPipelineSpec.cpp` — 3 Describe blocks present, RED stubs present
+- Commits 6f8df5a, fd3233b, 5c90491 — FOUND in git log
+- UE Session Frontend: 3 pass / 6 fail — CONFIRMED by user (Task 4)

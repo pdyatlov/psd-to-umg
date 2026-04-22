@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: "16-01-PLAN.md Task 4 checkpoint:human-verify — awaiting RED state confirmation"
-last_updated: "2026-04-22T14:00:00.000Z"
-last_activity: 2026-04-22 -- Phase 16 Plan 01 Tasks 1-3 complete; Task 4 human-verify pending
+stopped_at: "Completed 16-01-PLAN.md — RED state confirmed 3 pass / 6 fail; advancing to 16-02"
+last_updated: "2026-04-22T15:00:00.000Z"
+last_activity: 2026-04-22 -- Phase 16 Plan 01 complete; all 4 tasks done, RED baseline confirmed
 progress:
   total_phases: 2
   completed_phases: 1
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 16 (rich-text-multiple-text-runs) — EXECUTING
-Plan: 1 of 3
+Plan: 2 of 3
 Status: Executing Phase 16
-Last activity: 2026-04-22 -- Phase 16 execution started
+Last activity: 2026-04-22 -- Plan 16-01 complete; advancing to 16-02 (multi-run extraction loop)
 
 ## Performance Metrics
 

@@ -16,7 +16,12 @@ int32 FTextLayerMapper::GetPriority() const { return 100; }
 
 bool FTextLayerMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.ParsedTags.Type == EPsdTagType::Text;
+    // Phase 16: single-run text only. Multi-run layers (Spans.Num() > 1) route to
+    // FRichTextLayerMapper at priority 110. Spans.Num() <= 1 covers both 0 (parser
+    // left the array empty, legacy path) and 1 (edge case -- one run after sentinel
+    // strip; dominant-run scalars already capture it so UTextBlock suffices).
+    return Layer.ParsedTags.Type == EPsdTagType::Text
+        && Layer.Text.Spans.Num() <= 1;
 }
 
 UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
@@ -26,9 +31,13 @@ UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc
     // Content.
     TextWidget->SetText(FText::FromString(Layer.Text.Content));
 
-    // DPI conversion: Photoshop 72 DPI -> UMG 96 DPI (multiply by 0.75).
-    // TEXT-01 — already shipped Phase 3, preserved verbatim.
+    // DPI conversion: PhotoshopAPI returns designer_pt * (4/3) for font sizes.
+    // Multiplying by 0.75 (= 3/4) recovers the designer's intended pt value.
+    // E.g. 24pt designer → raw 32.0 → 32 * 0.75 = 24 UMG.
     const float UmgSize = Layer.Text.SizePx * 0.75f;
+    UE_LOG(LogPSD2UMG, Log,
+        TEXT("FTextLayerMapper: layer '%s' SizePx=%.2f → UmgSize=%.2f → rounded=%d"),
+        *Layer.Name, Layer.Text.SizePx, UmgSize, FMath::RoundToInt(UmgSize));
 
     // Resolve font via settings (TEXT-05) + apply bold/italic typeface (TEXT-02).
     const UPSD2UMGSettings* Settings = UPSD2UMGSettings::Get();
@@ -113,8 +122,14 @@ UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc
         TextWidget->SetShadowColorAndOpacity(Layer.Text.ShadowColor);
     }
 
-    // Color (Phase 3 baseline).
-    TextWidget->SetColorAndOpacity(FSlateColor(Layer.Text.Color));
+    // Color: prefer Color Overlay effect color over text fill color.
+    // In Photoshop, Color Overlay on a text layer completely replaces the displayed
+    // color (same as on image layers). The fill color stored in text style runs is
+    // the underlying value; the overlay is what the designer actually sees and intends.
+    const FLinearColor& TextColor = Layer.Effects.bHasColorOverlay
+        ? Layer.Effects.ColorOverlayColor
+        : Layer.Text.Color;
+    TextWidget->SetColorAndOpacity(FSlateColor(TextColor));
 
     // Justification (Phase 3 baseline).
     TextWidget->SetJustification(Layer.Text.Alignment);

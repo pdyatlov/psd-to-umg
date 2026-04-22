@@ -25,6 +25,18 @@ public:
     UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
 };
 
+// Defined in FRichTextLayerMapper.cpp (Phase 16 / RICH-01, RICH-02 -- multi-run rich text)
+// Priority 110: above FTextLayerMapper (100) so multi-run text layers route here first.
+// CanMap: Layer.ParsedTags.Type == EPsdTagType::Text && Layer.Text.Spans.Num() > 1.
+// Map: emits URichTextBlock with persistent UDataTable companion asset (FRichTextStyleRow rows).
+class FRichTextLayerMapper : public IPsdLayerMapper
+{
+public:
+    int32 GetPriority() const override;
+    bool CanMap(const FPsdLayer& Layer) const override;
+    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
+};
+
 // Defined in FFillLayerMapper.cpp  (Phase 13 / GRAD-01, GRAD-02 -- gradient fill)
 class FFillLayerMapper : public IPsdLayerMapper
 {

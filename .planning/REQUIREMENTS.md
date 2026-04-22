@@ -9,7 +9,7 @@
 ### Import Dialog — Hidden Layers (HIDDEN-*)
 
 - [ ] **HIDDEN-01**: PSD layers with `bVisible = false` are displayed in the import dialog with their checkbox **unchecked** by default.
-- [ ] **HIDDEN-02**: The import dialog visually distinguishes hidden layers from visible ones (e.g., dimmed row, eye-closed icon, or `[hidden]` label).
+- [x] **HIDDEN-02**: The import dialog visually distinguishes hidden layers from visible ones (e.g., dimmed row, eye-closed icon, or `[hidden]` label).
 
 ### Import Dialog — Checkbox Filtering (FILTER-*)
 
@@ -30,13 +30,13 @@
 
 ### Gradient Layers (GRAD-*)
 
-- [ ] **GRAD-01**: A linear gradient fill layer in PSD produces a valid UMG widget (UImage with pre-rendered texture) after import.
-- [ ] **GRAD-02**: Gradient color stops and direction are preserved with no visible banding at standard resolutions.
+- [x] **GRAD-01**: A linear gradient fill layer in PSD produces a valid UMG widget (UImage with pre-rendered texture) after import.
+- [x] **GRAD-02**: Gradient color stops and direction are preserved with no visible banding at standard resolutions.
 
 ### Shape/Vector Layers (SHAPE-*)
 
-- [ ] **SHAPE-01**: A solid-color rectangle shape layer in PSD produces a UImage with a solid SlateBrush of the correct color after import.
-- [ ] **SHAPE-02**: Position and size of the shape widget match the PSD layer bounds within 1px.
+- [x] **SHAPE-01**: A solid-color rectangle shape layer in PSD produces a UImage with a solid SlateBrush of the correct color after import.
+- [x] **SHAPE-02**: Position and size of the shape widget match the PSD layer bounds within 1px.
 
 ### Group Effects (GRPFX-*)
 
@@ -53,16 +53,16 @@
 | REQ-ID | Assigned Phase | Status |
 |---|---|---|
 | HIDDEN-01 | Phase 11 | Pending verification |
-| HIDDEN-02 | Phase 11 / Phase 16.1 | Pending (eye icon done; dimming in Phase 16.1) |
+| HIDDEN-02 | Phase 11 / Phase 16.1 | Complete (verified 2026-04-22 — eye icon from Phase 11, row dimming from Phase 16.1) |
 | FILTER-01 | Phase 11 | Pending verification |
 | FILTER-02 | Phase 11 | Pending verification |
 | TEXT-F-01 | Phase 12 | Complete |
 | TEXT-F-02 | Phase 12 | Complete |
 | TEXT-F-03 | Phase 12 | Complete |
-| GRAD-01 | Phase 13 / Phase 16.1 | Pending verification (code done; FLayerTagParser fix in Phase 16.1) |
-| GRAD-02 | Phase 13 | Pending verification |
-| SHAPE-01 | Phase 14 / Phase 16.1 | Pending verification (code done; FLayerTagParser fix in Phase 16.1) |
-| SHAPE-02 | Phase 14 | Pending verification |
+| GRAD-01 | Phase 13 / Phase 16.1 | Complete (verified 2026-04-22 — Phase 16.1 FLayerTagParser fix closes the untagged-layer gap) |
+| GRAD-02 | Phase 13 | Complete (verified 2026-04-22) |
+| SHAPE-01 | Phase 14 / Phase 16.1 | Complete (verified 2026-04-22 — Phase 16.1 FLayerTagParser fix closes the untagged-layer gap) |
+| SHAPE-02 | Phase 14 | Complete (verified 2026-04-22) |
 | GRPFX-01 | Phase 15 | Complete (verified 2026-04-22) |
 | GRPFX-02 | Phase 15 | Complete (verified 2026-04-22) |
 | RICH-01 | Phase 16 | Complete (verified 2026-04-22) |

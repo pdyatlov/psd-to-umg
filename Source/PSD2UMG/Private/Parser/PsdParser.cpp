@@ -441,6 +441,160 @@ namespace PSD2UMG::Parser::Internal
 					OutLayer.Text.OutlineColor = FLinearColor::FromSRGBColor(FColor(R, G, B, Alpha));
 				}
 			}
+
+			// -----------------------------------------------------------
+			// Phase 16 -- Multi-run span extraction (RICH-01, RICH-02).
+			//
+			// The dominant-run extraction above populates OutLayer.Text.* scalar fields
+			// used by FTextLayerMapper for single-run layers AND as the "Default" row by
+			// FRichTextLayerMapper (Plan 16-03). This block ADDITIONALLY walks every style
+			// run and records per-span data into OutLayer.Text.Spans when run count > 1.
+			//
+			// Spans.Num() == 0 signals the legacy single-run path (UTextBlock).
+			// Spans.Num() >  1 signals multi-run (URichTextBlock).
+			// Spans.Num() == 1 is treated the same as 0 -- a single meaningful run is already
+			//                  captured in the dominant-run scalars; no need to duplicate.
+			//
+			// TODO (Phase 16+): UTF-16 / non-ASCII content. PhotoshopAPI's
+			// style_run_lengths() values are code-unit counts per the PSD spec (UTF-16).
+			// The RichText.psd fixture is intentionally ASCII-only (RedWord/GreenWord,
+			// BoldPart/NormalPart) so FString::Mid(CharOffset, RunLen) slicing by UE
+			// TCHAR count happens to match byte/char boundaries. For non-ASCII text (CJK,
+			// combining marks, emoji), length units may disagree between PhotoshopAPI's
+			// UTF-16 counts and the FString's platform-TCHAR indexing; slicing may cut
+			// mid-codepoint. Handle in a future phase by converting the source UTF-8 to
+			// UTF-16 code-units explicitly before slicing, or by walking
+			// FullUtf8 byte-by-byte with a UTF-8 codepoint decoder.
+			// -----------------------------------------------------------
+			{
+				const size_t RunCount = Text->style_run_count();
+				if (RunCount > 1)
+				{
+					auto LengthsOpt = Text->style_run_lengths();
+					const std::string FullUtf8 = Text->text().value_or("");
+
+					// PhotoshopAPI's style_run_lengths entries are code-unit counts
+					// (UTF-16 per PSD spec). The exposed text() is UTF-8. We slice by
+					// Unicode code-point count to match the run boundaries regardless
+					// of multi-byte UTF-8 encoding. For pure-ASCII fixtures (RichText.psd)
+					// code-points == bytes so this is equivalent to substr(offset, length).
+					// WARNING: ASCII-only path -- see TODO above for non-ASCII handling.
+					const FString FullText = Utf8ToFString(FullUtf8);
+					int32 CharOffset = 0;
+					const int32 FullLen = FullText.Len();
+
+					TArray<FPsdTextRunSpan> RawSpans;
+					RawSpans.Reserve(static_cast<int32>(RunCount));
+
+					for (size_t ri = 0; ri < RunCount; ++ri)
+					{
+						FPsdTextRunSpan Span;
+
+						// --- Text slice -------------------------------------------
+						const int32 RunLen = (LengthsOpt && ri < LengthsOpt->size())
+							? static_cast<int32>((*LengthsOpt)[ri])
+							: 0;
+
+						if (RunLen > 0 && CharOffset < FullLen)
+						{
+							const int32 Clipped = FMath::Min(RunLen, FullLen - CharOffset);
+							// TODO: FString::Mid indexes by TCHAR. Correct for ASCII;
+							// may need UTF-16 conversion for non-ASCII fixtures.
+							Span.Text = FullText.Mid(CharOffset, Clipped);
+							CharOffset += Clipped;
+						}
+						// else: zero-length run (sentinel or trailing); Span.Text stays empty
+
+						// --- Per-run fill color (ARGB -> RGBA swap, same as dominant-run above) ---
+						if (auto Fill = Text->style_run_fill_color(ri); Fill.has_value())
+						{
+							if (Fill->size() >= 4)
+							{
+								const double A  = (*Fill)[0];
+								const double Rd = (*Fill)[1];
+								const double Gd = (*Fill)[2];
+								const double Bd = (*Fill)[3];
+								const uint8 Ri    = static_cast<uint8>(FMath::Clamp(Rd, 0.0, 1.0) * 255.0);
+								const uint8 Gi    = static_cast<uint8>(FMath::Clamp(Gd, 0.0, 1.0) * 255.0);
+								const uint8 Bi    = static_cast<uint8>(FMath::Clamp(Bd, 0.0, 1.0) * 255.0);
+								const uint8 Alpha = static_cast<uint8>(FMath::Clamp(A,  0.0, 1.0) * 255.0);
+								Span.Color = FLinearColor::FromSRGBColor(FColor(Ri, Gi, Bi, Alpha));
+							}
+							else if (Fill->size() == 3)
+							{
+								const uint8 Ri = static_cast<uint8>(FMath::Clamp((*Fill)[0], 0.0, 1.0) * 255.0);
+								const uint8 Gi = static_cast<uint8>(FMath::Clamp((*Fill)[1], 0.0, 1.0) * 255.0);
+								const uint8 Bi = static_cast<uint8>(FMath::Clamp((*Fill)[2], 0.0, 1.0) * 255.0);
+								Span.Color = FLinearColor::FromSRGBColor(FColor(Ri, Gi, Bi));
+							}
+						}
+						// else: span inherits default White; mapper will fall back to Default row
+
+						// --- Per-run font (FontSet index -> PostScript name) -------
+						int32_t RunFontIdx = 0;
+						if (auto Idx = Text->style_run_font(ri); Idx.has_value() && *Idx >= 0)
+							RunFontIdx = *Idx;
+						if (auto FN = Text->font_postscript_name(static_cast<size_t>(RunFontIdx)); FN.has_value())
+						{
+							Span.FontName = Utf8ToFString(*FN);
+						}
+
+						// --- Per-run size (with scale_y, same as dominant-run above) -----
+						if (auto Sz = Text->style_run_font_size(ri); Sz.has_value())
+						{
+							double EffectiveSize = *Sz;
+							if (const auto ScaleY = Text->scale_y(); ScaleY.has_value() && *ScaleY > 0.01)
+								EffectiveSize *= *ScaleY;
+							Span.SizePx = static_cast<float>(EffectiveSize);
+						}
+
+						// --- Per-run bBold / bItalic (same dominant-run fallback logic) ---
+						if (auto Bold = Text->style_run_faux_bold(ri); Bold.has_value())
+							Span.bBold = *Bold;
+						if (auto Italic = Text->style_run_faux_italic(ri); Italic.has_value())
+							Span.bItalic = *Italic;
+						// PostScript name fallback (catches real Arial-BoldMT / Arial-ItalicMT).
+						if (!Span.bBold)
+							Span.bBold = Span.FontName.Contains(TEXT("Bold"), ESearchCase::IgnoreCase);
+						if (!Span.bItalic)
+							Span.bItalic = Span.FontName.Contains(TEXT("Italic"), ESearchCase::IgnoreCase)
+								|| Span.FontName.Contains(TEXT("Oblique"), ESearchCase::IgnoreCase);
+
+						RawSpans.Add(MoveTemp(Span));
+					}
+
+					// --- Sentinel stripping (research Pitfall 1) ---
+					// PhotoshopAPI appends a trailing whitespace-only run (usually \n or a single
+					// space) for cursor placement. Strip trailing spans whose text is empty or
+					// whitespace-only so the markup builder in Plan 16-03 does not emit <sN></>.
+					while (RawSpans.Num() > 0)
+					{
+						FString Trimmed = RawSpans.Last().Text;
+						Trimmed.TrimStartAndEndInline();
+						if (Trimmed.IsEmpty())
+							RawSpans.Pop(/*bAllowShrinking=*/false);
+						else
+							break;
+					}
+
+					// Only commit to OutLayer.Text.Spans if at least 2 meaningful spans remain.
+					// 1 remaining means the multi-run layer collapsed to a single visible span
+					// (all-sentinel tail); legacy single-run path is sufficient.
+					if (RawSpans.Num() > 1)
+					{
+						OutLayer.Text.Spans = MoveTemp(RawSpans);
+						UE_LOG(LogPSD2UMG, Log,
+							TEXT("Text layer '%s': multi-run extraction produced %d spans (RICH-01/02)"),
+							*OutLayer.Name, OutLayer.Text.Spans.Num());
+					}
+					else
+					{
+						UE_LOG(LogPSD2UMG, Log,
+							TEXT("Text layer '%s': %zu style runs collapsed to %d after sentinel strip; using dominant-run path"),
+							*OutLayer.Name, RunCount, RawSpans.Num());
+					}
+				}
+			}
 		}
 		catch (const std::exception& e)
 		{

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: verifying
-stopped_at: Completed 16-03-PLAN.md — Phase 16 Rich Text Multiple Text Runs DONE
-last_updated: "2026-04-22T11:53:28.324Z"
+stopped_at: Completed 16.1-01-PLAN.md — Phase 16.1 LayerTag Fix + Requirements Traceability DONE
+last_updated: "2026-04-22T13:09:33.222Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 2
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 16 — rich-text-multiple-text-runs
+**Current focus:** Phase 16.1 — layertag-fix-requirements-docs
 
 ## Current Position
 
-Phase: 16
-Plan: Not started
+Phase: 16.1 (layertag-fix-requirements-docs) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
 Last activity: 2026-04-22
 
@@ -90,6 +90,7 @@ Last activity: 2026-04-22
 | Phase 14-shape-vector-layers P03 | ~60m | 3 tasks | 5 files |
 | Phase 15 P01 | 3m | 3 tasks | 2 files |
 | Phase 16-rich-text-multiple-text-runs P02 | 10m | 1 tasks | 1 files |
+| Phase 16.1-layertag-fix-requirements-docs P01 | 30 | 5 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -151,6 +152,8 @@ Recent decisions affecting current work:
 - [Phase 16-rich-text-multiple-text-runs]: Multi-run block placed after stroke block inside existing try{} scope; RawSpans.Num() > 1 threshold after sentinel strip required to commit to Spans; ASCII-only FString::Mid slicing documented as TODO for non-ASCII
 - [Phase 16-rich-text-multiple-text-runs]: FRichTextLayerMapper at priority 110; FTextLayerMapper::CanMap narrowed to Spans.Num() <= 1 for compile-time mutual exclusion
 - [Phase 16-rich-text-multiple-text-runs]: DataTable persisted at {WbpPath}/{CleanName}_RichStyles/DT_{CleanName}_RichStyles to avoid Pitfall 6 package conflicts with WBP
+- [Phase 16.1-layertag-fix-requirements-docs]: D-02 switch maps Gradient/SolidFill/Shape to EPsdTagType::Image — mappers already gate on Type==Image so no mapper changes needed
+- [Phase 16.1-layertag-fix-requirements-docs]: bEffectivelyVisible propagated in BuildTreeRecursive for correct subtree dimming under hidden parent groups (HIDDEN-02 deviation)
 
 ### Roadmap Evolution
 
@@ -168,6 +171,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T11:50:11.219Z
-Stopped at: Completed 16-03-PLAN.md — Phase 16 Rich Text Multiple Text Runs DONE
+Last session: 2026-04-22T13:09:33.218Z
+Stopped at: Completed 16.1-01-PLAN.md — Phase 16.1 LayerTag Fix + Requirements Traceability DONE
 Resume file: None

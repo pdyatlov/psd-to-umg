@@ -67,7 +67,7 @@ Plans:
 - [x] **Phase 14: Shape/Vector Layers** - Photoshop solid-color shape layers imported as UImage with solid-color brush (completed 2026-04-22)
 - [x] **Phase 15: Group Effects** - Effects applied to group layers (drop shadow, color overlay) propagated to the group's container widget (completed 2026-04-22)
 - [x] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions (completed 2026-04-22)
-- [ ] **Phase 16.1: LayerTag Fix + Requirements Traceability** - FLayerTagParser type-inference fix for Gradient/SolidFill/Shape layers; HIDDEN-02 row dimming; REQUIREMENTS.md extended with v1.2 requirements and corrected traceability
+- [x] **Phase 16.1: LayerTag Fix + Requirements Traceability** - FLayerTagParser type-inference fix for Gradient/SolidFill/Shape layers; HIDDEN-02 row dimming; REQUIREMENTS.md extended with v1.2 requirements and corrected traceability (completed 2026-04-22)
 - [ ] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback
 
 ### Phase 13: Gradient Layers
@@ -130,7 +130,7 @@ Plans:
   3. REQUIREMENTS.md includes GRAD-01/02, SHAPE-01/02, GRPFX-01/02, RICH-01/02 with correct phase assignments and up-to-date traceability status
 **Plans**: 1 plan
 Plans:
-- [ ] 16.1-01-PLAN.md — FLayerTagParser 3-case fix + SPsdImportPreviewDialog dimming + REQUIREMENTS.md v1.2 extension
+- [x] 16.1-01-PLAN.md — FLayerTagParser 3-case fix + SPsdImportPreviewDialog dimming + REQUIREMENTS.md v1.2 extension
 
 ### Phase 17: Automated Font Matching
 **Goal**: Photoshop font family names are automatically resolved to UE font assets via a configurable mapping table, with fuzzy fallback for common name variants
@@ -151,7 +151,7 @@ Plans:
 | 14. Shape/Vector Layers | 3/3 | Complete | 2026-04-22 |
 | 15. Group Effects | 1/1 | Complete    | 2026-04-22 |
 | 16. Rich Text / Multiple Text Runs | 3/3 | Complete    | 2026-04-22 |
-| 16.1. LayerTag Fix + Requirements Traceability | 0/1 | Not started | - |
+| 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete   | 2026-04-22 |
 | 17. Automated Font Matching | 0/? | Not started | - |
 
 ## v1.3+ Backlog

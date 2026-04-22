@@ -608,6 +608,9 @@ TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
             SNew(STextBlock)
             .Text(FText::FromString(Item->DisplayName))
             .Font(FAppStyle::GetFontStyle(TEXT("NormalFont")))
+            .ColorAndOpacity(Item->bLayerVisible
+                ? FSlateColor::UseForeground()
+                : FSlateColor(FLinearColor(1.f, 1.f, 1.f, 0.4f)))
         ]
 
         // Col 3b: Tag chips — recognized (neutral) + unknown (warning) — D-26/D-27

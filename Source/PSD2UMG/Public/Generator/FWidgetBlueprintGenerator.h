@@ -15,7 +15,7 @@ public:
     // WbpPackagePath: e.g. "/Game/UI/Widgets"
     // WbpAssetName:   e.g. "WBP_MyHUD"
     // Returns nullptr on failure.
-    static UWidgetBlueprint* Generate(const FPsdDocument& Doc, const FString& WbpPackagePath, const FString& WbpAssetName);
+    static UWidgetBlueprint* Generate(const FPsdDocument& Doc, const FString& WbpPackagePath, const FString& WbpAssetName, const TSet<FString>& SkippedLayerNames = TSet<FString>());
 
     // Update an existing Widget Blueprint from a re-parsed PSD document.
     // - Matches existing widgets by name (D-05)

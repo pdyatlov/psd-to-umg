@@ -10,8 +10,7 @@
     "DocsURL": "",
     "MarketplaceURL": "",
     "SupportURL": "",
-    "EngineVersion": "5.7",
-    "CanContainContent": true,
+"CanContainContent": true,
     "Installed": false,
     "Modules": [
         {
@@ -21,6 +20,18 @@
             "PlatformAllowList": [
                 "Win64"
             ]
+        }
+    ],
+    "Plugins": [
+        {
+            "Name": "EnhancedInput",
+            "Enabled": true,
+            "Optional": true
+        },
+        {
+            "Name": "CommonUI",
+            "Enabled": true,
+            "Optional": true
         }
     ]
 }

@@ -506,25 +506,25 @@ namespace PSD2UMG::Parser::Internal
 						// else: zero-length run (sentinel or trailing); Span.Text stays empty
 
 						// --- Per-run fill color (ARGB -> RGBA swap, same as dominant-run above) ---
-						if (auto Fill = Text->style_run_fill_color(ri); Fill.has_value())
+						if (auto fills = Text->style_run_fill_color(ri); fills.has_value())
 						{
-							if (Fill->size() >= 4)
+							if (fills->size() >= 4)
 							{
-								const double A  = (*Fill)[0];
-								const double Rd = (*Fill)[1];
-								const double Gd = (*Fill)[2];
-								const double Bd = (*Fill)[3];
+								const double A  = (*fills)[0];
+								const double Rd = (*fills)[1];
+								const double Gd = (*fills)[2];
+								const double Bd = (*fills)[3];
 								const uint8 Ri    = static_cast<uint8>(FMath::Clamp(Rd, 0.0, 1.0) * 255.0);
 								const uint8 Gi    = static_cast<uint8>(FMath::Clamp(Gd, 0.0, 1.0) * 255.0);
 								const uint8 Bi    = static_cast<uint8>(FMath::Clamp(Bd, 0.0, 1.0) * 255.0);
 								const uint8 Alpha = static_cast<uint8>(FMath::Clamp(A,  0.0, 1.0) * 255.0);
 								Span.Color = FLinearColor::FromSRGBColor(FColor(Ri, Gi, Bi, Alpha));
 							}
-							else if (Fill->size() == 3)
+							else if (fills->size() == 3)
 							{
-								const uint8 Ri = static_cast<uint8>(FMath::Clamp((*Fill)[0], 0.0, 1.0) * 255.0);
-								const uint8 Gi = static_cast<uint8>(FMath::Clamp((*Fill)[1], 0.0, 1.0) * 255.0);
-								const uint8 Bi = static_cast<uint8>(FMath::Clamp((*Fill)[2], 0.0, 1.0) * 255.0);
+								const uint8 Ri = static_cast<uint8>(FMath::Clamp((*fills)[0], 0.0, 1.0) * 255.0);
+								const uint8 Gi = static_cast<uint8>(FMath::Clamp((*fills)[1], 0.0, 1.0) * 255.0);
+								const uint8 Bi = static_cast<uint8>(FMath::Clamp((*fills)[2], 0.0, 1.0) * 255.0);
 								Span.Color = FLinearColor::FromSRGBColor(FColor(Ri, Gi, Bi));
 							}
 						}

@@ -58,10 +58,15 @@ UWidget* FSmartObjectLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument
 
     if (Layer.RGBAPixels.Num() == 0)
     {
+        // Vector smart objects (.ai, etc.) have no rasterizable pixel data in PhotoshopAPI
+        // because the composited channel data is discarded when loading from file.
+        // Create a placeholder UImage so the layer appears at the correct position in the
+        // widget tree. The designer can assign a texture manually after import.
         UE_LOG(LogPSD2UMG, Warning,
-            TEXT("FSmartObjectLayerMapper: No pixel data available for Smart Object '%s'; skipping."),
+            TEXT("FSmartObjectLayerMapper: No pixel data for Smart Object '%s' (vector linked file). Creating placeholder UImage."),
             *Layer.Name);
-        return nullptr;
+        UImage* Placeholder = Tree->ConstructWidget<UImage>(UImage::StaticClass(), FName(*Layer.ParsedTags.CleanName));
+        return Placeholder;
     }
 
     const FString PsdName = FPaths::GetBaseFilename(Doc.SourcePath);

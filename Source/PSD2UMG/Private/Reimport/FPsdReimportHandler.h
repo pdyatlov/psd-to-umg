@@ -19,5 +19,5 @@ public:
     virtual bool CanReimport(UObject* Obj, TArray<FString>& OutFilenames) override;
     virtual void SetReimportPaths(UObject* Obj, const TArray<FString>& NewReimportPaths) override;
     virtual EReimportResult::Type Reimport(UObject* Obj) override;
-    virtual int32 GetPriority() const override { return ImportPriority; }
+    virtual int32 GetPriority() const override { return 100; }
 };

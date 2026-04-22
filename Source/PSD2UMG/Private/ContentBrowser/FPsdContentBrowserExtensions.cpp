@@ -5,12 +5,12 @@
 #include "ContentBrowserMenuContexts.h"
 #include "AssetRegistry/AssetData.h"
 #include "Engine/Texture2D.h"
-#include "Blueprint/WidgetBlueprint.h"
+#include "WidgetBlueprint.h"
 #include "Styling/AppStyle.h"
 #include "UObject/MetaData.h"
 #include "Misc/Paths.h"
-#include "Factories/ReimportFeedbackContext.h"
 #include "ObjectTools.h"
+#include "EditorReimportHandler.h"
 
 #include "PSD2UMGLog.h"
 
@@ -18,7 +18,7 @@
 
 namespace PsdContentBrowserExtensions
 {
-    static void RegisterMenus()
+    void RegisterMenus()
     {
         UToolMenu* AssetContextMenu = UToolMenus::Get()->ExtendMenu(TEXT("ContentBrowser.AssetContextMenu"));
         if (!AssetContextMenu)
@@ -70,14 +70,12 @@ namespace PsdContentBrowserExtensions
                         }
                     }
 
-                    // Check for WBPs with PSD2UMG metadata tag
+                    // Show "Reimport from PSD" for any WBP — FPsdReimportHandler::CanReimport
+                    // checks for the PSD2UMG.SourcePsdPath package metadata at runtime.
+                    // FMetaData is not indexed by the asset registry so we can't filter here cheaply.
                     if (AssetData.AssetClassPath.GetAssetName() == TEXT("WidgetBlueprint"))
                     {
-                        FAssetTagValueRef PsdPathTag = AssetData.TagsAndValues.FindTag(TEXT("PSD2UMG.SourcePsdPath"));
-                        if (PsdPathTag.IsSet())
-                        {
-                            bHasPsdWBP = true;
-                        }
+                        bHasPsdWBP = true;
                     }
                 }
 
@@ -132,7 +130,7 @@ namespace PsdContentBrowserExtensions
                                 if (Obj)
                                 {
                                     // Trigger reimport via FReimportManager — dispatches to FPsdReimportHandler
-                                    FReimportManager::Instance()->Reimport(Obj, /*bAskForNewFileIfMissing=*/false);
+                                    FReimportManager::Instance()->Reimport(Obj, /*bAskForNewFileIfMissing=*/true);
                                 }
                             }
                         }));

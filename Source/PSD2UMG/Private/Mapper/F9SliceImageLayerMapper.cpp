@@ -16,7 +16,12 @@ int32 F9SliceImageLayerMapper::GetPriority() const { return 150; }
 
 bool F9SliceImageLayerMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.ParsedTags.NineSlice.IsSet();
+    // @9s applies to an image layer carrying pixel data. Groups that carry the
+    // tag (e.g. via explicit @image + @9s misuse, or a container wrapping a
+    // 9-slice image) must fall through to FGroupLayerMapper instead of being
+    // silently skipped when the group has no pixels of its own.
+    return Layer.ParsedTags.NineSlice.IsSet()
+        && Layer.ParsedTags.Type == EPsdTagType::Image;
 }
 
 UWidget* F9SliceImageLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree)

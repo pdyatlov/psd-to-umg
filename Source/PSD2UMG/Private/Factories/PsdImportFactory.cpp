@@ -13,6 +13,7 @@
 #include "Widgets/SWindow.h"
 #include "Editor.h"
 
+#include "WidgetBlueprint.h"
 #include "PSD2UMGLog.h"
 #include "Generator/FWidgetBlueprintGenerator.h"
 #include "Parser/PsdDiagnostics.h"
@@ -166,6 +167,7 @@ UObject* UPsdImportFactory::FactoryCreateBinary(
 
 			bool bConfirmed = false;
 			FString UserOutputPath = WbpDir;
+			TSet<FString> SkippedLayerNames;
 
 			// Create the dialog and host window
 			TSharedPtr<SWindow> DialogWindow = SNew(SWindow)
@@ -182,15 +184,42 @@ UObject* UPsdImportFactory::FactoryCreateBinary(
 				.RootItems(RootItems)
 				.InitialOutputPath(WbpDir)
 				.bIsReimport(false)
-				.OnCancelled(FSimpleDelegate::CreateLambda([&bConfirmed]()
+				.Diagnostics(Diag.Entries)
+				.OnCancelled(FSimpleDelegate::CreateLambda([&bConfirmed, &DialogWindow]()
 				{
 					bConfirmed = false;
+					if (DialogWindow.IsValid()) DialogWindow->RequestDestroyWindow();
 				}))
 				.OnConfirmed(FOnImportConfirmed::CreateLambda(
-					[&bConfirmed, &UserOutputPath](const FString& OutPath, const TArray<TSharedPtr<FPsdLayerTreeItem>>& /*Items*/)
+					[&bConfirmed, &UserOutputPath, &SkippedLayerNames, &DialogWindow](const FString& OutPath, const TArray<TSharedPtr<FPsdLayerTreeItem>>& Items)
 					{
 						bConfirmed = true;
 						UserOutputPath = OutPath;
+						// Collect unchecked layer names. Only add the root of each unchecked
+						// subtree — do NOT recurse into already-skipped children. The generator
+						// never enters a skipped layer's subtree, so adding children of a skipped
+						// parent pollutes SkippedLayerNames with names that may collide with
+						// identically-named layers in other (visible) branches.
+						TFunction<void(const TArray<TSharedPtr<FPsdLayerTreeItem>>&)> Collect;
+						Collect = [&](const TArray<TSharedPtr<FPsdLayerTreeItem>>& TreeItems)
+						{
+							for (const TSharedPtr<FPsdLayerTreeItem>& Item : TreeItems)
+							{
+								if (!Item.IsValid()) continue;
+								if (!Item->bChecked)
+								{
+									SkippedLayerNames.Add(Item->LayerName);
+									// Do not recurse: generator skips the subtree anyway,
+									// and child names must not pollute the skip set.
+								}
+								else
+								{
+									Collect(Item->Children);
+								}
+							}
+						};
+						Collect(Items);
+						if (DialogWindow.IsValid()) DialogWindow->RequestDestroyWindow();
 					}));
 
 			DialogWindow->SetContent(DialogContent);
@@ -203,7 +232,7 @@ UObject* UPsdImportFactory::FactoryCreateBinary(
 				FString FinalDir = UserOutputPath;
 				if (FinalDir.IsEmpty()) { FinalDir = WbpDir; }
 
-				WBP = FWidgetBlueprintGenerator::Generate(Doc, FinalDir, WbpAssetName);
+				WBP = FWidgetBlueprintGenerator::Generate(Doc, FinalDir, WbpAssetName, SkippedLayerNames);
 				if (WBP)
 				{
 					UE_LOG(LogPSD2UMG, Log, TEXT("PSD2UMG: generated Widget Blueprint %s/%s"), *FinalDir, *WbpAssetName);
@@ -232,12 +261,15 @@ UObject* UPsdImportFactory::FactoryCreateBinary(
 			}
 		}
 
-		// Store PSD source path as metadata on the WBP package
+		// Store PSD source path as metadata on the WBP package.
+		// CurrentFilename is the actual on-disk .psd path set by the import framework.
+		// TempPath was already deleted at this point — do not store it.
 		if (WBP)
 		{
-			UMetaData* MetaData = WBP->GetOutermost()->GetMetaData();
-			MetaData->SetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"), *TempPath);
-			MetaData->SetValue(WBP, TEXT("PSD2UMG.SourcePsdName"), *InName.ToString());
+			const FString ActualSourcePath = UFactory::GetCurrentFilename();
+			FMetaData& MetaData = WBP->GetOutermost()->GetMetaData();
+			MetaData.SetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"), *ActualSourcePath);
+			MetaData.SetValue(WBP, TEXT("PSD2UMG.SourcePsdName"), *InName.ToString());
 		}
 	}
 

@@ -10,7 +10,8 @@
 #include "UI/PsdLayerTreeItem.h"
 #include "PSD2UMGLog.h"
 
-#include "Blueprint/WidgetBlueprint.h"
+#include "WidgetBlueprint.h"
+#include "Blueprint/WidgetTree.h"
 #include "EditorFramework/AssetImportData.h"
 #include "Framework/Application/SlateApplication.h"
 #include "HAL/FileManager.h"
@@ -29,19 +30,14 @@ bool FPsdReimportHandler::CanReimport(UObject* Obj, TArray<FString>& OutFilename
         return false;
     }
 
-    UMetaData* Meta = WBP->GetOutermost()->GetMetaData();
-    if (!Meta)
+    // Accept any WBP — if no metadata exists, OutFilenames stays empty and
+    // FReimportManager will prompt the user to locate the source file.
+    FMetaData& Meta = WBP->GetOutermost()->GetMetaData();
+    const FString SourcePath = Meta.GetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"));
+    if (!SourcePath.IsEmpty())
     {
-        return false;
+        OutFilenames.Add(SourcePath);
     }
-
-    const FString SourcePath = Meta->GetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"));
-    if (SourcePath.IsEmpty())
-    {
-        return false;
-    }
-
-    OutFilenames.Add(SourcePath);
     return true;
 }
 
@@ -56,11 +52,8 @@ void FPsdReimportHandler::SetReimportPaths(UObject* Obj, const TArray<FString>& 
         return;
     }
 
-    UMetaData* Meta = WBP->GetOutermost()->GetMetaData();
-    if (Meta)
-    {
-        Meta->SetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"), *NewReimportPaths[0]);
-    }
+    FMetaData& Meta = WBP->GetOutermost()->GetMetaData();
+    Meta.SetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"), *NewReimportPaths[0]);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,14 +68,8 @@ EReimportResult::Type FPsdReimportHandler::Reimport(UObject* Obj)
     }
 
     // Step 1: Read source PSD path from package metadata
-    UMetaData* Meta = WBP->GetOutermost()->GetMetaData();
-    if (!Meta)
-    {
-        UE_LOG(LogPSD2UMG, Error, TEXT("FPsdReimportHandler::Reimport: no metadata on WBP '%s'"), *WBP->GetName());
-        return EReimportResult::Failed;
-    }
-
-    const FString SourcePath = Meta->GetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"));
+    FMetaData& Meta = WBP->GetOutermost()->GetMetaData();
+    const FString SourcePath = Meta.GetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"));
     if (SourcePath.IsEmpty())
     {
         UE_LOG(LogPSD2UMG, Error, TEXT("FPsdReimportHandler::Reimport: PSD2UMG.SourcePsdPath metadata is empty on '%s'"), *WBP->GetName());
@@ -122,7 +109,7 @@ EReimportResult::Type FPsdReimportHandler::Reimport(UObject* Obj)
             if (!Item.IsValid()) continue;
 
             UWidget* ExistingWidget = WBP->WidgetTree
-                ? WBP->WidgetTree->FindWidget(FName(*Item->LayerName))
+                ? WBP->WidgetTree.Get()->FindWidget(FName(*Item->LayerName))
                 : nullptr;
 
             // We don't have a direct FPsdLayer reference from FPsdLayerTreeItem,
@@ -167,17 +154,20 @@ EReimportResult::Type FPsdReimportHandler::Reimport(UObject* Obj)
             [&bConfirmed, &SkippedLayerNames, &DialogWindow](const FString& /*Path*/, const TArray<TSharedPtr<FPsdLayerTreeItem>>& Items)
             {
                 bConfirmed = true;
-                // Collect unchecked layer names
+                // Collect unchecked layer names. Only add the root of each unchecked
+                // subtree — do NOT recurse into already-skipped children to avoid
+                // name collisions with identically-named layers in other branches.
                 TFunction<void(const TArray<TSharedPtr<FPsdLayerTreeItem>>&)> CollectUnchecked;
                 CollectUnchecked = [&](const TArray<TSharedPtr<FPsdLayerTreeItem>>& TreeItems)
                 {
                     for (const TSharedPtr<FPsdLayerTreeItem>& Item : TreeItems)
                     {
-                        if (Item.IsValid() && !Item->bChecked)
+                        if (!Item.IsValid()) continue;
+                        if (!Item->bChecked)
                         {
                             SkippedLayerNames.Add(Item->LayerName);
                         }
-                        if (Item.IsValid())
+                        else
                         {
                             CollectUnchecked(Item->Children);
                         }
@@ -213,7 +203,7 @@ EReimportResult::Type FPsdReimportHandler::Reimport(UObject* Obj)
     }
 
     // Step 9: Update source path metadata (in case path changed)
-    Meta->SetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"), *SourcePath);
+    Meta.SetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"), *SourcePath);
 
     UE_LOG(LogPSD2UMG, Log, TEXT("FPsdReimportHandler::Reimport: successfully reimported '%s' from '%s'"), *WBP->GetName(), *SourcePath);
     return EReimportResult::Succeeded;

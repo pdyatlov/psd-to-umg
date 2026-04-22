@@ -4,6 +4,11 @@
 #include "PSD2UMGSetting.h"
 #include "PSD2UMGLog.h"
 #include "Engine/Font.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "AssetRegistry/IAssetRegistry.h"
+#include "AssetRegistry/ARFilter.h"
+#include "AssetRegistry/AssetData.h"
+#include "UObject/WeakObjectPtr.h"
 
 namespace PSD2UMG
 {
@@ -26,6 +31,60 @@ namespace PSD2UMG
         { TEXT("-Oblique"),     false, true  },
         { TEXT("-It"),          false, true  },
     };
+
+    // Auto-discovery cache (D-04). Lazy-populated on first Resolve call that
+    // reaches the AutoDiscovered step; cleared via InvalidateDiscoveryCache()
+    // at end of every import (called from PsdImportFactory::FactoryCreateBinary).
+    //
+    // Key: lowercase asset name (matches FAssetData::AssetName after ToLower).
+    // Value: TWeakObjectPtr<UFont> so GC doesn't pin fonts between imports.
+    static TMap<FString, TWeakObjectPtr<UFont>> GDiscoveryCache;
+    static bool GDiscoveryCachePopulated = false;
+
+    static void PopulateDiscoveryCache()
+    {
+        GDiscoveryCache.Reset();
+
+        FAssetRegistryModule& AssetRegistryModule =
+            FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+        IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
+
+        FARFilter Filter;
+        Filter.ClassPaths.Add(UFont::StaticClass()->GetClassPathName());
+        Filter.PackagePaths.Add(FName(TEXT("/Game")));
+        Filter.PackagePaths.Add(FName(TEXT("/Engine/EngineFonts")));
+        Filter.bRecursivePaths = true;
+
+        TArray<FAssetData> Assets;
+        AssetRegistry.GetAssets(Filter, Assets);
+
+        GDiscoveryCache.Reserve(Assets.Num());
+        for (const FAssetData& Data : Assets)
+        {
+            const FString Key = Data.AssetName.ToString().ToLower();
+            // Store a soft reference as TWeakObjectPtr — the asset may not be
+            // in memory yet; Resolve will GetAsset() -> loads synchronously.
+            if (UObject* Loaded = Data.GetAsset())
+            {
+                if (UFont* AsFont = Cast<UFont>(Loaded))
+                {
+                    GDiscoveryCache.Add(Key, AsFont);
+                }
+            }
+        }
+
+        GDiscoveryCachePopulated = true;
+
+        UE_LOG(LogPSD2UMG, Verbose,
+            TEXT("FFontResolver: discovery cache populated with %d UFont assets from /Game and /Engine/EngineFonts"),
+            GDiscoveryCache.Num());
+    }
+
+    void FFontResolver::InvalidateDiscoveryCache()
+    {
+        GDiscoveryCache.Reset();
+        GDiscoveryCachePopulated = false;
+    }
 
     void FFontResolver::ParseSuffix(
         const FString& PsPostscriptName,
@@ -113,7 +172,30 @@ namespace PSD2UMG
             }
         }
 
-        // 3. DefaultFont fallback.
+        // 3. Auto-discovery via AssetRegistry scan of /Game + /Engine/EngineFonts (D-01, D-04, D-05).
+        //    Key lookup is lowercase base name (after ParseSuffix strip) per D-02.
+        {
+            if (!GDiscoveryCachePopulated)
+            {
+                PopulateDiscoveryCache();
+            }
+
+            const FString Key = BaseName.ToLower();
+            if (!Key.IsEmpty())
+            {
+                if (const TWeakObjectPtr<UFont>* HitWeak = GDiscoveryCache.Find(Key))
+                {
+                    if (UFont* HitFont = HitWeak->Get())
+                    {
+                        Result.Font = HitFont;
+                        Result.Source = EFontResolutionSource::AutoDiscovered;
+                        return Result;
+                    }
+                }
+            }
+        }
+
+        // 4. DefaultFont fallback.
         if (Settings->DefaultFont.ToSoftObjectPath().IsValid())
         {
             if (UFont* Loaded = Settings->DefaultFont.LoadSynchronous())
@@ -127,7 +209,7 @@ namespace PSD2UMG
             }
         }
 
-        // 4. Engine default.
+        // 5. Engine default.
         Result.Source = EFontResolutionSource::EngineDefault;
         UE_LOG(LogPSD2UMG, Warning,
             TEXT("Font '%s' not found in FontMap and no DefaultFont configured; using engine default"),

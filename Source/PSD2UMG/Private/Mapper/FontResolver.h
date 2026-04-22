@@ -46,5 +46,11 @@ namespace PSD2UMG
 
         /** Map (bBold, bItalic) to the canonical UE typeface FName. */
         static FName MakeTypefaceName(bool bBold, bool bItalic);
+
+        /**
+         * Clear the auto-discovery cache (D-04). Called by the import factory
+         * after each import so cache state cannot outlive a single PSD import.
+         */
+        static void InvalidateDiscoveryCache();
     };
 }

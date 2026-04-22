@@ -53,10 +53,31 @@ UWidget* FButtonLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc
     const FString BaseTexturePath = FTextureImporter::BuildTexturePath(PsdName);
 
     // D-12/D-13: explicit @state child match first; Normal falls back to first untagged Image.
-    ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Normal),   BaseTexturePath, [&](const FSlateBrush& B){ Style.SetNormal(B); });
-    ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Hover),    BaseTexturePath, [&](const FSlateBrush& B){ Style.SetHovered(B); });
-    ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Pressed),  BaseTexturePath, [&](const FSlateBrush& B){ Style.SetPressed(B); });
-    ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Disabled), BaseTexturePath, [&](const FSlateBrush& B){ Style.SetDisabled(B); });
+    // D-03 (Phase 17.1): track filled slots so we can emit ONE aggregate warning when a
+    // @button group is missing state children — designers get actionable feedback without
+    // the import being aborted; unfilled slots retain FButtonStyle::GetDefault().
+    TArray<FString> MissingSlots;
+
+    const bool bNormal = ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Normal),   BaseTexturePath, [&](const FSlateBrush& B){ Style.SetNormal(B); });
+    if (!bNormal) { MissingSlots.Add(TEXT("Normal")); }
+
+    const bool bHover = ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Hover),    BaseTexturePath, [&](const FSlateBrush& B){ Style.SetHovered(B); });
+    if (!bHover) { MissingSlots.Add(TEXT("Hovered")); }
+
+    const bool bPressed = ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Pressed),  BaseTexturePath, [&](const FSlateBrush& B){ Style.SetPressed(B); });
+    if (!bPressed) { MissingSlots.Add(TEXT("Pressed")); }
+
+    const bool bDisabled = ApplyChildBrush(FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Disabled), BaseTexturePath, [&](const FSlateBrush& B){ Style.SetDisabled(B); });
+    if (!bDisabled) { MissingSlots.Add(TEXT("Disabled")); }
+
+    if (MissingSlots.Num() > 0)
+    {
+        UE_LOG(LogPSD2UMG, Warning,
+            TEXT("FButtonLayerMapper: Layer '%s' — %d/4 button state slots populated; missing: %s"),
+            *Layer.ParsedTags.CleanName,
+            4 - MissingSlots.Num(),
+            *FString::Join(MissingSlots, TEXT(", ")));
+    }
 
     Btn->SetStyle(Style);
     return Btn;

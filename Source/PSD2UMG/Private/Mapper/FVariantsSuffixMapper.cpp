@@ -14,7 +14,11 @@ int32 FVariantsSuffixMapper::GetPriority() const { return 200; }
 
 bool FVariantsSuffixMapper::CanMap(const FPsdLayer& Layer) const
 {
-    return Layer.ParsedTags.bIsVariants;
+    // D-01 (Phase 17.1): explicit type tag beats @variants modifier. Without this
+    // guard, @button @variants would race FButtonLayerMapper at priority 200 because
+    // TArray::Sort is introsort (unstable). HasType() reflects whether any explicit
+    // @type tag (e.g. @button, @progress, @hbox) resolved to EPsdTagType::Non-None.
+    return Layer.ParsedTags.bIsVariants && !Layer.ParsedTags.HasType();
 }
 
 UWidget* FVariantsSuffixMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)

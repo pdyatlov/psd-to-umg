@@ -355,6 +355,9 @@ FParsedLayerTags FLayerTagParser::Parse(
 		case EPsdLayerType::Image:       Out.Type = EPsdTagType::Image;       break;
 		case EPsdLayerType::Text:        Out.Type = EPsdTagType::Text;        break;
 		case EPsdLayerType::SmartObject: Out.Type = EPsdTagType::SmartObject; break;
+		case EPsdLayerType::Gradient:    Out.Type = EPsdTagType::Image;       break;
+		case EPsdLayerType::SolidFill:   Out.Type = EPsdTagType::Image;       break;
+		case EPsdLayerType::Shape:       Out.Type = EPsdTagType::Image;       break;
 		default: break;
 		}
 	}

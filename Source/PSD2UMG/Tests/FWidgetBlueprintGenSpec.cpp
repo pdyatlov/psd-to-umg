@@ -16,6 +16,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/ProgressBar.h"
 #include "Components/HorizontalBox.h"
+#include "Components/VerticalBox.h"
 #include "Components/WidgetSwitcher.h"
 #include "EditorAssetLibrary.h"
 #include "Misc/PackageName.h"
@@ -751,6 +752,281 @@ void FWidgetBlueprintGenSpec::Define()
             TestEqual(TEXT("R-05: no HBox without explicit @hbox tag"), HBoxCount, 0);
             TestEqual(TEXT("R-05: all 3 images present on canvas"), ImageCount, 3);
         });
+
+        // ---- Phase 15: GRPFX-01 and GRPFX-02 spec cases ----
+
+        It("should create shadow sibling for drop shadow on canvas group", [this]()
+        {
+            // GRPFX-01 happy path: canvas-parented group with drop shadow produces a _Shadow
+            // sibling UImage at (mainOffset + DropShadowOffset) with ZOrder = main - 1.
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(400, 400);
+            Doc.SourcePath = TEXT("C:/test/GroupShadow.psd");
+
+            FPsdLayer& GroupLayer = Doc.RootLayers.AddDefaulted_GetRef();
+            GroupLayer.Name = TEXT("ShadowedGroup");
+            GroupLayer.Type = EPsdLayerType::Group;
+            GroupLayer.Bounds = FIntRect(50, 50, 200, 200);
+            GroupLayer.bVisible = true;
+            GroupLayer.Effects.bHasDropShadow = true;
+            GroupLayer.Effects.DropShadowColor = FLinearColor(0.f, 0.f, 0.f, 0.7f);
+            GroupLayer.Effects.DropShadowOffset = FVector2D(5.0, 5.0);
+            // No children — isolates shadow sibling behaviour
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_GroupShadow"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP) return;
+
+            UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("Root is UCanvasPanel"), Root);
+            if (!Root) return;
+
+            // Expect 2 children: main group panel + shadow sibling
+            TestEqual(TEXT("Root has 2 children (main + shadow)"), Root->GetChildrenCount(), 2);
+            if (Root->GetChildrenCount() != 2) return;
+
+            // Identify shadow UImage and main UCanvasPanel from children
+            UImage* ShadowImg = nullptr;
+            UCanvasPanel* MainPanel = nullptr;
+            for (int32 c = 0; c < Root->GetChildrenCount(); ++c)
+            {
+                UWidget* W = Root->GetChildAt(c);
+                if (UImage* AsImg = Cast<UImage>(W))
+                {
+                    ShadowImg = AsImg;
+                }
+                else if (UCanvasPanel* AsPanel = Cast<UCanvasPanel>(W))
+                {
+                    MainPanel = AsPanel;
+                }
+            }
+
+            TestNotNull(TEXT("Shadow UImage exists"), ShadowImg);
+            TestNotNull(TEXT("Main UCanvasPanel exists"), MainPanel);
+            if (!ShadowImg || !MainPanel) return;
+
+            // Shadow widget name must contain "_Shadow"
+            TestTrue(TEXT("Shadow widget name contains '_Shadow'"),
+                ShadowImg->GetName().Contains(TEXT("_Shadow")));
+
+            // Shadow ZOrder must be exactly 1 less than main ZOrder
+            UCanvasPanelSlot* ShadowSlot = Cast<UCanvasPanelSlot>(ShadowImg->Slot);
+            UCanvasPanelSlot* MainSlot   = Cast<UCanvasPanelSlot>(MainPanel->Slot);
+            TestNotNull(TEXT("ShadowSlot valid"), ShadowSlot);
+            TestNotNull(TEXT("MainSlot valid"), MainSlot);
+            if (ShadowSlot && MainSlot)
+            {
+                TestTrue(TEXT("Shadow ZOrder = main ZOrder - 1"),
+                    ShadowSlot->GetZOrder() == MainSlot->GetZOrder() - 1);
+            }
+
+            // Shadow brush tint must match DropShadowColor RGB
+            FSlateBrush ShadowBrush = ShadowImg->GetBrush();
+            FLinearColor Tint = ShadowBrush.TintColor.GetSpecifiedColor();
+            TestTrue(TEXT("Shadow tint R near 0"), FMath::IsNearlyEqual(Tint.R, 0.f, 0.01f));
+            TestTrue(TEXT("Shadow tint G near 0"), FMath::IsNearlyEqual(Tint.G, 0.f, 0.01f));
+            TestTrue(TEXT("Shadow tint B near 0"), FMath::IsNearlyEqual(Tint.B, 0.f, 0.01f));
+        });
+
+        It("should emit warning for drop shadow on group inside non-canvas parent", [this]()
+        {
+            // GRPFX-01 non-canvas branch (D-03): group with drop shadow inside @vbox parent
+            // produces NO shadow sibling — canvas-only sibling pattern cannot apply.
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(400, 400);
+            Doc.SourcePath = TEXT("C:/test/GroupShadowNonCanvas.psd");
+
+            // Outer layer: @vbox group (maps to UVerticalBox)
+            FPsdLayer& OuterLayer = Doc.RootLayers.AddDefaulted_GetRef();
+            OuterLayer.Name = TEXT("Container @vbox");
+            OuterLayer.Type = EPsdLayerType::Group;
+            OuterLayer.Bounds = FIntRect(0, 0, 400, 400);
+            OuterLayer.bVisible = true;
+
+            // Inner layer: group with drop shadow inside the vbox
+            FPsdLayer& InnerLayer = OuterLayer.Children.AddDefaulted_GetRef();
+            InnerLayer.Name = TEXT("InnerShadowed");
+            InnerLayer.Type = EPsdLayerType::Group;
+            InnerLayer.Bounds = FIntRect(10, 10, 100, 100);
+            InnerLayer.bVisible = true;
+            InnerLayer.Effects.bHasDropShadow = true;
+            InnerLayer.Effects.DropShadowColor = FLinearColor::Black;
+            InnerLayer.Effects.DropShadowOffset = FVector2D(3.f, 3.f);
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_GroupShadowNonCanvas"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP) return;
+
+            UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("Root is UCanvasPanel"), Root);
+            if (!Root) return;
+
+            // Root has 1 child: the UVerticalBox from @vbox tag
+            TestEqual(TEXT("Root has 1 child (vbox)"), Root->GetChildrenCount(), 1);
+            if (Root->GetChildrenCount() < 1) return;
+
+            UVerticalBox* VBox = Cast<UVerticalBox>(Root->GetChildAt(0));
+            TestNotNull(TEXT("Root child is UVerticalBox"), VBox);
+            if (!VBox) return;
+
+            // VBox must have exactly 1 child (the inner group) — NO shadow sibling
+            TestEqual(TEXT("VBox has exactly 1 child (no shadow sibling)"), VBox->GetChildrenCount(), 1);
+        });
+
+        It("should insert color overlay as last child of canvas group after recursion", [this]()
+        {
+            // GRPFX-02 canvas happy path: canvas group with color overlay gets a _ColorOverlay
+            // UImage as its LAST child after PSD children have been added.
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(400, 400);
+            Doc.SourcePath = TEXT("C:/test/GroupOverlayCanvas.psd");
+
+            FPsdLayer& GroupLayer = Doc.RootLayers.AddDefaulted_GetRef();
+            GroupLayer.Name = TEXT("OverlayGroup");
+            GroupLayer.Type = EPsdLayerType::Group;
+            GroupLayer.Bounds = FIntRect(0, 0, 300, 300);
+            GroupLayer.bVisible = true;
+            GroupLayer.Effects.bHasColorOverlay = true;
+            GroupLayer.Effects.ColorOverlayColor = FLinearColor(1.f, 0.5f, 0.f, 1.f);
+
+            // Two child image layers (so we can prove overlay is LAST)
+            FPsdLayer& ChildA = GroupLayer.Children.AddDefaulted_GetRef();
+            ChildA.Name = TEXT("ChildA");
+            ChildA.Type = EPsdLayerType::Image;
+            ChildA.Bounds = FIntRect(0, 0, 100, 100);
+            ChildA.PixelWidth = 100; ChildA.PixelHeight = 100;
+            ChildA.RGBAPixels.SetNumZeroed(100 * 100 * 4);
+
+            FPsdLayer& ChildB = GroupLayer.Children.AddDefaulted_GetRef();
+            ChildB.Name = TEXT("ChildB");
+            ChildB.Type = EPsdLayerType::Image;
+            ChildB.Bounds = FIntRect(100, 0, 200, 100);
+            ChildB.PixelWidth = 100; ChildB.PixelHeight = 100;
+            ChildB.RGBAPixels.SetNumZeroed(100 * 100 * 4);
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_GroupOverlayCanvas"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP) return;
+
+            UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("Root is UCanvasPanel"), Root);
+            if (!Root) return;
+
+            // Root has exactly 1 child: the group's UCanvasPanel
+            TestEqual(TEXT("Root has 1 child (group panel)"), Root->GetChildrenCount(), 1);
+            if (Root->GetChildrenCount() < 1) return;
+
+            UCanvasPanel* GroupPanel = Cast<UCanvasPanel>(Root->GetChildAt(0));
+            TestNotNull(TEXT("Group child is UCanvasPanel"), GroupPanel);
+            if (!GroupPanel) return;
+
+            // Group panel has 3 children: 2 PSD images + 1 overlay
+            TestEqual(TEXT("Group panel has 3 children (2 images + overlay)"), GroupPanel->GetChildrenCount(), 3);
+            if (GroupPanel->GetChildrenCount() < 3) return;
+
+            // Last child must be a UImage named *_ColorOverlay
+            UWidget* LastChild = GroupPanel->GetChildAt(GroupPanel->GetChildrenCount() - 1);
+            UImage* OverlayImg = Cast<UImage>(LastChild);
+            TestNotNull(TEXT("Last child is UImage (overlay)"), OverlayImg);
+            if (!OverlayImg) return;
+
+            TestTrue(TEXT("Overlay name contains '_ColorOverlay'"),
+                OverlayImg->GetName().Contains(TEXT("_ColorOverlay")));
+
+            // Overlay slot must have fill anchors (0,0)-(1,1) and zero offsets
+            UCanvasPanelSlot* OverlaySlot = Cast<UCanvasPanelSlot>(OverlayImg->Slot);
+            TestNotNull(TEXT("Overlay slot is UCanvasPanelSlot"), OverlaySlot);
+            if (OverlaySlot)
+            {
+                FAnchors A = OverlaySlot->GetAnchors();
+                TestTrue(TEXT("Overlay anchor min X near 0"), FMath::IsNearlyEqual(A.Minimum.X, 0.f, 0.01f));
+                TestTrue(TEXT("Overlay anchor min Y near 0"), FMath::IsNearlyEqual(A.Minimum.Y, 0.f, 0.01f));
+                TestTrue(TEXT("Overlay anchor max X near 1"), FMath::IsNearlyEqual(A.Maximum.X, 1.f, 0.01f));
+                TestTrue(TEXT("Overlay anchor max Y near 1"), FMath::IsNearlyEqual(A.Maximum.Y, 1.f, 0.01f));
+
+                FMargin Offsets = OverlaySlot->GetLayout().Offsets;
+                TestTrue(TEXT("Overlay offset Left near 0"), FMath::IsNearlyEqual(Offsets.Left, 0.f, 0.01f));
+                TestTrue(TEXT("Overlay offset Top near 0"), FMath::IsNearlyEqual(Offsets.Top, 0.f, 0.01f));
+                TestTrue(TEXT("Overlay offset Right near 0"), FMath::IsNearlyEqual(Offsets.Right, 0.f, 0.01f));
+                TestTrue(TEXT("Overlay offset Bottom near 0"), FMath::IsNearlyEqual(Offsets.Bottom, 0.f, 0.01f));
+
+                // ZOrder >= 2 (above both PSD children)
+                TestTrue(TEXT("Overlay ZOrder >= 2"), OverlaySlot->GetZOrder() >= 2);
+            }
+
+            // Overlay brush tint must match ColorOverlayColor
+            FSlateBrush OverlayBrush = OverlayImg->GetBrush();
+            FLinearColor Tint = OverlayBrush.TintColor.GetSpecifiedColor();
+            TestTrue(TEXT("Overlay tint R near 1.0"), FMath::IsNearlyEqual(Tint.R, 1.f, 0.01f));
+            TestTrue(TEXT("Overlay tint G near 0.5"), FMath::IsNearlyEqual(Tint.G, 0.5f, 0.01f));
+            TestTrue(TEXT("Overlay tint B near 0.0"), FMath::IsNearlyEqual(Tint.B, 0.f, 0.01f));
+        });
+
+        It("should append color overlay to non-canvas panel group as last child", [this]()
+        {
+            // GRPFX-02 non-canvas branch (D-06): @hbox group with color overlay gets a
+            // _ColorOverlay UImage appended as last child via AddChild (best-effort).
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(400, 400);
+            Doc.SourcePath = TEXT("C:/test/GroupOverlayHBox.psd");
+
+            FPsdLayer& GroupLayer = Doc.RootLayers.AddDefaulted_GetRef();
+            GroupLayer.Name = TEXT("Row @hbox");
+            GroupLayer.Type = EPsdLayerType::Group;
+            GroupLayer.Bounds = FIntRect(0, 0, 400, 100);
+            GroupLayer.bVisible = true;
+            GroupLayer.Effects.bHasColorOverlay = true;
+            GroupLayer.Effects.ColorOverlayColor = FLinearColor(0.f, 1.f, 0.f, 0.5f);
+
+            // Two child images inside the @hbox
+            FPsdLayer& ChildA = GroupLayer.Children.AddDefaulted_GetRef();
+            ChildA.Name = TEXT("HChildA");
+            ChildA.Type = EPsdLayerType::Image;
+            ChildA.Bounds = FIntRect(0, 0, 200, 100);
+            ChildA.PixelWidth = 200; ChildA.PixelHeight = 100;
+            ChildA.RGBAPixels.SetNumZeroed(200 * 100 * 4);
+
+            FPsdLayer& ChildB = GroupLayer.Children.AddDefaulted_GetRef();
+            ChildB.Name = TEXT("HChildB");
+            ChildB.Type = EPsdLayerType::Image;
+            ChildB.Bounds = FIntRect(200, 0, 400, 100);
+            ChildB.PixelWidth = 200; ChildB.PixelHeight = 100;
+            ChildB.RGBAPixels.SetNumZeroed(200 * 100 * 4);
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_GroupOverlayHBox"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP) return;
+
+            UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("Root is UCanvasPanel"), Root);
+            if (!Root) return;
+
+            TestEqual(TEXT("Root has 1 child (hbox)"), Root->GetChildrenCount(), 1);
+            if (Root->GetChildrenCount() < 1) return;
+
+            UHorizontalBox* HBox = Cast<UHorizontalBox>(Root->GetChildAt(0));
+            TestNotNull(TEXT("Root child is UHorizontalBox"), HBox);
+            if (!HBox) return;
+
+            // HBox must have 3 children: 2 PSD images + 1 overlay
+            TestEqual(TEXT("HBox has 3 children (2 images + overlay)"), HBox->GetChildrenCount(), 3);
+            if (HBox->GetChildrenCount() < 3) return;
+
+            // Last child must be a UImage named *_ColorOverlay
+            UWidget* LastChild = HBox->GetChildAt(HBox->GetChildrenCount() - 1);
+            UImage* OverlayImg = Cast<UImage>(LastChild);
+            TestNotNull(TEXT("Last child is UImage (overlay)"), OverlayImg);
+            if (!OverlayImg) return;
+
+            TestTrue(TEXT("Overlay name contains '_ColorOverlay'"),
+                OverlayImg->GetName().Contains(TEXT("_ColorOverlay")));
+
+            // Overlay brush tint must have G near 1.0
+            FSlateBrush OverlayBrush = OverlayImg->GetBrush();
+            FLinearColor Tint = OverlayBrush.TintColor.GetSpecifiedColor();
+            TestTrue(TEXT("Overlay tint G near 1.0"), FMath::IsNearlyEqual(Tint.G, 1.f, 0.01f));
+        });
+
     });
 }
 

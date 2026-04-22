@@ -37,9 +37,10 @@ void FLayerMappingRegistry::RegisterDefaults()
     // Suffix mappers (priority 200 — same tier as prefix mappers)
     Mappers.Add(MakeUnique<FVariantsSuffixMapper>());
 
-    // Type-based mappers (priority 100)
+    // Type-based mappers (priority 100) + rich text variant (priority 110)
     Mappers.Add(MakeUnique<FImageLayerMapper>());
-    Mappers.Add(MakeUnique<FTextLayerMapper>());
+    Mappers.Add(MakeUnique<FRichTextLayerMapper>()); // Phase 16 / RICH-01, RICH-02 -- priority 110 (multi-run text)
+    Mappers.Add(MakeUnique<FTextLayerMapper>());     // priority 100 (single-run text; CanMap narrowed to Spans.Num() <= 1)
     Mappers.Add(MakeUnique<FFillLayerMapper>());        // Phase 13 / GRAD-01, GRAD-02 -- gradient fill
     Mappers.Add(MakeUnique<FSolidFillLayerMapper>());   // Phase 13 / GRAD-01 -- solid color fill
     Mappers.Add(MakeUnique<FShapeLayerMapper>());       // Phase 14 / SHAPE-01 -- drawn vector shape, solid-color fill (vscg)

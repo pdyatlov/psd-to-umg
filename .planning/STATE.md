@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: "Completed 16-01-PLAN.md — RED state confirmed 3 pass / 6 fail; advancing to 16-02"
-last_updated: "2026-04-22T15:00:00.000Z"
-last_activity: 2026-04-22 -- Phase 16 Plan 01 complete; all 4 tasks done, RED baseline confirmed
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-04-22T11:29:13.023Z"
+last_activity: 2026-04-22
 progress:
   total_phases: 2
   completed_phases: 1
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 16 (rich-text-multiple-text-runs) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 16
-Last activity: 2026-04-22 -- Plan 16-01 complete; advancing to 16-02 (multi-run extraction loop)
+Plan: 3 of 3
+Status: Ready to execute
+Last activity: 2026-04-22
 
 ## Performance Metrics
 
@@ -89,6 +89,7 @@ Last activity: 2026-04-22 -- Plan 16-01 complete; advancing to 16-02 (multi-run 
 | Phase 14-shape-vector-layers P02 | 4 | 1 tasks | 1 files |
 | Phase 14-shape-vector-layers P03 | ~60m | 3 tasks | 5 files |
 | Phase 15 P01 | 3m | 3 tasks | 2 files |
+| Phase 16-rich-text-multiple-text-runs P02 | 10m | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -147,6 +148,7 @@ Recent decisions affecting current work:
 - [Phase 14-shape-vector-layers]: vscg m_Data[0..3] IS the class ID ('SoCo'=solid, 'GdFl'=gradient) — NOT a version prefix. Descriptor starts at offset 8. There is no "Type" enum item inside the descriptor body; type discrimination is done via the upfront class ID check. TryParseAt(8) is primary for vscg (unlike SoCo where offset 4 wins).
 - [Phase 15]: D-01/D-02: Group shadow uses null brush (NoDrawType) — no texture asset, solid tint, sized to bounds; ZOrder = main - 1
 - [Phase 15]: D-04/D-05/D-06: Canvas group overlay uses fill anchors (0,0)-(1,1); non-canvas group uses AddChild best-effort; deferred via DeferredOverlayPanel local to ensure LAST child placement after recursion
+- [Phase 16-rich-text-multiple-text-runs]: Multi-run block placed after stroke block inside existing try{} scope; RawSpans.Num() > 1 threshold after sentinel strip required to commit to Spans; ASCII-only FString::Mid slicing documented as TODO for non-ASCII
 
 ### Roadmap Evolution
 
@@ -164,6 +166,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T14:00:00.000Z
-Stopped at: 16-01-PLAN.md Task 4 checkpoint:human-verify
+Last session: 2026-04-22T11:29:13.019Z
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None

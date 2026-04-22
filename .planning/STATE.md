@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: verifying
-stopped_at: Completed 17-automated-font-matching-17-02-PLAN.md
-last_updated: "2026-04-22T14:50:00.465Z"
+status: executing
+stopped_at: Completed 17.1-01-PLAN.md
+last_updated: "2026-04-22T15:52:40.565Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 2
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 17 — automated-font-matching
+**Current focus:** Phase 17.1 — button-variants-state-wiring
 
 ## Current Position
 
-Phase: 17
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 17.1 (button-variants-state-wiring) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-22
 
 ## Performance Metrics
@@ -93,6 +93,7 @@ Last activity: 2026-04-22
 | Phase 16.1-layertag-fix-requirements-docs P01 | 30 | 5 tasks | 6 files |
 | Phase 17-automated-font-matching P01 | 3min | 3 tasks | 3 files |
 | Phase 17-automated-font-matching P02 | 3min | 3 tasks | 4 files |
+| Phase 17.1-button-variants-state-wiring P01 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -162,11 +163,14 @@ Recent decisions affecting current work:
 - [Phase 17-automated-font-matching]: TWeakObjectPtr<UFont> for cache values prevents GC pinning fonts between imports; InvalidateDiscoveryCache clears after every import
 - [Phase 17-automated-font-matching]: Lookup key is BaseName.ToLower() after ParseSuffix strip per D-02 case-insensitive matching, not the raw PostScript name
 - [Phase 17-automated-font-matching]: Single InvalidateDiscoveryCache call at end of if (bOk) block outside if (WBP) fires on success and failure paths per D-04
+- [Phase 17.1-button-variants-state-wiring]: BTN-STATE-01 VariantsMapper.CanMap starts RED: FVariantsSuffixMapper returns bIsVariants only (no HasType guard); Plan 02 adds D-01 one-line guard to turn GREEN
+- [Phase 17.1-button-variants-state-wiring]: BTN-STATE-02 mappers called directly (no FLayerMappingRegistry round-trip per D-04) to avoid TArray::Sort introsort non-determinism at same priority tier
 
 ### Roadmap Evolution
 
 - Phase 9 added: Unified layer naming convention (tag-based)
 - Phases 11-12 added: v1.1 Import Fidelity Fixes
+- Phase 17.1 inserted (URGENT) after Phase 17: Button+Variants co-tag and UE Button state wiring validation — must run before Phase 18
 
 ### Pending Todos
 
@@ -179,6 +183,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T14:46:26.677Z
-Stopped at: Completed 17-automated-font-matching-17-02-PLAN.md
+Last session: 2026-04-22T15:52:40.562Z
+Stopped at: Completed 17.1-01-PLAN.md
 Resume file: None

@@ -69,6 +69,7 @@ Plans:
 - [x] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions (completed 2026-04-22)
 - [x] **Phase 16.1: LayerTag Fix + Requirements Traceability** - FLayerTagParser type-inference fix for Gradient/SolidFill/Shape layers; HIDDEN-02 row dimming; REQUIREMENTS.md extended with v1.2 requirements and corrected traceability (completed 2026-04-22)
 - [x] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback (completed 2026-04-22)
+- [ ] **Phase 17.1: Button+Variants State Wiring Validation** (INSERTED) — Verify `@button`+`@variants` can co-exist on one layer, and that all four UE Button child states (`@state:normal/hover/pressed/disabled`) wire correctly
 
 ### Phase 13: Gradient Layers
 **Goal**: Gradient fill layers from Photoshop import as usable UMG widgets — either pre-rendered as Texture2D or as a native gradient widget if available
@@ -144,6 +145,20 @@ Plans:
 - [x] 17-01-PLAN.md — Enum AutoDiscovered + RED spec + REQUIREMENTS.md FONT-01/02 entries (Wave 1)
 - [x] 17-02-PLAN.md — AssetRegistry auto-discovery cache + PsdImportFactory invalidation hook + FONT-01 close-out (Wave 2)
 
+### Phase 17.1: Button+Variants State Wiring Validation (INSERTED)
+**Goal**: Confirm that a PSD layer tagged with both `@button` and `@variants` is parsed and mapped correctly — no tag conflict, correct widget type — and that child layers tagged `@state:normal`, `@state:hover`, `@state:pressed`, `@state:disabled` are wired to the four UE Button widget appearance slots
+**Depends on**: Phase 17 (tag parser), Phase 3 (mapper pipeline)
+**Requirements**: BTN-STATE-01, BTN-STATE-02
+**Success Criteria** (what must be TRUE):
+  1. A layer tagged `@button @variants` produces a UButton widget (not a generic UImage or conflict error)
+  2. Child layers `@state:normal`, `@state:hover`, `@state:pressed`, `@state:disabled` each map to the corresponding `Normal`/`Hovered`/`Pressed`/`Disabled` appearance slot on the UButton
+  3. No assertion or tag-conflict log error fires when both `@button` and `@variants` are present on the same layer
+  4. Missing state children (e.g. only `@state:normal` present) produce a warning but do not abort import
+**Plans**: 2 plans
+Plans:
+- [x] 17.1-01-PLAN.md — Wave 0 RED: FButtonLayerMapperSpec.cpp + REQUIREMENTS.md BTN-STATE-01/02 entries (Wave 1)
+- [ ] 17.1-02-PLAN.md — GREEN: FVariantsSuffixMapper HasType guard (D-01) + FButtonLayerMapper aggregate missing-slots warning (D-03) + REQUIREMENTS close-out (Wave 2)
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -156,6 +171,7 @@ Plans:
 | 16. Rich Text / Multiple Text Runs | 3/3 | Complete    | 2026-04-22 |
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
 | 17. Automated Font Matching | 2/2 | Complete    | 2026-04-22 |
+| 17.1. Button+Variants State Wiring Validation | 1/2 | In Progress|  |
 | 18. Phase 11 Verification Backfill | 0/TBD | Pending | — |
 | 19. Integration Stability Fixes | 0/TBD | Pending | — |
 

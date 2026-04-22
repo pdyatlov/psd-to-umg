@@ -151,7 +151,7 @@ Plans:
 | 14. Shape/Vector Layers | 3/3 | Complete | 2026-04-22 |
 | 15. Group Effects | 1/1 | Complete    | 2026-04-22 |
 | 16. Rich Text / Multiple Text Runs | 3/3 | Complete    | 2026-04-22 |
-| 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete   | 2026-04-22 |
+| 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
 | 17. Automated Font Matching | 0/? | Not started | - |
 
 ## v1.3+ Backlog

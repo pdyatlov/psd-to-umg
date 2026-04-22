@@ -48,6 +48,11 @@
 - [x] **RICH-01**: A text layer with two differently-colored spans produces a `URichTextBlock` with both colors represented in inline markup.
 - [x] **RICH-02**: A text layer with bold and normal weight runs produces a `URichTextBlock` with correct weight styling per span.
 
+### Typography — Font Matching (FONT-*)
+
+- [ ] **FONT-01**: A Photoshop PostScript font name (e.g. "Roboto-Bold") is resolved automatically via AssetRegistry scan over `/Game/` and `/Engine/EngineFonts/` to the correct UFont asset when no explicit `FontMap` entry exists and the asset's base name matches case-insensitively (after `ParseSuffix` strips style suffix). New enum value `EFontResolutionSource::AutoDiscovered` reports the resolution source.
+- [x] **FONT-02**: When a PSD font name cannot be resolved via FontMap or AutoDiscovered, `FFontResolver::Resolve` logs a warning (`LogPSD2UMG Warning: Font '%s' not found in FontMap; using DefaultFont`) and falls back to the project's configured `DefaultFont` (or engine default if DefaultFont is unset). Prevents silent "no font" output.
+
 ## Traceability
 
 | REQ-ID | Assigned Phase | Status |
@@ -67,6 +72,8 @@
 | GRPFX-02 | Phase 15 | Complete (verified 2026-04-22) |
 | RICH-01 | Phase 16 | Complete (verified 2026-04-22) |
 | RICH-02 | Phase 16 | Complete (verified 2026-04-22) |
+| FONT-01 | Phase 17 | Pending verification (RED spec landed in 17-01; implementation in 17-02) |
+| FONT-02 | Phase 17 | Complete (already implemented in FontResolver.cpp DefaultFont fallback; D-06 marks it closed) |
 
 ---
 

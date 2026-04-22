@@ -12,11 +12,16 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
 #include "Components/PanelSlot.h"
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
 #include "Kismet2/KismetEditorUtilities.h"
+#include "UObject/GarbageCollection.h"
 #include "UObject/UObjectGlobals.h"
 #include "WidgetBlueprintFactory.h"
 #include "Blueprint/UserWidget.h"
@@ -37,7 +42,8 @@ static void PopulateChildren(
     const TArray<FPsdLayer>& Layers,
     const FPsdDocument& Doc,
     const FIntPoint& CanvasSize,
-    const TSet<FString>& SkippedLayerNames = TSet<FString>())
+    const TSet<FString>& SkippedLayerNames = TSet<FString>(),
+    const FIntPoint& ParentOffset = FIntPoint::ZeroValue)
 {
     const int32 TotalLayers = Layers.Num();
     for (int32 i = 0; i < TotalLayers; ++i)
@@ -47,13 +53,16 @@ static void PopulateChildren(
         // Skip layers the user unchecked in the preview dialog
         if (SkippedLayerNames.Contains(Layer.Name))
         {
+            UE_LOG(LogPSD2UMG, Log, TEXT("PopulateChildren: '%s' skipped (SkippedLayerNames; bVisible=%d in PSD)"), *Layer.Name, Layer.bVisible ? 1 : 0);
             continue;
         }
 
         // Skip zero-size non-groups (D-14)
         if (Layer.Bounds.IsEmpty() && Layer.Type != EPsdLayerType::Group)
         {
-            UE_LOG(LogPSD2UMG, Warning, TEXT("Skipping zero-size layer: %s"), *Layer.Name);
+            UE_LOG(LogPSD2UMG, Warning, TEXT("Skipping zero-size layer: '%s' type=%d bounds=(%d,%d)-(%d,%d)"),
+                *Layer.Name, (int32)Layer.Type,
+                Layer.Bounds.Min.X, Layer.Bounds.Min.Y, Layer.Bounds.Max.X, Layer.Bounds.Max.Y);
             continue;
         }
 
@@ -124,6 +133,34 @@ static void PopulateChildren(
             UE_LOG(LogPSD2UMG, Log,
                 TEXT("Layer '%s' attached to non-canvas parent '%s' (class %s) — slot defaults applied"),
                 *LayerPtr->Name, *Parent->GetName(), *Parent->GetClass()->GetName());
+
+            // VBox/HBox: set Fill proportional to layer bounds so items occupy
+            // the right relative space. Fill(H) / Fill(W) divides the container
+            // proportionally among siblings; equal bounds = equal share.
+            if (UVerticalBoxSlot* VBoxSlot = Cast<UVerticalBoxSlot>(Slot))
+            {
+                const float BoundsH = static_cast<float>(LayerPtr->Bounds.Height());
+                if (BoundsH > 0.f)
+                {
+                    FSlateChildSize Size;
+                    Size.SizeRule = ESlateSizeRule::Fill;
+                    Size.Value = BoundsH;
+
+                    VBoxSlot->SetSize(Size);
+                }
+            }
+            else if (UHorizontalBoxSlot* HBoxSlot = Cast<UHorizontalBoxSlot>(Slot))
+            {
+                const float BoundsW = static_cast<float>(LayerPtr->Bounds.Width());
+                if (BoundsW > 0.f)
+                {
+                    FSlateChildSize Size;
+                    Size.SizeRule = ESlateSizeRule::Fill;
+                    Size.Value = BoundsW;
+
+                    HBoxSlot->SetSize(Size);
+                }
+            }
         }
         if (!Slot) { continue; }
 
@@ -133,20 +170,24 @@ static void PopulateChildren(
             FAnchorData Data;
             Data.Alignment = FVector2D(0.f, 0.f);
 
+            // Local bounds: layer coordinates relative to this canvas panel's top-left.
+            // At root level ParentOffset=(0,0) so local == absolute.
+            const FIntRect EffectiveBounds = FIntRect(
+                LayerPtr->Bounds.Min - ParentOffset,
+                LayerPtr->Bounds.Max - ParentOffset);
+
             FAnchorResult AnchorResult;
             if (LayerPtr->Type == EPsdLayerType::Group)
             {
-                // Groups are transparent containers: fill the parent canvas so children
-                // stay in the same coordinate system as the root. PhotoshopAPI does not
-                // populate bounds on group layers, so we must not use them here.
-                AnchorResult.Anchors = FAnchors(0.f, 0.f, 1.f, 1.f);
-                AnchorResult.bStretchH = true;
-                AnchorResult.bStretchV = true;
+                // Both canvas and layout groups: use @anchor tag + computed bounds.
+                // Canvas groups are now positional (not fill-stretch); their children
+                // receive a local coordinate context when PopulateChildren recurses.
+                AnchorResult = FAnchorCalculator::Calculate(*LayerPtr, EffectiveBounds, CanvasSize);
                 AnchorResult.CleanName = LayerPtr->ParsedTags.CleanName;
             }
             else
             {
-                AnchorResult = FAnchorCalculator::Calculate(*LayerPtr, LayerPtr->Bounds, CanvasSize);
+                AnchorResult = FAnchorCalculator::Calculate(*LayerPtr, EffectiveBounds, CanvasSize);
             }
 
             Data.Anchors = AnchorResult.Anchors;
@@ -154,46 +195,41 @@ static void PopulateChildren(
             const float AnchorPixelX = AnchorResult.Anchors.Minimum.X * static_cast<float>(CanvasSize.X);
             const float AnchorPixelY = AnchorResult.Anchors.Minimum.Y * static_cast<float>(CanvasSize.Y);
 
-            if (LayerPtr->Type == EPsdLayerType::Group)
+            if (AnchorResult.bStretchH && AnchorResult.bStretchV)
             {
-                // Group fills parent: zero margins on all sides
-                Data.Offsets = FMargin(0.f, 0.f, 0.f, 0.f);
-            }
-            else if (AnchorResult.bStretchH && AnchorResult.bStretchV)
-            {
-                // Full stretch: offsets are margins from all 4 edges
+                // Full stretch: offsets are margins from all 4 edges (local space)
                 Data.Offsets = FMargin(
-                    static_cast<float>(LayerPtr->Bounds.Min.X),
-                    static_cast<float>(LayerPtr->Bounds.Min.Y),
-                    static_cast<float>(CanvasSize.X - LayerPtr->Bounds.Max.X),
-                    static_cast<float>(CanvasSize.Y - LayerPtr->Bounds.Max.Y));
+                    static_cast<float>(EffectiveBounds.Min.X),
+                    static_cast<float>(EffectiveBounds.Min.Y),
+                    static_cast<float>(CanvasSize.X - EffectiveBounds.Max.X),
+                    static_cast<float>(CanvasSize.Y - EffectiveBounds.Max.Y));
             }
             else if (AnchorResult.bStretchH)
             {
                 // Horizontal stretch: Left/Right margins, Top offset from anchor Y, Bottom = height
                 Data.Offsets = FMargin(
-                    static_cast<float>(LayerPtr->Bounds.Min.X),
-                    static_cast<float>(LayerPtr->Bounds.Min.Y) - AnchorPixelY,
-                    static_cast<float>(CanvasSize.X - LayerPtr->Bounds.Max.X),
-                    static_cast<float>(LayerPtr->Bounds.Height()));
+                    static_cast<float>(EffectiveBounds.Min.X),
+                    static_cast<float>(EffectiveBounds.Min.Y) - AnchorPixelY,
+                    static_cast<float>(CanvasSize.X - EffectiveBounds.Max.X),
+                    static_cast<float>(EffectiveBounds.Height()));
             }
             else if (AnchorResult.bStretchV)
             {
                 // Vertical stretch: Top/Bottom margins, Left offset from anchor X, Right = width
                 Data.Offsets = FMargin(
-                    static_cast<float>(LayerPtr->Bounds.Min.X) - AnchorPixelX,
-                    static_cast<float>(LayerPtr->Bounds.Min.Y),
-                    static_cast<float>(LayerPtr->Bounds.Width()),
-                    static_cast<float>(CanvasSize.Y - LayerPtr->Bounds.Max.Y));
+                    static_cast<float>(EffectiveBounds.Min.X) - AnchorPixelX,
+                    static_cast<float>(EffectiveBounds.Min.Y),
+                    static_cast<float>(EffectiveBounds.Width()),
+                    static_cast<float>(CanvasSize.Y - EffectiveBounds.Max.Y));
             }
             else
             {
-                // Point anchor: offset from anchor point, size = width/height
+                // Point anchor: offset from anchor point, size = width/height (local space)
                 Data.Offsets = FMargin(
-                    static_cast<float>(LayerPtr->Bounds.Min.X) - AnchorPixelX,
-                    static_cast<float>(LayerPtr->Bounds.Min.Y) - AnchorPixelY,
-                    static_cast<float>(LayerPtr->Bounds.Width()),
-                    static_cast<float>(LayerPtr->Bounds.Height()));
+                    static_cast<float>(EffectiveBounds.Min.X) - AnchorPixelX,
+                    static_cast<float>(EffectiveBounds.Min.Y) - AnchorPixelY,
+                    static_cast<float>(EffectiveBounds.Width()),
+                    static_cast<float>(EffectiveBounds.Height()));
             }
 
             // TEXT-06 — paragraph text layers: override slot width with BoxWidthPx
@@ -210,32 +246,64 @@ static void PopulateChildren(
             // ZOrder: PSD index 0 = topmost. UMG higher = on top. Invert.
             CanvasSlot->SetZOrder(TotalLayers - 1 - i);
 
+            // Non-canvas layout groups (VBox, HBox, etc.): use explicit bounds size.
+            // SetAutoSize would force the slot to use the widget's desired size, which
+            // is 0 for VBox/HBox when children use Fill slots. Keep explicit W/H.
+
             UE_LOG(LogPSD2UMG, Log,
-                TEXT("Layer '%s': bounds=(%d,%d)-(%d,%d) canvas=%dx%d anchors=(%.2f,%.2f,%.2f,%.2f) stretchH=%d stretchV=%d offsets=(L%.1f T%.1f R%.1f B%.1f)"),
+                TEXT("Layer '%s': localBounds=(%d,%d)-(%d,%d) canvas=%dx%d anchors=(%.2f,%.2f,%.2f,%.2f) stretchH=%d stretchV=%d offsets=(L%.1f T%.1f R%.1f B%.1f)"),
                 *LayerPtr->Name,
-                LayerPtr->Bounds.Min.X, LayerPtr->Bounds.Min.Y, LayerPtr->Bounds.Max.X, LayerPtr->Bounds.Max.Y,
+                EffectiveBounds.Min.X, EffectiveBounds.Min.Y, EffectiveBounds.Max.X, EffectiveBounds.Max.Y,
                 CanvasSize.X, CanvasSize.Y,
                 AnchorResult.Anchors.Minimum.X, AnchorResult.Anchors.Minimum.Y,
                 AnchorResult.Anchors.Maximum.X, AnchorResult.Anchors.Maximum.Y,
                 AnchorResult.bStretchH ? 1 : 0, AnchorResult.bStretchV ? 1 : 0,
                 Data.Offsets.Left, Data.Offsets.Top, Data.Offsets.Right, Data.Offsets.Bottom);
 
-            // FX-04: Drop Shadow (per D-06, D-07, D-08) — canvas-only sibling pattern
-            if (LayerPtr->Effects.bHasDropShadow && LayerPtr->Type == EPsdLayerType::Image)
+            // FX-04: Drop Shadow — canvas-only sibling pattern
+            // Phase 15 GRPFX-01 (D-01, D-02): extended to EPsdLayerType::Group with null-brush variant
+            const bool bShadowSupportedType =
+                (LayerPtr->Type == EPsdLayerType::Image || LayerPtr->Type == EPsdLayerType::Group);
+            if (LayerPtr->Effects.bHasDropShadow && bShadowSupportedType)
             {
-                if (UImage* MainImg = Cast<UImage>(Widget))
-                {
-                    // Create shadow UImage as sibling — shares same texture, tinted to shadow color
-                    UImage* ShadowImg = Tree->ConstructWidget<UImage>(
-                        UImage::StaticClass(),
-                        FName(*FString::Printf(TEXT("%s_Shadow"), *LayerPtr->Name)));
+                // Construct shadow sibling. Use ParsedTags.CleanName when available;
+                // fall back to Name for parity with legacy image-shadow behaviour (Open Question 2 resolution).
+                const FString ShadowBaseName = !LayerPtr->ParsedTags.CleanName.IsEmpty()
+                    ? LayerPtr->ParsedTags.CleanName
+                    : LayerPtr->Name;
+                const FName ShadowFName = MakeUniqueObjectName(
+                    Tree, UImage::StaticClass(),
+                    FName(*FString::Printf(TEXT("%s_Shadow"), *ShadowBaseName)));
+                UImage* ShadowImg = Tree->ConstructWidget<UImage>(UImage::StaticClass(), ShadowFName);
 
-                    // Copy the brush from the main image and apply shadow tint
-                    FSlateBrush ShadowBrush = MainImg->GetBrush();
+                FSlateBrush ShadowBrush;
+                bool bShadowBrushReady = true;
+                if (LayerPtr->Type == EPsdLayerType::Group)
+                {
+                    // D-02: null brush — no texture, solid color tint, sized to group bounds
+                    ShadowBrush.DrawAs = ESlateBrushDrawType::NoDrawType;
+                    ShadowBrush.ImageSize = FVector2D(
+                        static_cast<float>(LayerPtr->Bounds.Width()),
+                        static_cast<float>(LayerPtr->Bounds.Height()));
+                }
+                else if (UImage* MainImg = Cast<UImage>(Widget))
+                {
+                    // Existing image path: copy brush (preserves texture + 9-slice margins)
+                    ShadowBrush = MainImg->GetBrush();
+                }
+                else
+                {
+                    // Defensive: Image type but widget is not UImage (e.g. flatten path) — skip shadow
+                    UE_LOG(LogPSD2UMG, Warning,
+                        TEXT("Drop shadow on image layer '%s' — widget is not UImage, shadow skipped."),
+                        *LayerPtr->Name);
+                    bShadowBrushReady = false;
+                }
+
+                if (bShadowBrushReady)
+                {
                     ShadowBrush.TintColor = FSlateColor(LayerPtr->Effects.DropShadowColor);
                     ShadowImg->SetBrush(ShadowBrush);
-
-                    // Shadow opacity from shadow color alpha
                     ShadowImg->SetRenderOpacity(LayerPtr->Effects.DropShadowColor.A);
 
                     // Add to canvas and position with offset
@@ -246,26 +314,31 @@ static void PopulateChildren(
                         ShadowData.Anchors = CanvasSlot->GetLayout().Anchors;
                         FMargin ShadowOffsets = CanvasSlot->GetLayout().Offsets;
                         ShadowOffsets.Left += static_cast<float>(LayerPtr->Effects.DropShadowOffset.X);
-                        ShadowOffsets.Top += static_cast<float>(LayerPtr->Effects.DropShadowOffset.Y);
+                        ShadowOffsets.Top  += static_cast<float>(LayerPtr->Effects.DropShadowOffset.Y);
                         ShadowData.Offsets = ShadowOffsets;
                         ShadowSlot->SetLayout(ShadowData);
-                        // Shadow behind main widget (lower ZOrder)
+                        // D-01: shadow ZOrder = main - 1 (behind main widget)
                         ShadowSlot->SetZOrder(CanvasSlot->GetZOrder() - 1);
                     }
                 }
             }
-            else if (LayerPtr->Effects.bHasDropShadow && LayerPtr->Type != EPsdLayerType::Image)
+            else if (LayerPtr->Effects.bHasDropShadow)
             {
+                // Non-supported type (Text, Shape, Gradient, SolidFill, etc.) — retain existing warning
                 UE_LOG(LogPSD2UMG, Warning,
-                    TEXT("Drop shadow on non-image layer '%s' — no-op (per D-08)."), *LayerPtr->Name);
+                    TEXT("Drop shadow on layer '%s' (type=%d) — no-op (per D-08)."),
+                    *LayerPtr->Name, static_cast<int32>(LayerPtr->Type));
             }
         } // end canvas-only block
 
-        // ---- Drop-shadow skip warning for non-canvas parents (D-06) ----
-        if (!CanvasParent && LayerPtr->Effects.bHasDropShadow && LayerPtr->Type == EPsdLayerType::Image)
+        // ---- Drop-shadow skip warning for non-canvas parents (D-03 / Pitfall 4) ----
+        // D-03: drop shadow on Group OR Image inside non-canvas parent is a no-op + warning
+        if (!CanvasParent && LayerPtr->Effects.bHasDropShadow
+            && (LayerPtr->Type == EPsdLayerType::Image || LayerPtr->Type == EPsdLayerType::Group))
         {
             UE_LOG(LogPSD2UMG, Warning,
-                TEXT("Drop shadow on layer '%s' inside non-canvas parent '%s' — no-op (canvas-only sibling pattern)."),
+                TEXT("Drop shadow on %s layer '%s' inside non-canvas parent '%s' — no-op (canvas-only sibling pattern)."),
+                LayerPtr->Type == EPsdLayerType::Group ? TEXT("group") : TEXT("image"),
                 *LayerPtr->Name, *Parent->GetName());
         }
 
@@ -300,11 +373,22 @@ static void PopulateChildren(
         }
 
         // Recurse into group children (skip if flattened)
+        UE_LOG(LogPSD2UMG, Log, TEXT("Layer '%s': type=%d children=%d bFlattened=%d"),
+            *Layer.Name, static_cast<int32>(Layer.Type), Layer.Children.Num(), bFlattened ? 1 : 0);
         if (!bFlattened && Layer.Type == EPsdLayerType::Group && !Layer.Children.IsEmpty())
         {
             if (UPanelWidget* ChildPanel = Cast<UPanelWidget>(Widget))
             {
-                PopulateChildren(Registry, Tree, ChildPanel, Layer.Children, Doc, CanvasSize, SkippedLayerNames);
+                // Canvas panel children use local coordinate space:
+                // CanvasSize = panel size, ParentOffset = panel top-left in parent space.
+                const bool bChildIsCanvas = Cast<UCanvasPanel>(ChildPanel) != nullptr;
+                const FIntPoint ChildCanvasSize = (bChildIsCanvas && !LayerPtr->Bounds.IsEmpty())
+                    ? FIntPoint(LayerPtr->Bounds.Width(), LayerPtr->Bounds.Height())
+                    : CanvasSize;
+                const FIntPoint ChildParentOffset = (bChildIsCanvas && !LayerPtr->Bounds.IsEmpty())
+                    ? LayerPtr->Bounds.Min
+                    : ParentOffset;
+                PopulateChildren(Registry, Tree, ChildPanel, Layer.Children, Doc, ChildCanvasSize, SkippedLayerNames, ChildParentOffset);
             }
             else
             {
@@ -335,55 +419,28 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     }
     WbpPackage->FullyLoad();
 
-    // Step 1b: Sweep ANY residual objects under the target package (not just a
-    // UBlueprint). FindObject<UBlueprint> can miss stale widget-tree subobjects
-    // left from previous import/compile cycles — particularly when the BlueprintGeneratedClass
-    // or an archetype survived in memory but the UBlueprint itself was never loaded.
-    // Surviving subobjects named the same as widgets we're about to create cause
-    // "Cannot replace existing object of a different class" fatals during compile.
+    // Step 1b: If a WBP already exists in this package (e.g. user re-imports the
+    // same PSD via File > Import instead of the Reimport action), route directly
+    // to Update() rather than evicting the old WBP via MarkAsGarbage.
+    // Eviction + GC during a subsequent CompileBlueprint leaves REINST_ classes
+    // and garbage objects still reachable from the package when SaveLoadedAsset
+    // starts its traversal, triggering crashes in IsEditorOnlyObjectWithoutWritingCache.
+    if (UWidgetBlueprint* ExistingWBP = FindObject<UWidgetBlueprint>(WbpPackage, *WbpAssetName))
     {
-        TArray<UObject*> PackageObjects;
-        GetObjectsWithOuter(WbpPackage, PackageObjects, /*bIncludeNestedObjects=*/true);
-        int32 StaleCount = 0;
-        for (UObject* Obj : PackageObjects)
-        {
-            if (!Obj) continue;
-            Obj->ClearFlags(RF_Standalone | RF_Public);
-            Obj->MarkAsGarbage();
-            Obj->Rename(nullptr, GetTransientPackage(),
-                REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
-            ++StaleCount;
-        }
-        if (StaleCount > 0)
-        {
-            UE_LOG(LogPSD2UMG, Warning,
-                TEXT("FWidgetBlueprintGenerator: evicted %d residual object(s) from package '%s' before regeneration"),
-                StaleCount, *WbpPackage->GetName());
-        }
-
-        // The BlueprintGeneratedClass lives OUTSIDE the package outer in some cases
-        // (StaticFindObject by full path catches it). Name is "<AssetName>_C".
-        if (UClass* OldClass = FindObject<UClass>(WbpPackage, *FString::Printf(TEXT("%s_C"), *WbpAssetName)))
-        {
-            OldClass->ClearFlags(RF_Standalone | RF_Public);
-            OldClass->MarkAsGarbage();
-            OldClass->Rename(nullptr, GetTransientPackage(),
-                REN_DontCreateRedirectors | REN_NonTransactional);
-        }
-
-        // Force a full GC so stale subobjects are actually reaped before the new
-        // blueprint claims the canonical path.
-        if (StaleCount > 0)
-        {
-            CollectGarbage(RF_NoFlags, /*bPurgeObjectsOnFullPurge=*/true);
-        }
+        UE_LOG(LogPSD2UMG, Log,
+            TEXT("FWidgetBlueprintGenerator: WBP '%s' already exists — routing to Update()"), *WbpAssetName);
+        return Update(ExistingWBP, Doc, SkippedLayerNames) ? ExistingWBP : nullptr;
     }
 
-    // Step 2: Create WBP via factory (canonical editor path — same as "New Widget Blueprint" in Content Browser)
+    // Step 2: Create WBP via factory (canonical editor path).
+    // Set RootWidgetClass = UCanvasPanel so the factory creates a canvas root.
+    // FactoryCreateNew may overwrite this from project DefaultRootWidget settings,
+    // but UCanvasPanel is the standard default, so it's preserved in almost all cases.
     UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>(GetTransientPackage());
     Factory->AddToRoot();
     Factory->ParentClass = UUserWidget::StaticClass();
 
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 2 FactoryCreateNew start for %s"), *WbpAssetName);
     UWidgetBlueprint* WBP = CastChecked<UWidgetBlueprint>(
         Factory->FactoryCreateNew(
             UWidgetBlueprint::StaticClass(),
@@ -392,6 +449,7 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
             RF_Public | RF_Standalone | RF_Transactional,
             nullptr,
             GWarn));
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 2 FactoryCreateNew done, WBP=%p"), WBP);
 
     Factory->RemoveFromRoot();
 
@@ -401,76 +459,63 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
         return nullptr;
     }
 
-    // Step 2b: Evict any widgets the factory / OnWidgetBlueprintCreated hook
-    // inserted before we populate. Project plugins commonly listen to this
-    // event and inject default widgets; they can collide by-name with PSD
-    // layer widgets during blueprint compile ("Cannot replace existing object
-    // of a different class"). Sweeping here guarantees a pristine tree.
-    if (WBP->WidgetTree)
+    // Step 3: Get (or create) the root canvas.
+    //
+    // CRITICAL: Do NOT rename/evict the factory's root widget to the transient package.
+    // AllWidgets is UPROPERTY(Instanced) — during CompileBlueprint's internal GC pass,
+    // it resolves every TObjectPtr in AllWidgets. If the factory widget was moved to
+    // transient, its handle can resolve to INDEX_NONE → GetObjectPtr(-1) → fatal checkf.
+    //
+    // Instead, USE the factory's CanvasPanel as our root. PSD layers are added as its
+    // children. The factory widget stays properly registered in GUObjectArray throughout.
+    UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+    if (!RootCanvas)
     {
-        WBP->WidgetTree->RootWidget = nullptr;
-        TArray<UObject*> TreeSubobjects;
-        GetObjectsWithOuter(WBP->WidgetTree, TreeSubobjects, /*bIncludeNestedObjects=*/true);
-        int32 EvictedCount = 0;
-        for (UObject* Obj : TreeSubobjects)
-        {
-            if (!Obj) continue;
-            Obj->ClearFlags(RF_Standalone | RF_Public);
-            Obj->MarkAsGarbage();
-            Obj->Rename(nullptr, GetTransientPackage(),
-                REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
-            ++EvictedCount;
-        }
-        if (EvictedCount > 0)
-        {
-            UE_LOG(LogPSD2UMG, Warning,
-                TEXT("FWidgetBlueprintGenerator: evicted %d factory/hook-inserted widget(s) from fresh WidgetTree"),
-                EvictedCount);
-        }
+        // Project settings produced no canvas (DefaultRootWidget = null or non-canvas).
+        // No factory widget exists to orphan, so creating ours here is safe.
+        RootCanvas = WBP->WidgetTree->ConstructWidget<UCanvasPanel>(
+            UCanvasPanel::StaticClass(), TEXT("Root_Canvas"));
+        WBP->WidgetTree->RootWidget = RootCanvas;
     }
-
-    // Also sweep the BlueprintGeneratedClass CDO's WidgetTree archetype if it
-    // exists — same reasoning as above but for the class-level defaults that
-    // get baked into the generated class template during compile.
-    if (WBP->GeneratedClass)
-    {
-        if (UWidgetBlueprintGeneratedClass* BPGClass = Cast<UWidgetBlueprintGeneratedClass>(WBP->GeneratedClass))
-        {
-            if (UWidgetTree* ArchetypeTree = BPGClass->GetWidgetTreeArchetype())
-            {
-                ArchetypeTree->RootWidget = nullptr;
-                TArray<UObject*> ArchetypeSubobjects;
-                GetObjectsWithOuter(ArchetypeTree, ArchetypeSubobjects, /*bIncludeNestedObjects=*/true);
-                for (UObject* Obj : ArchetypeSubobjects)
-                {
-                    if (!Obj) continue;
-                    Obj->ClearFlags(RF_Standalone | RF_Public);
-                    Obj->MarkAsGarbage();
-                    Obj->Rename(nullptr, GetTransientPackage(),
-                        REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
-                }
-            }
-        }
-    }
-
-    // Step 3: Set up root canvas
-    UCanvasPanel* RootCanvas = WBP->WidgetTree->ConstructWidget<UCanvasPanel>(
-        UCanvasPanel::StaticClass(), TEXT("Root_Canvas"));
-    WBP->WidgetTree->RootWidget = RootCanvas;
 
     // Step 4: Populate widget tree recursively
     // Set the thread-local package path so FSmartObjectLayerMapper can obtain
     // the parent WBP location without interface changes (per plan 06-02 depth strategy).
     FSmartObjectImporter::SetCurrentPackagePath(WbpPackagePath);
     FLayerMappingRegistry Registry;
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 4 PopulateChildren start, %d root layers"), Doc.RootLayers.Num());
     PopulateChildren(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 4 PopulateChildren done"));
 
-    // Step 5: Compile AFTER full tree population (critical — compiling before population leaves empty BP)
-    FKismetEditorUtilities::CompileBlueprint(WBP);
+    // Step 5: Compile AFTER full tree population (critical — compiling before population leaves empty BP).
+    // SkipGarbageCollection defers GC to the explicit call below (matches ReloadUtilities.cpp pattern).
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint start for %s"), *WbpAssetName);
+    FKismetEditorUtilities::CompileBlueprint(WBP, EBlueprintCompileOptions::SkipGarbageCollection);
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint done"));
+
+    // Set design canvas size to match PSD so the WBP designer view shows the correct layout.
+    if (WBP->GeneratedClass)
+    {
+        if (UUserWidget* CDO = Cast<UUserWidget>(WBP->GeneratedClass->GetDefaultObject()))
+        {
+            CDO->DesignTimeSize = FVector2D(static_cast<float>(Doc.CanvasSize.X), static_cast<float>(Doc.CanvasSize.Y));
+            CDO->DesignSizeMode = EDesignPreviewSizeMode::Custom;
+        }
+    }
+
+    // Step 5b: Flush garbage with standard editor keep-flags (RF_Standalone).
+    // RF_NoFlags would strip the RF_Standalone protection from WBP, textures, and widgets,
+    // letting them be collected before SaveLoadedAsset traverses the package.
+    // GARBAGE_COLLECTION_KEEPFLAGS == RF_Standalone in editor mode (matches ReloadUtilities.cpp:1202).
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5b CollectGarbage start"));
+    CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS, /*bPurgeObjectsOnFullPurge=*/true);
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5b CollectGarbage done"));
 
     // Step 6: Mark dirty and save
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 6 SaveLoadedAsset start"));
     WbpPackage->MarkPackageDirty();
     UEditorAssetLibrary::SaveLoadedAsset(WBP, false);
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 6 SaveLoadedAsset done"));
 
     UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: created and saved WBP: %s"), *FullPath);
     return WBP;
@@ -732,8 +777,9 @@ bool FWidgetBlueprintGenerator::Update(
     FLayerMappingRegistry Registry;
     UpdateCanvas(Registry, ExistingWBP->WidgetTree, RootCanvas, NewDoc.RootLayers, NewDoc, NewDoc.CanvasSize, ExistingWidgets, SkippedLayerNames);
 
-    // Compile and save
-    FKismetEditorUtilities::CompileBlueprint(ExistingWBP);
+    // Compile, flush GC, then save — same pattern as Generate().
+    FKismetEditorUtilities::CompileBlueprint(ExistingWBP, EBlueprintCompileOptions::SkipGarbageCollection);
+    CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS, /*bPurgeObjectsOnFullPurge=*/true);
     ExistingWBP->GetOutermost()->MarkPackageDirty();
     UEditorAssetLibrary::SaveLoadedAsset(ExistingWBP, false);
 

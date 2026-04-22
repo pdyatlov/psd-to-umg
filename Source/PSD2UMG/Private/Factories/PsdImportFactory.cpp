@@ -20,6 +20,7 @@
 #include "Parser/PsdParser.h"
 #include "Parser/PsdTypes.h"
 #include "PSD2UMGSetting.h"
+#include "Mapper/FontResolver.h"
 #include "UI/SPsdImportPreviewDialog.h"
 #include "UI/PsdLayerTreeItem.h"
 
@@ -271,6 +272,10 @@ UObject* UPsdImportFactory::FactoryCreateBinary(
 			MetaData.SetValue(WBP, TEXT("PSD2UMG.SourcePsdPath"), *ActualSourcePath);
 			MetaData.SetValue(WBP, TEXT("PSD2UMG.SourcePsdName"), *InName.ToString());
 		}
+
+		// D-04: clear the auto-discovery cache unconditionally at end of import
+		// (both success and failure paths) so cache state never outlives a single PSD import.
+		PSD2UMG::FFontResolver::InvalidateDiscoveryCache();
 	}
 
 	return Result;

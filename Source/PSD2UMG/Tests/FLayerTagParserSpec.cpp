@@ -34,6 +34,21 @@ BEGIN_DEFINE_SPEC(FLayerTagParserSpec, "PSD2UMG.Parser.LayerTagParser",
         return FLayerTagParser::Parse(FStringView(Name), EPsdLayerType::Text, Index, Diag);
     }
 
+    static FParsedLayerTags ParseGradient(const TCHAR* Name, FString& Diag, int32 Index = 0)
+    {
+        return FLayerTagParser::Parse(FStringView(Name), EPsdLayerType::Gradient, Index, Diag);
+    }
+
+    static FParsedLayerTags ParseSolidFill(const TCHAR* Name, FString& Diag, int32 Index = 0)
+    {
+        return FLayerTagParser::Parse(FStringView(Name), EPsdLayerType::SolidFill, Index, Diag);
+    }
+
+    static FParsedLayerTags ParseShape(const TCHAR* Name, FString& Diag, int32 Index = 0)
+    {
+        return FLayerTagParser::Parse(FStringView(Name), EPsdLayerType::Shape, Index, Diag);
+    }
+
 END_DEFINE_SPEC(FLayerTagParserSpec)
 
 void FLayerTagParserSpec::Define()
@@ -71,6 +86,27 @@ void FLayerTagParserSpec::Define()
             FString Diag;
             const FParsedLayerTags T = ParseText(TEXT("Title"), Diag);
             TestEqual(TEXT("Type"), (int32)T.Type, (int32)EPsdTagType::Text);
+        });
+
+        It("gradient layer with no type tag defaults to Image", [this]()
+        {
+            FString Diag;
+            const FParsedLayerTags T = ParseGradient(TEXT("GradBg"), Diag);
+            TestEqual(TEXT("Type"), (int32)T.Type, (int32)EPsdTagType::Image);
+        });
+
+        It("solid-fill layer with no type tag defaults to Image", [this]()
+        {
+            FString Diag;
+            const FParsedLayerTags T = ParseSolidFill(TEXT("Tint"), Diag);
+            TestEqual(TEXT("Type"), (int32)T.Type, (int32)EPsdTagType::Image);
+        });
+
+        It("shape layer with no type tag defaults to Image", [this]()
+        {
+            FString Diag;
+            const FParsedLayerTags T = ParseShape(TEXT("Rect"), Diag);
+            TestEqual(TEXT("Type"), (int32)T.Type, (int32)EPsdTagType::Image);
         });
     });
 

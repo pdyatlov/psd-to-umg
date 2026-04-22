@@ -139,7 +139,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. A font named "Roboto-Bold" in PSD resolves to the correct UE font asset without any manual configuration if the asset exists in the project
   2. A font with no exact match logs a warning and falls back to the project default font rather than silently producing no font
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [x] 17-01-PLAN.md — Enum AutoDiscovered + RED spec + REQUIREMENTS.md FONT-01/02 entries (Wave 1)
+- [ ] 17-02-PLAN.md — AssetRegistry auto-discovery cache + PsdImportFactory invalidation hook + FONT-01 close-out (Wave 2)
 
 ## Progress
 
@@ -152,7 +155,7 @@ Plans:
 | 15. Group Effects | 1/1 | Complete    | 2026-04-22 |
 | 16. Rich Text / Multiple Text Runs | 3/3 | Complete    | 2026-04-22 |
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
-| 17. Automated Font Matching | 0/? | Not started | - |
+| 17. Automated Font Matching | 1/2 | In Progress|  |
 
 ## v1.3+ Backlog
 

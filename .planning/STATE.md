@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: verifying
-stopped_at: Completed 16.1-01-PLAN.md — Phase 16.1 LayerTag Fix + Requirements Traceability DONE
-last_updated: "2026-04-22T13:12:32.162Z"
+status: executing
+stopped_at: Completed 17-automated-font-matching-17-01-PLAN.md
+last_updated: "2026-04-22T14:40:50.440Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 2
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 16.1 — layertag-fix-requirements-docs
+**Current focus:** Phase 17 — automated-font-matching
 
 ## Current Position
 
-Phase: 16.1
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 17 (automated-font-matching) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-22
 
 ## Performance Metrics
@@ -91,6 +91,7 @@ Last activity: 2026-04-22
 | Phase 15 P01 | 3m | 3 tasks | 2 files |
 | Phase 16-rich-text-multiple-text-runs P02 | 10m | 1 tasks | 1 files |
 | Phase 16.1-layertag-fix-requirements-docs P01 | 30 | 5 tasks | 6 files |
+| Phase 17-automated-font-matching P01 | 3min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -154,6 +155,9 @@ Recent decisions affecting current work:
 - [Phase 16-rich-text-multiple-text-runs]: DataTable persisted at {WbpPath}/{CleanName}_RichStyles/DT_{CleanName}_RichStyles to avoid Pitfall 6 package conflicts with WBP
 - [Phase 16.1-layertag-fix-requirements-docs]: D-02 switch maps Gradient/SolidFill/Shape to EPsdTagType::Image — mappers already gate on Type==Image so no mapper changes needed
 - [Phase 16.1-layertag-fix-requirements-docs]: bEffectivelyVisible propagated in BuildTreeRecursive for correct subtree dimming under hidden parent groups (HIDDEN-02 deviation)
+- [Phase 17-automated-font-matching]: AutoDiscovered enum value inserted at slot 2 (between CaseInsensitive and Default) per D-05 resolver chain order — no explicit integer assignments
+- [Phase 17-automated-font-matching]: RED spec split from implementation: Plan 17-01 adds failing FONT-01 test and FONT-02 chain-order guard; Plan 17-02 turns RED GREEN by implementing AutoDiscovered branch
+- [Phase 17-automated-font-matching]: FONT-02 marked Complete in REQUIREMENTS.md — DefaultFont fallback warning already implemented in FontResolver.cpp lines 116-135 per D-06
 
 ### Roadmap Evolution
 
@@ -171,6 +175,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T13:09:33.218Z
-Stopped at: Completed 16.1-01-PLAN.md — Phase 16.1 LayerTag Fix + Requirements Traceability DONE
+Last session: 2026-04-22T14:40:50.436Z
+Stopped at: Completed 17-automated-font-matching-17-01-PLAN.md
 Resume file: None

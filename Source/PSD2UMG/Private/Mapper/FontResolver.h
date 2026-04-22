@@ -13,6 +13,7 @@ namespace PSD2UMG
     {
         Exact,
         CaseInsensitive,
+        AutoDiscovered,
         Default,
         EngineDefault,
     };

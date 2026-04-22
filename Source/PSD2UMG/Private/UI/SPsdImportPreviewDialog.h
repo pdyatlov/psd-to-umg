@@ -105,7 +105,8 @@ private:
                                    TArray<TSharedPtr<FPsdLayerTreeItem>>& OutItems,
                                    int32 Depth,
                                    TWeakPtr<FPsdLayerTreeItem> Parent,
-                                   bool bParentChecked = true);
+                                   bool bParentChecked = true,
+                                   bool bParentEffectivelyVisible = true);
 
     // -------------------------------------------------------------------------
     // Member variables

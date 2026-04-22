@@ -244,7 +244,8 @@ void SPsdImportPreviewDialog::BuildTreeRecursive(
     TArray<TSharedPtr<FPsdLayerTreeItem>>& OutItems,
     int32 Depth,
     TWeakPtr<FPsdLayerTreeItem> Parent,
-    bool bParentChecked)
+    bool bParentChecked,
+    bool bParentEffectivelyVisible)
 {
     for (const FPsdLayer& Layer : Layers)
     {
@@ -252,8 +253,9 @@ void SPsdImportPreviewDialog::BuildTreeRecursive(
         Item->LayerName    = Layer.Name;                                                         // D-07: raw name as skip key
         Item->DisplayName  = Layer.ParsedTags.CleanName.IsEmpty()                                // D-07: tag-free name for display
                            ? Layer.Name : Layer.ParsedTags.CleanName;
-        Item->bLayerVisible = Layer.bVisible;                                                    // Phase 11: PSD source truth
-        Item->bChecked     = bParentChecked && Layer.bVisible;                                   // D-01 + D-02: inherit parent state
+        Item->bLayerVisible        = Layer.bVisible;                                             // Phase 11: PSD source truth
+        Item->bEffectivelyVisible  = bParentEffectivelyVisible && Layer.bVisible;                // Phase 16.1: AND with ancestors
+        Item->bChecked             = bParentChecked && Layer.bVisible;                           // D-01 + D-02: inherit parent state
         Item->WidgetTypeName = InferWidgetTypeName(Layer);
         Item->BadgeColor   = BadgeColorForType(Item->WidgetTypeName);
         Item->ChangeAnnotation = EPsdChangeAnnotation::None;
@@ -263,7 +265,7 @@ void SPsdImportPreviewDialog::BuildTreeRecursive(
 
         if (Layer.Children.Num() > 0)
         {
-            BuildTreeRecursive(Layer.Children, Item->Children, Depth + 1, Item, Item->bChecked); // D-02: propagate
+            BuildTreeRecursive(Layer.Children, Item->Children, Depth + 1, Item, Item->bChecked, Item->bEffectivelyVisible); // D-02 + Phase 16.1
         }
 
         OutItems.Add(Item);
@@ -608,7 +610,7 @@ TSharedRef<ITableRow> SPsdImportPreviewDialog::OnGenerateRow(
             SNew(STextBlock)
             .Text(FText::FromString(Item->DisplayName))
             .Font(FAppStyle::GetFontStyle(TEXT("NormalFont")))
-            .ColorAndOpacity(Item->bLayerVisible
+            .ColorAndOpacity(Item->bEffectivelyVisible
                 ? FSlateColor::UseForeground()
                 : FSlateColor(FLinearColor(1.f, 1.f, 1.f, 0.4f)))
         ]

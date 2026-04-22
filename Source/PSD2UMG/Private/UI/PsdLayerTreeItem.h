@@ -20,8 +20,9 @@ struct FPsdLayerTreeItem
     FString DisplayName;         // CleanName or raw Name — shown in tree row (Phase 11)
     FString WidgetTypeName;      // "Button", "Image", "TextBlock", "CanvasPanel", etc.
     FLinearColor BadgeColor;
-    bool bChecked = true;        // user intent — mutable; initialized from bVisible at tree build
-    bool bLayerVisible = true;   // PSD source truth — read-only after BuildTreeRecursive (Phase 11)
+    bool bChecked = true;             // user intent — mutable; initialized from bVisible at tree build
+    bool bLayerVisible = true;        // PSD source truth — read-only after BuildTreeRecursive (Phase 11)
+    bool bEffectivelyVisible = true;  // bLayerVisible AND all ancestors visible — used for row dimming
     EPsdChangeAnnotation ChangeAnnotation = EPsdChangeAnnotation::None;
     int32 Depth = 0;
     TWeakPtr<FPsdLayerTreeItem> Parent;

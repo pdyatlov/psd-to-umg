@@ -57,10 +57,10 @@
 
 | REQ-ID | Assigned Phase | Status |
 |---|---|---|
-| HIDDEN-01 | Phase 11 | Pending verification |
+| HIDDEN-01 | Phase 11 / Phase 18 | Pending (Phase 18 gap closure) |
 | HIDDEN-02 | Phase 11 / Phase 16.1 | Complete (verified 2026-04-22 — eye icon from Phase 11, row dimming from Phase 16.1) |
-| FILTER-01 | Phase 11 | Pending verification |
-| FILTER-02 | Phase 11 | Pending verification |
+| FILTER-01 | Phase 11 / Phase 18 | Pending (Phase 18 gap closure) |
+| FILTER-02 | Phase 11 / Phase 18 | Pending (Phase 18 gap closure) |
 | TEXT-F-01 | Phase 12 | Complete |
 | TEXT-F-02 | Phase 12 | Complete |
 | TEXT-F-03 | Phase 12 | Complete |

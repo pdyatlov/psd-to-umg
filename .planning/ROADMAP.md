@@ -156,6 +156,37 @@ Plans:
 | 16. Rich Text / Multiple Text Runs | 3/3 | Complete    | 2026-04-22 |
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
 | 17. Automated Font Matching | 2/2 | Complete    | 2026-04-22 |
+| 18. Phase 11 Verification Backfill | 0/TBD | Pending | — |
+| 19. Integration Stability Fixes | 0/TBD | Pending | — |
+
+## v1.1 / v1.2 Gap Closure (Phases 18-19)
+
+- [ ] **Phase 18: Phase 11 Verification Backfill** — Execute Phase 11 plans, produce VERIFICATION.md, document headless path limitation, close HIDDEN-01/FILTER-01/FILTER-02
+- [ ] **Phase 19: Integration Stability Fixes** — Raise fill/shape mapper priorities to 101, add reimport cache invalidation
+
+### Phase 18: Phase 11 Verification Backfill
+**Goal**: Formally close HIDDEN-01, FILTER-01, and FILTER-02 by executing the already-written Phase 11 plans in UE Editor, producing a VERIFICATION.md, and documenting the headless import path limitation.
+**Depends on**: Phase 11 (code complete; this phase verifies and documents)
+**Requirements**: HIDDEN-01, FILTER-01, FILTER-02
+**Gap Closure**: Closes gaps from v1.1/v1.2 audit
+**Success Criteria** (what must be TRUE):
+  1. Phase 11 plans 11-01 and 11-02 executed and confirmed working in UE Editor
+  2. VERIFICATION.md exists for Phase 11 with all criteria passing
+  3. Headless path limitation (bShowPreviewDialog=false skips filtering) formally documented
+  4. REQUIREMENTS.md HIDDEN-01, FILTER-01, FILTER-02 marked Complete
+  5. ROADMAP Phase 11 plans checked [x]
+**Plans**: TBD
+
+### Phase 19: Integration Stability Fixes
+**Goal**: Eliminate the mapper priority collision (non-stable sort risk for gradient/shape/fill layers) and reimport cache leak (fonts added between reimports invisible until engine restart).
+**Depends on**: Phase 13, Phase 14, Phase 17
+**Requirements**: GRAD-01, SHAPE-01, FONT-01 (integration hardening)
+**Gap Closure**: Closes MAPPER_PRIORITY_COLLISION and REIMPORT_CACHE_LEAK integration gaps from v1.1/v1.2 audit
+**Success Criteria** (what must be TRUE):
+  1. FFillLayerMapper, FSolidFillLayerMapper, FShapeLayerMapper registered at priority 101 (above FImageLayerMapper at 100)
+  2. FPsdReimportHandler::Reimport calls FFontResolver::InvalidateDiscoveryCache() after FWidgetBlueprintGenerator::Update
+  3. Existing gradient, shape, and font tests pass with no regressions
+**Plans**: TBD
 
 ## v1.3+ Backlog
 

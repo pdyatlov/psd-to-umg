@@ -25,6 +25,28 @@ enum class EPsdLayerType : uint8
 };
 
 /**
+ * A single character-range span within a multi-run PSD text layer (Phase 16 / RICH-01, RICH-02).
+ * Populated only when the underlying TySh descriptor declares style_run_count() > 1.
+ * Plan 16-02 (parser) fills this from style_run_fill_color(i) / style_run_faux_bold(i) / style_run_font(i).
+ * Plan 16-03 (mapper) consumes this when FPsdTextRun::Spans.Num() > 1 to emit URichTextBlock.
+ */
+USTRUCT()
+struct PSD2UMG_API FPsdTextRunSpan
+{
+	GENERATED_BODY()
+
+	// UTF-8 substring for this span (slice of FPsdTextRun::Content).
+	FString Text;
+
+	// Per-span style. FontName is a PostScript name (same convention as FPsdTextRun::FontName).
+	FString FontName;
+	float SizePx = 0.f;
+	FLinearColor Color = FLinearColor::White;
+	bool bBold = false;
+	bool bItalic = false;
+};
+
+/**
  * A single text run extracted from a PSD text layer. Phase 2 only supports
  * one run per text layer (multi-run flattening with a diagnostic warning).
  * Multi-run / per-character styling is deferred to Phase 4.
@@ -57,6 +79,11 @@ struct PSD2UMG_API FPsdTextRun
 	// Units: raw PSD pixels / linear color; DPI conversion applied by FTextLayerMapper (D-09 Option B).
 	FVector2D ShadowOffset = FVector2D::ZeroVector;
 	FLinearColor ShadowColor = FLinearColor::Transparent;
+
+	// Phase 16 -- per-run spans for multi-style text (RICH-01, RICH-02).
+	// Empty (Num()==0) = single-run legacy path; Plan 16-02 populates only when style_run_count() > 1.
+	// When Num() > 1, FRichTextLayerMapper (Plan 16-03) emits URichTextBlock instead of UTextBlock.
+	TArray<FPsdTextRunSpan> Spans;
 };
 
 /**

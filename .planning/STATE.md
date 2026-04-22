@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: executing
-stopped_at: Completed 17-automated-font-matching-17-01-PLAN.md
-last_updated: "2026-04-22T14:40:50.440Z"
+status: verifying
+stopped_at: Completed 17-automated-font-matching-17-02-PLAN.md
+last_updated: "2026-04-22T14:46:26.681Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 2
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 17 (automated-font-matching) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-22
 
 ## Performance Metrics
@@ -92,6 +92,7 @@ Last activity: 2026-04-22
 | Phase 16-rich-text-multiple-text-runs P02 | 10m | 1 tasks | 1 files |
 | Phase 16.1-layertag-fix-requirements-docs P01 | 30 | 5 tasks | 6 files |
 | Phase 17-automated-font-matching P01 | 3min | 3 tasks | 3 files |
+| Phase 17-automated-font-matching P02 | 3min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -158,6 +159,9 @@ Recent decisions affecting current work:
 - [Phase 17-automated-font-matching]: AutoDiscovered enum value inserted at slot 2 (between CaseInsensitive and Default) per D-05 resolver chain order — no explicit integer assignments
 - [Phase 17-automated-font-matching]: RED spec split from implementation: Plan 17-01 adds failing FONT-01 test and FONT-02 chain-order guard; Plan 17-02 turns RED GREEN by implementing AutoDiscovered branch
 - [Phase 17-automated-font-matching]: FONT-02 marked Complete in REQUIREMENTS.md — DefaultFont fallback warning already implemented in FontResolver.cpp lines 116-135 per D-06
+- [Phase 17-automated-font-matching]: TWeakObjectPtr<UFont> for cache values prevents GC pinning fonts between imports; InvalidateDiscoveryCache clears after every import
+- [Phase 17-automated-font-matching]: Lookup key is BaseName.ToLower() after ParseSuffix strip per D-02 case-insensitive matching, not the raw PostScript name
+- [Phase 17-automated-font-matching]: Single InvalidateDiscoveryCache call at end of if (bOk) block outside if (WBP) fires on success and failure paths per D-04
 
 ### Roadmap Evolution
 
@@ -175,6 +179,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T14:40:50.436Z
-Stopped at: Completed 17-automated-font-matching-17-01-PLAN.md
+Last session: 2026-04-22T14:46:26.677Z
+Stopped at: Completed 17-automated-font-matching-17-02-PLAN.md
 Resume file: None

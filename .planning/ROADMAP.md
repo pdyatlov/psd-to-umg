@@ -68,7 +68,7 @@ Plans:
 - [x] **Phase 15: Group Effects** - Effects applied to group layers (drop shadow, color overlay) propagated to the group's container widget (completed 2026-04-22)
 - [x] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions (completed 2026-04-22)
 - [x] **Phase 16.1: LayerTag Fix + Requirements Traceability** - FLayerTagParser type-inference fix for Gradient/SolidFill/Shape layers; HIDDEN-02 row dimming; REQUIREMENTS.md extended with v1.2 requirements and corrected traceability (completed 2026-04-22)
-- [ ] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback
+- [x] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback (completed 2026-04-22)
 
 ### Phase 13: Gradient Layers
 **Goal**: Gradient fill layers from Photoshop import as usable UMG widgets — either pre-rendered as Texture2D or as a native gradient widget if available
@@ -142,7 +142,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 17-01-PLAN.md — Enum AutoDiscovered + RED spec + REQUIREMENTS.md FONT-01/02 entries (Wave 1)
-- [ ] 17-02-PLAN.md — AssetRegistry auto-discovery cache + PsdImportFactory invalidation hook + FONT-01 close-out (Wave 2)
+- [x] 17-02-PLAN.md — AssetRegistry auto-discovery cache + PsdImportFactory invalidation hook + FONT-01 close-out (Wave 2)
 
 ## Progress
 
@@ -155,7 +155,7 @@ Plans:
 | 15. Group Effects | 1/1 | Complete    | 2026-04-22 |
 | 16. Rich Text / Multiple Text Runs | 3/3 | Complete    | 2026-04-22 |
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
-| 17. Automated Font Matching | 1/2 | In Progress|  |
+| 17. Automated Font Matching | 2/2 | Complete   | 2026-04-22 |
 
 ## v1.3+ Backlog
 

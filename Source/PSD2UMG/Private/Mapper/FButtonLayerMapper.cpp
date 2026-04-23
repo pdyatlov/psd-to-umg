@@ -30,14 +30,33 @@ namespace
         {
             return false;
         }
-        UTexture2D* Tex = FTextureImporter::ImportLayer(*Child, BaseTexturePath);
+        // State children may be Group wrappers (e.g. component sets where each variant
+        // is a named group and the actual pixels live in its first Image child).
+        const FPsdLayer* ImageLayer = Child;
+        if (Child->Type == EPsdLayerType::Group)
+        {
+            ImageLayer = nullptr;
+            for (const FPsdLayer& GChild : Child->Children)
+            {
+                if (GChild.Type == EPsdLayerType::Image)
+                {
+                    ImageLayer = &GChild;
+                    break;
+                }
+            }
+        }
+        if (!ImageLayer)
+        {
+            return false;
+        }
+        UTexture2D* Tex = FTextureImporter::ImportLayer(*ImageLayer, BaseTexturePath);
         if (!Tex)
         {
             return false;
         }
         FSlateBrush Brush;
         Brush.SetResourceObject(Tex);
-        Brush.ImageSize = FVector2D(static_cast<float>(Child->PixelWidth), static_cast<float>(Child->PixelHeight));
+        Brush.ImageSize = FVector2D(static_cast<float>(ImageLayer->PixelWidth), static_cast<float>(ImageLayer->PixelHeight));
         Apply(Brush);
         return true;
     }

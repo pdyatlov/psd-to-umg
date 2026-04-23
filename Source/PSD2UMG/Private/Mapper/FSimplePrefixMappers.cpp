@@ -18,8 +18,8 @@
 #include "Components/ListView.h"
 #include "Components/TileView.h"
 #include "Components/WidgetSwitcher.h"
-#include "Blueprint/UserWidget.h"
 #include "UObject/UnrealType.h"
+#include "Widgets/PsdListEntryPlaceholder.h"
 
 // ---------------------------------------------------------------------------
 // FHBoxLayerMapper  (@hbox)
@@ -136,7 +136,7 @@ bool FListLayerMapper::CanMap(const FPsdLayer& Layer) const
 UWidget* FListLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
 {
     UListView* ListView = Tree->ConstructWidget<UListView>(UListView::StaticClass(), FName(*Layer.ParsedTags.CleanName));
-    SetListEntryClass(ListView, UUserWidget::StaticClass());
+    SetListEntryClass(ListView, UPsdListEntryPlaceholder::StaticClass());
     UE_LOG(LogPSD2UMG, Warning, TEXT("FListLayerMapper: '%s' — EntryWidgetClass set to UUserWidget placeholder; replace with your entry widget class."), *Layer.ParsedTags.CleanName);
     return ListView;
 }
@@ -152,7 +152,7 @@ bool FTileLayerMapper::CanMap(const FPsdLayer& Layer) const
 UWidget* FTileLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
 {
     UTileView* TileView = Tree->ConstructWidget<UTileView>(UTileView::StaticClass(), FName(*Layer.ParsedTags.CleanName));
-    SetListEntryClass(TileView, UUserWidget::StaticClass());
+    SetListEntryClass(TileView, UPsdListEntryPlaceholder::StaticClass());
     UE_LOG(LogPSD2UMG, Warning, TEXT("FTileLayerMapper: '%s' — EntryWidgetClass set to UUserWidget placeholder; replace with your entry widget class."), *Layer.ParsedTags.CleanName);
     return TileView;
 }

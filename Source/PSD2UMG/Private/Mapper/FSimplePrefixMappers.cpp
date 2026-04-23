@@ -19,6 +19,7 @@
 #include "Components/TileView.h"
 #include "Components/WidgetSwitcher.h"
 #include "Blueprint/UserWidget.h"
+#include "UObject/UnrealType.h"
 
 // ---------------------------------------------------------------------------
 // FHBoxLayerMapper  (@hbox)
@@ -111,6 +112,19 @@ UWidget* FInputLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Do
     return Tree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass(), FName(*Layer.ParsedTags.CleanName));
 }
 
+namespace
+{
+    // EntryWidgetClass is protected on UListViewBase with no public setter.
+    // Use reflection to set it so blueprint compilation does not fail on null entry class.
+    static void SetListEntryClass(UListViewBase* View, UClass* EntryClass)
+    {
+        if (FClassProperty* Prop = FindFProperty<FClassProperty>(UListViewBase::StaticClass(), TEXT("EntryWidgetClass")))
+        {
+            Prop->SetObjectPropertyValue_InContainer(View, EntryClass);
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // FListLayerMapper  (@list)
 // ---------------------------------------------------------------------------
@@ -122,9 +136,7 @@ bool FListLayerMapper::CanMap(const FPsdLayer& Layer) const
 UWidget* FListLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
 {
     UListView* ListView = Tree->ConstructWidget<UListView>(UListView::StaticClass(), FName(*Layer.ParsedTags.CleanName));
-    // UUserWidget is a placeholder so ValidateCompiledDefaults does not block blueprint compile.
-    // Designers must replace EntryWidgetClass with their real entry widget after import.
-    ListView->EntryWidgetClass = UUserWidget::StaticClass();
+    SetListEntryClass(ListView, UUserWidget::StaticClass());
     UE_LOG(LogPSD2UMG, Warning, TEXT("FListLayerMapper: '%s' — EntryWidgetClass set to UUserWidget placeholder; replace with your entry widget class."), *Layer.ParsedTags.CleanName);
     return ListView;
 }
@@ -140,9 +152,7 @@ bool FTileLayerMapper::CanMap(const FPsdLayer& Layer) const
 UWidget* FTileLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)
 {
     UTileView* TileView = Tree->ConstructWidget<UTileView>(UTileView::StaticClass(), FName(*Layer.ParsedTags.CleanName));
-    // UUserWidget is a placeholder so ValidateCompiledDefaults does not block blueprint compile.
-    // Designers must replace EntryWidgetClass with their real entry widget after import.
-    TileView->EntryWidgetClass = UUserWidget::StaticClass();
+    SetListEntryClass(TileView, UUserWidget::StaticClass());
     UE_LOG(LogPSD2UMG, Warning, TEXT("FTileLayerMapper: '%s' — EntryWidgetClass set to UUserWidget placeholder; replace with your entry widget class."), *Layer.ParsedTags.CleanName);
     return TileView;
 }

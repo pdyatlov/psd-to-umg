@@ -483,180 +483,6 @@ static void PopulateChildren(
 }
 
 // ---------------------------------------------------------------------------
-// FWidgetBlueprintGenerator::Generate
-// ---------------------------------------------------------------------------
-UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
-    const FPsdDocument& Doc,
-    const FString& WbpPackagePath,
-    const FString& WbpAssetName,
-    const TSet<FString>& SkippedLayerNames)
-{
-    // Step 1: Create WBP package
-    const FString FullPath = FString::Printf(TEXT("%s/%s"), *WbpPackagePath, *WbpAssetName);
-    UPackage* WbpPackage = CreatePackage(*FullPath);
-    if (!WbpPackage)
-    {
-        UE_LOG(LogPSD2UMG, Error, TEXT("FWidgetBlueprintGenerator: failed to create package for %s"), *FullPath);
-        return nullptr;
-    }
-    WbpPackage->FullyLoad();
-
-    // Step 1b: If a WBP already exists in this package (e.g. user re-imports the
-    // same PSD via File > Import instead of the Reimport action), route directly
-    // to Update() rather than evicting the old WBP via MarkAsGarbage.
-    // Eviction + GC during a subsequent CompileBlueprint leaves REINST_ classes
-    // and garbage objects still reachable from the package when SaveLoadedAsset
-    // starts its traversal, triggering crashes in IsEditorOnlyObjectWithoutWritingCache.
-    if (UWidgetBlueprint* ExistingWBP = FindObject<UWidgetBlueprint>(WbpPackage, *WbpAssetName))
-    {
-        UE_LOG(LogPSD2UMG, Log,
-            TEXT("FWidgetBlueprintGenerator: WBP '%s' already exists — routing to Update()"), *WbpAssetName);
-        return Update(ExistingWBP, Doc, SkippedLayerNames) ? ExistingWBP : nullptr;
-    }
-
-    // Step 2: Create WBP via factory (canonical editor path).
-    // Set RootWidgetClass = UCanvasPanel so the factory creates a canvas root.
-    // FactoryCreateNew may overwrite this from project DefaultRootWidget settings,
-    // but UCanvasPanel is the standard default, so it's preserved in almost all cases.
-    UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>(GetTransientPackage());
-    Factory->AddToRoot();
-    Factory->ParentClass = UUserWidget::StaticClass();
-
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 2 FactoryCreateNew start for %s"), *WbpAssetName);
-    UWidgetBlueprint* WBP = CastChecked<UWidgetBlueprint>(
-        Factory->FactoryCreateNew(
-            UWidgetBlueprint::StaticClass(),
-            WbpPackage,
-            FName(*WbpAssetName),
-            RF_Public | RF_Standalone | RF_Transactional,
-            nullptr,
-            GWarn));
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 2 FactoryCreateNew done, WBP=%p"), WBP);
-
-    Factory->RemoveFromRoot();
-
-    if (!WBP)
-    {
-        UE_LOG(LogPSD2UMG, Error, TEXT("FWidgetBlueprintGenerator: FactoryCreateNew returned null for %s"), *WbpAssetName);
-        return nullptr;
-    }
-
-    // Step 3: Get (or create) the root canvas.
-    //
-    // CRITICAL: Do NOT rename/evict the factory's root widget to the transient package.
-    // AllWidgets is UPROPERTY(Instanced) — during CompileBlueprint's internal GC pass,
-    // it resolves every TObjectPtr in AllWidgets. If the factory widget was moved to
-    // transient, its handle can resolve to INDEX_NONE → GetObjectPtr(-1) → fatal checkf.
-    //
-    // Instead, USE the factory's CanvasPanel as our root. PSD layers are added as its
-    // children. The factory widget stays properly registered in GUObjectArray throughout.
-    UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
-    if (!RootCanvas)
-    {
-        // Project settings produced no canvas (DefaultRootWidget = null or non-canvas).
-        // No factory widget exists to orphan, so creating ours here is safe.
-        RootCanvas = WBP->WidgetTree->ConstructWidget<UCanvasPanel>(
-            UCanvasPanel::StaticClass(), TEXT("Root_Canvas"));
-        WBP->WidgetTree->RootWidget = RootCanvas;
-    }
-
-    // Step 4: Populate widget tree recursively
-    // Set the thread-local package path so FSmartObjectLayerMapper can obtain
-    // the parent WBP location without interface changes (per plan 06-02 depth strategy).
-    FSmartObjectImporter::SetCurrentPackagePath(WbpPackagePath);
-    FLayerMappingRegistry Registry;
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 4 PopulateChildren start, %d root layers"), Doc.RootLayers.Num());
-    PopulateChildren(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 4 PopulateChildren done"));
-
-    // Step 4b: Phase 17.2 — build button state text animations BEFORE the first compile
-    // so WBP->Animations is populated and CompileBlueprint emits UPROPERTIES for each anim.
-    TArray<const FPsdLayer*> ButtonLayers;
-    TraverseButtonLayers(Doc.RootLayers, ButtonLayers);
-    TArray<FButtonAnimResult> ButtonAnimResults;
-    ButtonAnimResults.Reserve(ButtonLayers.Num());
-    for (const FPsdLayer* BtnLayer : ButtonLayers)
-    {
-        ButtonAnimResults.Add(BuildButtonStateAnimations(WBP, *BtnLayer));
-    }
-    UE_LOG(LogPSD2UMG, Log,
-        TEXT("FWidgetBlueprintGenerator: Step 4b — built animations for %d @button layers"),
-        ButtonLayers.Num());
-
-    // Step 5: First CompileBlueprint — SkeletonGeneratedClass gets UButton FObjectProperty
-    // (bIsVariable=true from FButtonLayerMapper) and UWidgetAnimation UPROPERTIES.
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint #1 start for %s"), *WbpAssetName);
-    FKismetEditorUtilities::CompileBlueprint(WBP, EBlueprintCompileOptions::SkipGarbageCollection);
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint #1 done"));
-
-    // Step 5b: Phase 17.2 — K2 event graph injection for every button with animations.
-    // REQUIRES SkeletonGeneratedClass to exist (compile #1 above created it).
-    for (int32 i = 0; i < ButtonLayers.Num(); ++i)
-    {
-        const FButtonAnimResult& R = ButtonAnimResults[i];
-        if (R.HoverAnim.IsEmpty() && R.PressedAnim.IsEmpty()) { continue; }
-        InjectButtonEventGraphWiring(
-            WBP,
-            ButtonLayers[i]->ParsedTags.CleanName,
-            R.HoverAnim,
-            R.PressedAnim);
-    }
-
-    // Step 5c: Phase 17.2 — second CompileBlueprint bakes K2 nodes into GeneratedClass.
-    if (ButtonAnimResults.Num() > 0)
-    {
-        UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5c CompileBlueprint #2 start (bake K2 nodes)"));
-        FKismetEditorUtilities::CompileBlueprint(WBP, EBlueprintCompileOptions::SkipGarbageCollection);
-        UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5c CompileBlueprint #2 done"));
-    }
-
-    // Set design canvas size to match PSD so the WBP designer view shows the correct layout.
-    if (WBP->GeneratedClass)
-    {
-        if (UUserWidget* CDO = Cast<UUserWidget>(WBP->GeneratedClass->GetDefaultObject()))
-        {
-            CDO->DesignTimeSize = FVector2D(static_cast<float>(Doc.CanvasSize.X), static_cast<float>(Doc.CanvasSize.Y));
-            CDO->DesignSizeMode = EDesignPreviewSizeMode::Custom;
-        }
-    }
-
-    // Step 5b: Flush garbage with standard editor keep-flags (RF_Standalone).
-    // RF_NoFlags would strip the RF_Standalone protection from WBP, textures, and widgets,
-    // letting them be collected before SaveLoadedAsset traverses the package.
-    // GARBAGE_COLLECTION_KEEPFLAGS == RF_Standalone in editor mode (matches ReloadUtilities.cpp:1202).
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5b CollectGarbage start"));
-    CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS, /*bPurgeObjectsOnFullPurge=*/true);
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5b CollectGarbage done"));
-
-    // Step 6: Mark dirty and save
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 6 SaveLoadedAsset start"));
-    WbpPackage->MarkPackageDirty();
-    UEditorAssetLibrary::SaveLoadedAsset(WBP, false);
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 6 SaveLoadedAsset done"));
-
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: created and saved WBP: %s"), *FullPath);
-    return WBP;
-}
-
-// ---------------------------------------------------------------------------
-// Internal helper: collect all widgets from a WidgetTree into a flat map by name
-// ---------------------------------------------------------------------------
-static void CollectWidgetsByName(UWidgetTree* Tree, TMap<FString, UWidget*>& OutMap)
-{
-    if (!Tree)
-    {
-        return;
-    }
-    Tree->ForEachWidget([&OutMap](UWidget* W)
-    {
-        if (W)
-        {
-            OutMap.Add(W->GetName(), W);
-        }
-    });
-}
-
-// ---------------------------------------------------------------------------
 // Phase 17.2 BTN-ANIM-02/03 — Button state text animation helpers
 // ---------------------------------------------------------------------------
 
@@ -920,6 +746,180 @@ static void InjectButtonEventGraphWiring(
         WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
             TEXT("OnReleased"),  TEXT("ReverseAnimation"), PressedAnimName);
     }
+}
+
+// ---------------------------------------------------------------------------
+// FWidgetBlueprintGenerator::Generate
+// ---------------------------------------------------------------------------
+UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
+    const FPsdDocument& Doc,
+    const FString& WbpPackagePath,
+    const FString& WbpAssetName,
+    const TSet<FString>& SkippedLayerNames)
+{
+    // Step 1: Create WBP package
+    const FString FullPath = FString::Printf(TEXT("%s/%s"), *WbpPackagePath, *WbpAssetName);
+    UPackage* WbpPackage = CreatePackage(*FullPath);
+    if (!WbpPackage)
+    {
+        UE_LOG(LogPSD2UMG, Error, TEXT("FWidgetBlueprintGenerator: failed to create package for %s"), *FullPath);
+        return nullptr;
+    }
+    WbpPackage->FullyLoad();
+
+    // Step 1b: If a WBP already exists in this package (e.g. user re-imports the
+    // same PSD via File > Import instead of the Reimport action), route directly
+    // to Update() rather than evicting the old WBP via MarkAsGarbage.
+    // Eviction + GC during a subsequent CompileBlueprint leaves REINST_ classes
+    // and garbage objects still reachable from the package when SaveLoadedAsset
+    // starts its traversal, triggering crashes in IsEditorOnlyObjectWithoutWritingCache.
+    if (UWidgetBlueprint* ExistingWBP = FindObject<UWidgetBlueprint>(WbpPackage, *WbpAssetName))
+    {
+        UE_LOG(LogPSD2UMG, Log,
+            TEXT("FWidgetBlueprintGenerator: WBP '%s' already exists — routing to Update()"), *WbpAssetName);
+        return Update(ExistingWBP, Doc, SkippedLayerNames) ? ExistingWBP : nullptr;
+    }
+
+    // Step 2: Create WBP via factory (canonical editor path).
+    // Set RootWidgetClass = UCanvasPanel so the factory creates a canvas root.
+    // FactoryCreateNew may overwrite this from project DefaultRootWidget settings,
+    // but UCanvasPanel is the standard default, so it's preserved in almost all cases.
+    UWidgetBlueprintFactory* Factory = NewObject<UWidgetBlueprintFactory>(GetTransientPackage());
+    Factory->AddToRoot();
+    Factory->ParentClass = UUserWidget::StaticClass();
+
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 2 FactoryCreateNew start for %s"), *WbpAssetName);
+    UWidgetBlueprint* WBP = CastChecked<UWidgetBlueprint>(
+        Factory->FactoryCreateNew(
+            UWidgetBlueprint::StaticClass(),
+            WbpPackage,
+            FName(*WbpAssetName),
+            RF_Public | RF_Standalone | RF_Transactional,
+            nullptr,
+            GWarn));
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 2 FactoryCreateNew done, WBP=%p"), WBP);
+
+    Factory->RemoveFromRoot();
+
+    if (!WBP)
+    {
+        UE_LOG(LogPSD2UMG, Error, TEXT("FWidgetBlueprintGenerator: FactoryCreateNew returned null for %s"), *WbpAssetName);
+        return nullptr;
+    }
+
+    // Step 3: Get (or create) the root canvas.
+    //
+    // CRITICAL: Do NOT rename/evict the factory's root widget to the transient package.
+    // AllWidgets is UPROPERTY(Instanced) — during CompileBlueprint's internal GC pass,
+    // it resolves every TObjectPtr in AllWidgets. If the factory widget was moved to
+    // transient, its handle can resolve to INDEX_NONE → GetObjectPtr(-1) → fatal checkf.
+    //
+    // Instead, USE the factory's CanvasPanel as our root. PSD layers are added as its
+    // children. The factory widget stays properly registered in GUObjectArray throughout.
+    UCanvasPanel* RootCanvas = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+    if (!RootCanvas)
+    {
+        // Project settings produced no canvas (DefaultRootWidget = null or non-canvas).
+        // No factory widget exists to orphan, so creating ours here is safe.
+        RootCanvas = WBP->WidgetTree->ConstructWidget<UCanvasPanel>(
+            UCanvasPanel::StaticClass(), TEXT("Root_Canvas"));
+        WBP->WidgetTree->RootWidget = RootCanvas;
+    }
+
+    // Step 4: Populate widget tree recursively
+    // Set the thread-local package path so FSmartObjectLayerMapper can obtain
+    // the parent WBP location without interface changes (per plan 06-02 depth strategy).
+    FSmartObjectImporter::SetCurrentPackagePath(WbpPackagePath);
+    FLayerMappingRegistry Registry;
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 4 PopulateChildren start, %d root layers"), Doc.RootLayers.Num());
+    PopulateChildren(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 4 PopulateChildren done"));
+
+    // Step 4b: Phase 17.2 — build button state text animations BEFORE the first compile
+    // so WBP->Animations is populated and CompileBlueprint emits UPROPERTIES for each anim.
+    TArray<const FPsdLayer*> ButtonLayers;
+    TraverseButtonLayers(Doc.RootLayers, ButtonLayers);
+    TArray<FButtonAnimResult> ButtonAnimResults;
+    ButtonAnimResults.Reserve(ButtonLayers.Num());
+    for (const FPsdLayer* BtnLayer : ButtonLayers)
+    {
+        ButtonAnimResults.Add(BuildButtonStateAnimations(WBP, *BtnLayer));
+    }
+    UE_LOG(LogPSD2UMG, Log,
+        TEXT("FWidgetBlueprintGenerator: Step 4b — built animations for %d @button layers"),
+        ButtonLayers.Num());
+
+    // Step 5: First CompileBlueprint — SkeletonGeneratedClass gets UButton FObjectProperty
+    // (bIsVariable=true from FButtonLayerMapper) and UWidgetAnimation UPROPERTIES.
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint #1 start for %s"), *WbpAssetName);
+    FKismetEditorUtilities::CompileBlueprint(WBP, EBlueprintCompileOptions::SkipGarbageCollection);
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint #1 done"));
+
+    // Step 5b: Phase 17.2 — K2 event graph injection for every button with animations.
+    // REQUIRES SkeletonGeneratedClass to exist (compile #1 above created it).
+    for (int32 i = 0; i < ButtonLayers.Num(); ++i)
+    {
+        const FButtonAnimResult& R = ButtonAnimResults[i];
+        if (R.HoverAnim.IsEmpty() && R.PressedAnim.IsEmpty()) { continue; }
+        InjectButtonEventGraphWiring(
+            WBP,
+            ButtonLayers[i]->ParsedTags.CleanName,
+            R.HoverAnim,
+            R.PressedAnim);
+    }
+
+    // Step 5c: Phase 17.2 — second CompileBlueprint bakes K2 nodes into GeneratedClass.
+    if (ButtonAnimResults.Num() > 0)
+    {
+        UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5c CompileBlueprint #2 start (bake K2 nodes)"));
+        FKismetEditorUtilities::CompileBlueprint(WBP, EBlueprintCompileOptions::SkipGarbageCollection);
+        UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5c CompileBlueprint #2 done"));
+    }
+
+    // Set design canvas size to match PSD so the WBP designer view shows the correct layout.
+    if (WBP->GeneratedClass)
+    {
+        if (UUserWidget* CDO = Cast<UUserWidget>(WBP->GeneratedClass->GetDefaultObject()))
+        {
+            CDO->DesignTimeSize = FVector2D(static_cast<float>(Doc.CanvasSize.X), static_cast<float>(Doc.CanvasSize.Y));
+            CDO->DesignSizeMode = EDesignPreviewSizeMode::Custom;
+        }
+    }
+
+    // Step 5b: Flush garbage with standard editor keep-flags (RF_Standalone).
+    // RF_NoFlags would strip the RF_Standalone protection from WBP, textures, and widgets,
+    // letting them be collected before SaveLoadedAsset traverses the package.
+    // GARBAGE_COLLECTION_KEEPFLAGS == RF_Standalone in editor mode (matches ReloadUtilities.cpp:1202).
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5b CollectGarbage start"));
+    CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS, /*bPurgeObjectsOnFullPurge=*/true);
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5b CollectGarbage done"));
+
+    // Step 6: Mark dirty and save
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 6 SaveLoadedAsset start"));
+    WbpPackage->MarkPackageDirty();
+    UEditorAssetLibrary::SaveLoadedAsset(WBP, false);
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 6 SaveLoadedAsset done"));
+
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: created and saved WBP: %s"), *FullPath);
+    return WBP;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helper: collect all widgets from a WidgetTree into a flat map by name
+// ---------------------------------------------------------------------------
+static void CollectWidgetsByName(UWidgetTree* Tree, TMap<FString, UWidget*>& OutMap)
+{
+    if (!Tree)
+    {
+        return;
+    }
+    Tree->ForEachWidget([&OutMap](UWidget* W)
+    {
+        if (W)
+        {
+            OutMap.Add(W->GetName(), W);
+        }
+    });
 }
 
 // ---------------------------------------------------------------------------

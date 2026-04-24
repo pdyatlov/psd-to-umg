@@ -9,6 +9,8 @@
 #include "Tracks/MovieSceneFloatTrack.h"
 #include "Sections/MovieSceneFloatSection.h"
 #include "Channels/MovieSceneFloatChannel.h"
+#include "Tracks/MovieSceneColorTrack.h"
+#include "Sections/MovieSceneColorSection.h"
 #include "MovieSceneBinding.h"
 
 // Helper: build a UMovieScene with the standard UMG tick/display settings
@@ -129,6 +131,70 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateScaleAnim(
 
     WBP->Animations.Add(Anim);
 
+    return Anim;
+}
+
+UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateColorAnim(
+    UWidgetBlueprint* WBP,
+    const FString& AnimName,
+    const FName& TargetWidgetName,
+    FLinearColor FromColor, FLinearColor ToColor, float DurationSec)
+{
+    if (!WBP)
+    {
+        return nullptr;
+    }
+
+    // Pitfall 4: MakeUniqueObjectName guarantees no silent overwrite if two buttons
+    // share a CleanName within the same PSD (e.g. two "MyBtn @button" groups).
+    // The actual resolved name is readable via Anim->GetFName() after construction.
+    const FName UniqueName = MakeUniqueObjectName(
+        WBP, UWidgetAnimation::StaticClass(), FName(*AnimName));
+    UWidgetAnimation* Anim = NewObject<UWidgetAnimation>(
+        WBP,
+        UniqueName,
+        RF_Transactional | RF_Public);
+
+    UMovieScene* Scene = CreateMovieScene(WBP, DurationSec);
+    Anim->MovieScene = Scene;
+
+    const FGuid ObjectGuid = Scene->AddPossessable(
+        TargetWidgetName.ToString(), UObject::StaticClass());
+
+    const FFrameNumber StartFrame(0);
+    const FFrameNumber EndFrame(FMath::RoundToInt(DurationSec * 24000.0f));
+
+    UMovieSceneColorTrack* Track = Scene->AddTrack<UMovieSceneColorTrack>(ObjectGuid);
+    if (!Track)
+    {
+        return Anim; // defensive; AddTrack should always succeed on a fresh scene
+    }
+    Track->SetPropertyNameAndPath(FName(TEXT("ColorAndOpacity")), TEXT("ColorAndOpacity"));
+
+    UMovieSceneColorSection* Section = Cast<UMovieSceneColorSection>(Track->CreateNewSection());
+    if (!Section)
+    {
+        return Anim;
+    }
+    Section->SetRange(TRange<FFrameNumber>(StartFrame, EndFrame));
+    Track->AddSection(*Section);
+
+    Section->GetRedChannel().AddLinearKey(StartFrame,   FromColor.R);
+    Section->GetRedChannel().AddLinearKey(EndFrame,     ToColor.R);
+    Section->GetGreenChannel().AddLinearKey(StartFrame, FromColor.G);
+    Section->GetGreenChannel().AddLinearKey(EndFrame,   ToColor.G);
+    Section->GetBlueChannel().AddLinearKey(StartFrame,  FromColor.B);
+    Section->GetBlueChannel().AddLinearKey(EndFrame,    ToColor.B);
+    Section->GetAlphaChannel().AddLinearKey(StartFrame, FromColor.A);
+    Section->GetAlphaChannel().AddLinearKey(EndFrame,   ToColor.A);
+
+    FWidgetAnimationBinding Binding;
+    Binding.WidgetName = TargetWidgetName;
+    Binding.AnimationGuid = ObjectGuid;
+    Binding.SlotWidgetName = NAME_None;
+    Anim->AnimationBindings.Add(Binding);
+
+    WBP->Animations.Add(Anim);
     return Anim;
 }
 

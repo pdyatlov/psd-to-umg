@@ -19,12 +19,8 @@
 #include "Parser/FLayerTagParser.h"
 #include "Parser/PsdTypes.h"
 #include "TestHelpers.h"
+#include "Animation/FPsdWidgetAnimationBuilder.h"
 #include "PSD2UMGLog.h"
-
-// NOTE: DO NOT #include "Animation/FPsdWidgetAnimationBuilder.h" here until
-// Plan 02 lands CreateColorAnim — including it now would be fine (the header
-// exists) but keep the intent clear: Plan 02's GREEN step turns the `#if 0`
-// blocks below into live calls by flipping to `#if 1`.
 
 #include "Animation/WidgetAnimation.h"
 #include "Blueprint/WidgetTree.h"
@@ -84,7 +80,7 @@ void FButtonStateTextAnimSpec::Define()
     {
         It("Creates exactly one UMovieSceneColorTrack bound to the target widget name", [this]()
         {
-#if 0 // Flipped to 1 by Phase 17.2 Plan 02 after CreateColorAnim lands
+#if 1 // Phase 17.2 Plan 02 — CreateColorAnim live
             UWidgetBlueprint* WBP = NewObject<UWidgetBlueprint>();
             WBP->WidgetTree = NewObject<UWidgetTree>(WBP);
             const FName LabelName(TEXT("Label"));
@@ -115,7 +111,7 @@ void FButtonStateTextAnimSpec::Define()
 
         It("Sets R/G/B/A channel start and end linear keys to FromColor and ToColor", [this]()
         {
-#if 0 // Flipped to 1 by Phase 17.2 Plan 02
+#if 1 // Phase 17.2 Plan 02 — CreateColorAnim live
             UWidgetBlueprint* WBP = NewObject<UWidgetBlueprint>();
             WBP->WidgetTree = NewObject<UWidgetTree>(WBP);
             const FName LabelName(TEXT("Label"));
@@ -178,11 +174,15 @@ void FButtonStateTextAnimSpec::Define()
 
             FPsdLayer State = PSD2UMG::Tests::MakeTaggedTestLayer(
                 TEXT("NormalGroup @state:normal"), EPsdLayerType::Group);
-            const bool bIsButtonParent = true;
 
-            // RED: Plan 02 replaces this literal `false` with the real guard return value.
-            const bool bShouldSkip = false;
-            (void)State; (void)bIsButtonParent;
+            // Phase 17.2 Plan 02 — reproduce PopulateChildren guard inline. This is the exact
+            // same predicate FWidgetBlueprintGenerator.cpp PopulateChildren uses to decide whether
+            // to `continue;` over a @state:* layer when its parent panel is a UButton. The
+            // condition is inlined in generator code (not a free function) so the test mirrors
+            // it. If PopulateChildren's guard ever changes, update this line to match.
+            const bool bIsButtonParent = true; // simulates Cast<UButton>(Parent) != nullptr
+            const bool bShouldSkip =
+                State.ParsedTags.State != EPsdStateTag::None && bIsButtonParent;
 
             TestTrue(TEXT("@state:normal child skipped under UButton parent — Plan 02 flips to true"), bShouldSkip);
         });

@@ -71,6 +71,7 @@ kind: Group -> Canvas, Image -> Image, Text -> Text.
 | `@9s` | 9-slice image, default 16px on all sides (shorthand). |
 | `@9s:L,T,R,B` | 9-slice with explicit margins (D-07). |
 | `@variants` | Group becomes `UWidgetSwitcher` (D-08). |
+| `@background` | Marks an Image inside a `@state:*` group as the state brush. Layer is skipped during child widget recursion — not added to the blueprint widget tree. If multiple Images exist in the state group, `@background` takes priority over the first-Image fallback. |
 | `@ia:IA_Confirm` | Bind input action by asset name -- case preserved (D-09). |
 | `@smartobject:TypeName` | Optional type-name annotation for smart-object layers (D-11). |
 | `@state:normal\|hover\|pressed\|disabled\|fill\|bg` | Mark a child layer as a state brush (D-12). |

@@ -262,6 +262,13 @@ namespace
 			return;
 		}
 
+		// ---- @background (modifier, no value) ----
+		if (NameLower == TEXT("background"))
+		{
+			Out.bIsBackground = true;
+			return;
+		}
+
 		// ---- @ia:IA_Name (case preserved) ----
 		if (NameLower == TEXT("ia"))
 		{

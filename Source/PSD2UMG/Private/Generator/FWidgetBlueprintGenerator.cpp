@@ -57,6 +57,13 @@ static void PopulateChildren(
             continue;
         }
 
+        // @background layers are consumed as FSlateBrush by FButtonLayerMapper; skip as child widgets.
+        if (Layer.ParsedTags.bIsBackground)
+        {
+            UE_LOG(LogPSD2UMG, Log, TEXT("PopulateChildren: '%s' skipped (@background — consumed as brush)"), *Layer.Name);
+            continue;
+        }
+
         // Skip zero-size non-groups (D-14)
         if (Layer.Bounds.IsEmpty() && Layer.Type != EPsdLayerType::Group)
         {

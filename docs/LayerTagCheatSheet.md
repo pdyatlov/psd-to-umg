@@ -60,6 +60,7 @@ Applied in addition to the type tag.
 | `@9s` | 9-slice image with default margins `{16, 16, 16, 16}`. | `Frame @9s` |
 | `@9s:L,T,R,B` | 9-slice with explicit pixel margins. | `Frame @9s:8,8,16,16` |
 | `@variants` | Group becomes `UWidgetSwitcher`; children are switcher slots. | `Menu @variants` |
+| `@background` | Mark an image inside a `@state:*` group as the state brush; layer is not exported as a child widget. | `bg @background` |
 | `@state:<value>` | Mark a child layer as a state brush on its parent button. | `Hover @state:hover` |
 | `@anim:<value>` | Mark a child group as an animation source on its parent. | `FadeIn @anim:show` |
 | `@ia:<AssetName>` | Bind an EnhancedInput action by asset name (case preserved). | `Confirm @button @ia:IA_Confirm` |
@@ -123,6 +124,7 @@ Before exporting a PSD for import:
 - [ ] 9-slice frames use `@9s` with explicit margins when the default 16 px is wrong.
 - [ ] Input-action bindings use the exact UE asset name: `@ia:IA_Confirm`, not `@ia:ia_confirm`.
 - [ ] Widget switchers (`@variants`) sit on a group layer; each child is a switcher slot.
+- [ ] Button state groups with multiple images use `@background` on the intended brush layer to avoid ambiguity.
 - [ ] Animation sources (`@anim:show|hide|hover`) sit under the widget they animate.
 - [ ] No legacy syntax remains (`Button_Name`, `_anchor-tl`, `_9s`, `[IA_X]`, `[L,T,R,B]`, `_show`, `_hide`, `_hover`, `_pressed`, `_fill`, `_bg`, `_variants`) — see the migration guide.
 

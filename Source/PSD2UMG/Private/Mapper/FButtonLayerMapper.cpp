@@ -36,12 +36,24 @@ namespace
         if (Child->Type == EPsdLayerType::Group)
         {
             ImageLayer = nullptr;
+            // @background-tagged image takes priority; fall back to first Image.
             for (const FPsdLayer& GChild : Child->Children)
             {
-                if (GChild.Type == EPsdLayerType::Image)
+                if (GChild.Type == EPsdLayerType::Image && GChild.ParsedTags.bIsBackground)
                 {
                     ImageLayer = &GChild;
                     break;
+                }
+            }
+            if (!ImageLayer)
+            {
+                for (const FPsdLayer& GChild : Child->Children)
+                {
+                    if (GChild.Type == EPsdLayerType::Image)
+                    {
+                        ImageLayer = &GChild;
+                        break;
+                    }
                 }
             }
         }

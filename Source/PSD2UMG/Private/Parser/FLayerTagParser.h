@@ -115,6 +115,9 @@ struct FParsedLayerTags
 	/** @variants modifier (on groups -> UWidgetSwitcher). */
 	bool bIsVariants = false;
 
+	/** @background modifier — marks an Image inside a @state group as the state brush; skipped during child widget recursion. */
+	bool bIsBackground = false;
+
 	/** D-18: unknown tags collected here; caller logs. */
 	TArray<FString> UnknownTags;
 

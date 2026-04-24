@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: "Checkpoint: 17.2-01 Task 3 — awaiting UE Editor build + 4 RED test confirmation (Tasks 1-2 complete)"
-last_updated: "2026-04-24T14:25:37.824Z"
+stopped_at: "Checkpoint: 17.2-02 Task 5 — awaiting UE Editor build + 3 GREEN/1 RED test confirmation (Tasks 1-4 complete)"
+last_updated: "2026-04-24T14:42:59.508Z"
 last_activity: 2026-04-24 -- Phase 17.2 execution started
 progress:
   total_phases: 2
@@ -167,6 +167,9 @@ Recent decisions affecting current work:
 - [Phase 17.1-button-variants-state-wiring]: BTN-STATE-02 mappers called directly (no FLayerMappingRegistry round-trip per D-04) to avoid TArray::Sort introsort non-determinism at same priority tier
 - [Phase 17.2]: CreateColorAnim signature locked in Plan 01 spec: static UWidgetAnimation* CreateColorAnim(UWidgetBlueprint*, const FString&, const FName&, FLinearColor FromColor, FLinearColor ToColor, float DurationSec) — Plan 02 must match exactly
 - [Phase 17.2]: BTN-ANIM-01 call sites guarded with #if 0 (not commented out) — Plan 02 GREEN step is a single-line flip to #if 1 after adding CreateColorAnim
+- [Phase 17.2]: CreateColorAnim uses MakeUniqueObjectName (not FName(*AnimName)) to prevent silent overwrite when two buttons share a CleanName in the same PSD
+- [Phase 17.2]: UButton content child (UTextBlock from @state:normal) explicitly attached by FButtonLayerMapper::Map because PopulateChildren skip guard blocks ALL @state:* groups including @state:normal
+- [Phase 17.2]: PopulateChildren @state skip guard scoped to Cast<UButton>(Parent) only to avoid breaking non-button panels with @state:* children
 
 ### Roadmap Evolution
 
@@ -185,6 +188,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-24T14:25:29.644Z
-Stopped at: Checkpoint: 17.2-01 Task 3 — awaiting UE Editor build + 4 RED test confirmation (Tasks 1-2 complete)
+Last session: 2026-04-24T14:42:52.158Z
+Stopped at: Checkpoint: 17.2-02 Task 5 — awaiting UE Editor build + 3 GREEN/1 RED test confirmation (Tasks 1-4 complete)
 Resume file: None

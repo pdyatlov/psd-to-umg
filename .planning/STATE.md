@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: "Checkpoint: 17.2-02 Task 5 — awaiting UE Editor build + 3 GREEN/1 RED test confirmation (Tasks 1-4 complete)"
-last_updated: "2026-04-24T14:42:59.508Z"
-last_activity: 2026-04-24 -- Phase 17.2 execution started
+stopped_at: "Checkpoint: 17.2-03 Task 4 — awaiting UE Editor full rebuild + 4/4 BTN-ANIM tests GREEN confirmation"
+last_updated: "2026-04-24T15:04:09.386Z"
+last_activity: 2026-04-24
 progress:
   total_phases: 2
   completed_phases: 1
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 17.2 (button-state-text-animation) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 17.2
-Last activity: 2026-04-24 -- Phase 17.2 execution started
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-04-24
 
 ## Performance Metrics
 
@@ -94,6 +94,7 @@ Last activity: 2026-04-24 -- Phase 17.2 execution started
 | Phase 17-automated-font-matching P01 | 3min | 3 tasks | 3 files |
 | Phase 17-automated-font-matching P02 | 3min | 3 tasks | 4 files |
 | Phase 17.1-button-variants-state-wiring P01 | 2min | 2 tasks | 2 files |
+| Phase 17.2 P03 | 15min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -170,6 +171,9 @@ Recent decisions affecting current work:
 - [Phase 17.2]: CreateColorAnim uses MakeUniqueObjectName (not FName(*AnimName)) to prevent silent overwrite when two buttons share a CleanName in the same PSD
 - [Phase 17.2]: UButton content child (UTextBlock from @state:normal) explicitly attached by FButtonLayerMapper::Map because PopulateChildren skip guard blocks ALL @state:* groups including @state:normal
 - [Phase 17.2]: PopulateChildren @state skip guard scoped to Cast<UButton>(Parent) only to avoid breaking non-button panels with @state:* children
+- [Phase 17.2]: Two-compile sequence mandatory for K2 node injection: animations in WBP->Animations before compile #1, K2 nodes injected after compile #1 SkeletonGeneratedClass has UButton property, compile #2 bakes K2 into GeneratedClass
+- [Phase 17.2]: Disabled state (D-02): UButton has no disabled delegate — no Disabled animation or K2 injection attempted; wiring deferred to future phase
+- [Phase 17.2]: Non-destructive reimport: Update() refreshes animations additively but does NOT re-inject K2 wiring; designer Event Graph modifications preserved
 
 ### Roadmap Evolution
 
@@ -188,6 +192,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-24T14:42:52.158Z
-Stopped at: Checkpoint: 17.2-02 Task 5 — awaiting UE Editor build + 3 GREEN/1 RED test confirmation (Tasks 1-4 complete)
+Last session: 2026-04-24T15:04:09.381Z
+Stopped at: Checkpoint: 17.2-03 Task 4 — awaiting UE Editor full rebuild + 4/4 BTN-ANIM tests GREEN confirmation
 Resume file: None

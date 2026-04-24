@@ -175,7 +175,7 @@ Plans:
 Plans:
 - [x] 17.2-01-PLAN.md — Wave 1 RED: FButtonStateTextAnimSpec.cpp + REQUIREMENTS.md BTN-ANIM-01/02/03 entries
 - [x] 17.2-02-PLAN.md — Wave 2 GREEN: CreateColorAnim + FButtonLayerMapper bIsVariable + @state:normal content + PopulateChildren skip guard; spec 3/4 GREEN
-- [ ] 17.2-03-PLAN.md — Wave 3 GREEN: BlueprintGraph dep + generator integration (TraverseButtonLayers + BuildButtonStateAnimations + InjectButtonEventGraphWiring + two-compile sequence); spec 4/4 GREEN; REQUIREMENTS BTN-ANIM-01/02 Complete
+- [x] 17.2-03-PLAN.md — Wave 3 GREEN: BlueprintGraph dep + generator integration (TraverseButtonLayers + BuildButtonStateAnimations + InjectButtonEventGraphWiring + two-compile sequence); spec 4/4 GREEN; REQUIREMENTS BTN-ANIM-01/02 Complete
 - [ ] 17.2-04-PLAN.md — Wave 4 human verify: end-to-end PIE test + 17.2-VERIFICATION.md + REQUIREMENTS BTN-ANIM-03 Complete
 
 ## Progress
@@ -191,7 +191,7 @@ Plans:
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
 | 17. Automated Font Matching | 2/2 | Complete    | 2026-04-22 |
 | 17.1. Button+Variants State Wiring Validation | 1/2 | In Progress|  |
-| 17.2. Button State Text Animation | 2/4 | In Progress|  |
+| 17.2. Button State Text Animation | 3/4 | In Progress|  |
 | 18. Phase 11 Verification Backfill | 0/TBD | Pending | — |
 | 19. Integration Stability Fixes | 0/TBD | Pending | — |
 

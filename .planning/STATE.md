@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: Completed 17.1-01-PLAN.md
-last_updated: "2026-04-22T15:52:40.565Z"
-last_activity: 2026-04-22
+stopped_at: "Checkpoint: 17.2-01 Task 3 — awaiting UE Editor build + 4 RED test confirmation (Tasks 1-2 complete)"
+last_updated: "2026-04-24T14:25:37.824Z"
+last_activity: 2026-04-24 -- Phase 17.2 execution started
 progress:
   total_phases: 2
   completed_phases: 1
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 17.1 — button-variants-state-wiring
+**Current focus:** Phase 17.2 — button-state-text-animation
 
 ## Current Position
 
-Phase: 17.1 (button-variants-state-wiring) — EXECUTING
-Plan: 2 of 2
-Status: Ready to execute
-Last activity: 2026-04-22
+Phase: 17.2 (button-state-text-animation) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 17.2
+Last activity: 2026-04-24 -- Phase 17.2 execution started
 
 ## Performance Metrics
 
@@ -165,6 +165,8 @@ Recent decisions affecting current work:
 - [Phase 17-automated-font-matching]: Single InvalidateDiscoveryCache call at end of if (bOk) block outside if (WBP) fires on success and failure paths per D-04
 - [Phase 17.1-button-variants-state-wiring]: BTN-STATE-01 VariantsMapper.CanMap starts RED: FVariantsSuffixMapper returns bIsVariants only (no HasType guard); Plan 02 adds D-01 one-line guard to turn GREEN
 - [Phase 17.1-button-variants-state-wiring]: BTN-STATE-02 mappers called directly (no FLayerMappingRegistry round-trip per D-04) to avoid TArray::Sort introsort non-determinism at same priority tier
+- [Phase 17.2]: CreateColorAnim signature locked in Plan 01 spec: static UWidgetAnimation* CreateColorAnim(UWidgetBlueprint*, const FString&, const FName&, FLinearColor FromColor, FLinearColor ToColor, float DurationSec) — Plan 02 must match exactly
+- [Phase 17.2]: BTN-ANIM-01 call sites guarded with #if 0 (not commented out) — Plan 02 GREEN step is a single-line flip to #if 1 after adding CreateColorAnim
 
 ### Roadmap Evolution
 
@@ -183,6 +185,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T15:52:40.562Z
-Stopped at: Completed 17.1-01-PLAN.md
+Last session: 2026-04-24T14:25:29.644Z
+Stopped at: Checkpoint: 17.2-01 Task 3 — awaiting UE Editor build + 4 RED test confirmation (Tasks 1-2 complete)
 Resume file: None

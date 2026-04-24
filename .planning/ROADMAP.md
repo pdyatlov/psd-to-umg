@@ -70,6 +70,7 @@ Plans:
 - [x] **Phase 16.1: LayerTag Fix + Requirements Traceability** - FLayerTagParser type-inference fix for Gradient/SolidFill/Shape layers; HIDDEN-02 row dimming; REQUIREMENTS.md extended with v1.2 requirements and corrected traceability (completed 2026-04-22)
 - [x] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback (completed 2026-04-22)
 - [ ] **Phase 17.1: Button+Variants State Wiring Validation** (INSERTED) — Verify `@button`+`@variants` can co-exist on one layer, and that all four UE Button child states (`@state:normal/hover/pressed/disabled`) wire correctly
+- [ ] **Phase 17.2: Button State Text Animation** (INSERTED) — When `@button` `@state:*` groups contain text layers with different ColorAndOpacity across states, generate UWidgetAnimation color tracks and wire OnHovered/OnPressed delegates via K2 Blueprint graph nodes
 
 ### Phase 13: Gradient Layers
 **Goal**: Gradient fill layers from Photoshop import as usable UMG widgets — either pre-rendered as Texture2D or as a native gradient widget if available
@@ -159,6 +160,24 @@ Plans:
 - [x] 17.1-01-PLAN.md — Wave 0 RED: FButtonLayerMapperSpec.cpp + REQUIREMENTS.md BTN-STATE-01/02 entries (Wave 1)
 - [ ] 17.1-02-PLAN.md — GREEN: FVariantsSuffixMapper HasType guard (D-01) + FButtonLayerMapper aggregate missing-slots warning (D-03) + REQUIREMENTS close-out (Wave 2)
 
+### Phase 17.2: Button State Text Animation (INSERTED)
+**Goal**: When a @button layer contains @state:* child groups that include text layers with different ColorAndOpacity values across states, auto-generate UWidgetAnimation color tracks and wire UButton event delegates (OnHovered/OnUnhovered/OnPressed/OnReleased) to PlayAnimation/ReverseAnimation calls via K2 Blueprint graph nodes injected into the WBP Event Graph — so the generated WBP works at runtime without any designer hand-wiring.
+**Depends on**: Phase 17 (tag parser + text pipeline), Phase 17.1 (@button state-slot wiring foundation), Phase 3 (mapper pipeline)
+**Requirements**: BTN-ANIM-01, BTN-ANIM-02, BTN-ANIM-03
+**Success Criteria** (what must be TRUE):
+  1. FPsdWidgetAnimationBuilder::CreateColorAnim produces a UWidgetAnimation with one UMovieSceneColorTrack on ColorAndOpacity, four R/G/B/A channel linear keys at frames 0 and DurationSec*24000
+  2. For a @button PSD with @state:normal + @state:hover text children of different colors, the generator creates an animation named {CleanName}_Hover bound to the inner text widget; symmetric for @state:pressed → {CleanName}_Pressed
+  3. @state:* layers direct-children of a UButton are NOT added as widget children by PopulateChildren (D-08/D-09); UButton's single child comes from @state:normal non-@background content (text only in this phase, per D-05)
+  4. WBP Event Graph contains UK2Node_ComponentBoundEvent for OnHovered/OnUnhovered/OnPressed/OnReleased, each wired (then-pin → exec-pin) to UK2Node_CallFunction targeting UUserWidget::PlayAnimation or ReverseAnimation; InAnimation pin fed by UK2Node_VariableGet referencing the corresponding animation
+  5. In PIE, hovering / pressing the generated button produces a visible text color transition; unhovering / releasing reverses it
+  6. Disabled state is intentionally NOT animated — UE 5.7 UButton has no OnDisabled delegate (D-02 limitation, documented in VERIFICATION.md)
+**Plans**: 4 plans
+Plans:
+- [x] 17.2-01-PLAN.md — Wave 1 RED: FButtonStateTextAnimSpec.cpp + REQUIREMENTS.md BTN-ANIM-01/02/03 entries
+- [ ] 17.2-02-PLAN.md — Wave 2 GREEN: CreateColorAnim + FButtonLayerMapper bIsVariable + @state:normal content + PopulateChildren skip guard; spec 3/4 GREEN
+- [ ] 17.2-03-PLAN.md — Wave 3 GREEN: BlueprintGraph dep + generator integration (TraverseButtonLayers + BuildButtonStateAnimations + InjectButtonEventGraphWiring + two-compile sequence); spec 4/4 GREEN; REQUIREMENTS BTN-ANIM-01/02 Complete
+- [ ] 17.2-04-PLAN.md — Wave 4 human verify: end-to-end PIE test + 17.2-VERIFICATION.md + REQUIREMENTS BTN-ANIM-03 Complete
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -172,6 +191,7 @@ Plans:
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
 | 17. Automated Font Matching | 2/2 | Complete    | 2026-04-22 |
 | 17.1. Button+Variants State Wiring Validation | 1/2 | In Progress|  |
+| 17.2. Button State Text Animation | 1/4 | In Progress|  |
 | 18. Phase 11 Verification Backfill | 0/TBD | Pending | — |
 | 19. Integration Stability Fixes | 0/TBD | Pending | — |
 

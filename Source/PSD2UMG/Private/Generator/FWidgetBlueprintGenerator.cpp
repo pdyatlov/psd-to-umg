@@ -10,6 +10,7 @@
 #include "PSD2UMGSetting.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/Button.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
@@ -61,6 +62,21 @@ static void PopulateChildren(
         if (Layer.ParsedTags.bIsBackground)
         {
             UE_LOG(LogPSD2UMG, Log, TEXT("PopulateChildren: '%s' skipped (@background — consumed as brush)"), *Layer.Name);
+            continue;
+        }
+
+        // Phase 17.2 D-08/D-09 — @state:* layers inside a UButton are consumed by
+        // FButtonLayerMapper as brush sources (hover/pressed/disabled slots) or content
+        // sources (normal text). FButtonLayerMapper::Map attaches the single content
+        // child explicitly; the generator must NOT also add the @state:* group as a
+        // widget child. Scope the guard to UButton parents only (Pitfall 5) so non-button
+        // panels with @state:* children are unaffected.
+        if (Layer.ParsedTags.State != EPsdStateTag::None && Cast<UButton>(Parent) != nullptr)
+        {
+            UE_LOG(LogPSD2UMG, Log,
+                TEXT("PopulateChildren: '%s' skipped (@state:%d under UButton '%s' — consumed by FButtonLayerMapper)"),
+                *Layer.Name, static_cast<int32>(Layer.ParsedTags.State),
+                Parent ? *Parent->GetName() : TEXT("<null>"));
             continue;
         }
 

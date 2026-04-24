@@ -21,6 +21,12 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Animation/FPsdWidgetAnimationBuilder.h"
+#include "K2Node_ComponentBoundEvent.h"
+#include "K2Node_CallFunction.h"
+#include "K2Node_VariableGet.h"
+#include "EdGraphSchema_K2.h"
+#include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "UObject/GarbageCollection.h"
 #include "UObject/UObjectGlobals.h"
@@ -563,11 +569,46 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
     PopulateChildren(Registry, WBP->WidgetTree, RootCanvas, Doc.RootLayers, Doc, Doc.CanvasSize, SkippedLayerNames);
     UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 4 PopulateChildren done"));
 
-    // Step 5: Compile AFTER full tree population (critical — compiling before population leaves empty BP).
-    // SkipGarbageCollection defers GC to the explicit call below (matches ReloadUtilities.cpp pattern).
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint start for %s"), *WbpAssetName);
+    // Step 4b: Phase 17.2 — build button state text animations BEFORE the first compile
+    // so WBP->Animations is populated and CompileBlueprint emits UPROPERTIES for each anim.
+    TArray<const FPsdLayer*> ButtonLayers;
+    TraverseButtonLayers(Doc.RootLayers, ButtonLayers);
+    TArray<FButtonAnimResult> ButtonAnimResults;
+    ButtonAnimResults.Reserve(ButtonLayers.Num());
+    for (const FPsdLayer* BtnLayer : ButtonLayers)
+    {
+        ButtonAnimResults.Add(BuildButtonStateAnimations(WBP, *BtnLayer));
+    }
+    UE_LOG(LogPSD2UMG, Log,
+        TEXT("FWidgetBlueprintGenerator: Step 4b — built animations for %d @button layers"),
+        ButtonLayers.Num());
+
+    // Step 5: First CompileBlueprint — SkeletonGeneratedClass gets UButton FObjectProperty
+    // (bIsVariable=true from FButtonLayerMapper) and UWidgetAnimation UPROPERTIES.
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint #1 start for %s"), *WbpAssetName);
     FKismetEditorUtilities::CompileBlueprint(WBP, EBlueprintCompileOptions::SkipGarbageCollection);
-    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint done"));
+    UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5 CompileBlueprint #1 done"));
+
+    // Step 5b: Phase 17.2 — K2 event graph injection for every button with animations.
+    // REQUIRES SkeletonGeneratedClass to exist (compile #1 above created it).
+    for (int32 i = 0; i < ButtonLayers.Num(); ++i)
+    {
+        const FButtonAnimResult& R = ButtonAnimResults[i];
+        if (R.HoverAnim.IsEmpty() && R.PressedAnim.IsEmpty()) { continue; }
+        InjectButtonEventGraphWiring(
+            WBP,
+            ButtonLayers[i]->ParsedTags.CleanName,
+            R.HoverAnim,
+            R.PressedAnim);
+    }
+
+    // Step 5c: Phase 17.2 — second CompileBlueprint bakes K2 nodes into GeneratedClass.
+    if (ButtonAnimResults.Num() > 0)
+    {
+        UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5c CompileBlueprint #2 start (bake K2 nodes)"));
+        FKismetEditorUtilities::CompileBlueprint(WBP, EBlueprintCompileOptions::SkipGarbageCollection);
+        UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5c CompileBlueprint #2 done"));
+    }
 
     // Set design canvas size to match PSD so the WBP designer view shows the correct layout.
     if (WBP->GeneratedClass)
@@ -613,6 +654,272 @@ static void CollectWidgetsByName(UWidgetTree* Tree, TMap<FString, UWidget*>& Out
             OutMap.Add(W->GetName(), W);
         }
     });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 17.2 BTN-ANIM-02/03 — Button state text animation helpers
+// ---------------------------------------------------------------------------
+
+// D-06: find a text layer inside a @state:* group, preferring one whose CleanName
+// matches the @state:normal label; fall back to the first Text-type child.
+static const FPsdLayer* FindTextInStateGroup(
+    const FPsdLayer& StateGroupLayer,
+    const FString& PreferredCleanName)
+{
+    for (const FPsdLayer& Child : StateGroupLayer.Children)
+    {
+        if (Child.Type == EPsdLayerType::Text
+            && Child.ParsedTags.CleanName == PreferredCleanName)
+        {
+            return &Child;
+        }
+    }
+    for (const FPsdLayer& Child : StateGroupLayer.Children)
+    {
+        if (Child.Type == EPsdLayerType::Text)
+        {
+            return &Child;
+        }
+    }
+    return nullptr;
+}
+
+// Depth-first collect every @button layer in the tree.
+static void TraverseButtonLayers(
+    const TArray<FPsdLayer>& Layers,
+    TArray<const FPsdLayer*>& OutButtons)
+{
+    for (const FPsdLayer& Layer : Layers)
+    {
+        if (Layer.ParsedTags.Type == EPsdTagType::Button)
+        {
+            OutButtons.Add(&Layer);
+        }
+        if (!Layer.Children.IsEmpty())
+        {
+            TraverseButtonLayers(Layer.Children, OutButtons);
+        }
+    }
+}
+
+// Build {CleanName}_Hover / {CleanName}_Pressed animations from per-state text colors.
+// Returns: pair of animation names (empty string = skipped — no text in that state group
+// per D-07). D-02: Disabled state not handled — UButton exposes no disabled delegate.
+struct FButtonAnimResult { FString HoverAnim; FString PressedAnim; FString TextWidgetName; };
+
+static FButtonAnimResult BuildButtonStateAnimations(
+    UWidgetBlueprint* WBP,
+    const FPsdLayer& ButtonLayer)
+{
+    FButtonAnimResult Result;
+    if (!WBP) { return Result; }
+
+    const FString& BtnClean = ButtonLayer.ParsedTags.CleanName;
+
+    const FPsdLayer* NormalGroup =
+        FLayerTagParser::FindChildByState(ButtonLayer.Children, EPsdStateTag::Normal);
+    if (!NormalGroup || NormalGroup->Type != EPsdLayerType::Group)
+    {
+        UE_LOG(LogPSD2UMG, Log,
+            TEXT("BuildButtonStateAnimations: button '%s' has no @state:normal group; skipping animations (D-07)"),
+            *BtnClean);
+        return Result;
+    }
+
+    const FPsdLayer* NormalText = FindTextInStateGroup(*NormalGroup, FString());
+    if (!NormalText)
+    {
+        UE_LOG(LogPSD2UMG, Log,
+            TEXT("BuildButtonStateAnimations: button '%s' has no text child in @state:normal; skipping color animations (D-07)"),
+            *BtnClean);
+        return Result;
+    }
+
+    const FName TextWidgetName(*NormalText->ParsedTags.CleanName);
+    Result.TextWidgetName = NormalText->ParsedTags.CleanName;
+    const FLinearColor NormalColor = NormalText->Text.Color;
+
+    // Hover
+    if (const FPsdLayer* HoverGroup =
+            FLayerTagParser::FindChildByState(ButtonLayer.Children, EPsdStateTag::Hover))
+    {
+        if (const FPsdLayer* HoverText =
+                FindTextInStateGroup(*HoverGroup, NormalText->ParsedTags.CleanName))
+        {
+            const FString RequestedAnimName = BtnClean + TEXT("_Hover");
+            UWidgetAnimation* Anim = FPsdWidgetAnimationBuilder::CreateColorAnim(
+                WBP, RequestedAnimName, TextWidgetName,
+                NormalColor, HoverText->Text.Color, /*DurationSec=*/0.15f);
+            if (Anim)
+            {
+                // Pitfall 4: Builder uses MakeUniqueObjectName — the actual asset name
+                // may have a numeric suffix if two buttons share a CleanName.
+                // Propagate the RESOLVED name so K2 wiring references the real animation.
+                Result.HoverAnim = Anim->GetFName().ToString();
+                UE_LOG(LogPSD2UMG, Log,
+                    TEXT("BuildButtonStateAnimations: created '%s' on widget '%s' (requested '%s')"),
+                    *Result.HoverAnim, *TextWidgetName.ToString(), *RequestedAnimName);
+            }
+        }
+        else
+        {
+            UE_LOG(LogPSD2UMG, Log,
+                TEXT("BuildButtonStateAnimations: button '%s' @state:hover has no text child; hover anim skipped (D-07)"),
+                *BtnClean);
+        }
+    }
+
+    // Pressed
+    if (const FPsdLayer* PressedGroup =
+            FLayerTagParser::FindChildByState(ButtonLayer.Children, EPsdStateTag::Pressed))
+    {
+        if (const FPsdLayer* PressedText =
+                FindTextInStateGroup(*PressedGroup, NormalText->ParsedTags.CleanName))
+        {
+            const FString RequestedAnimName = BtnClean + TEXT("_Pressed");
+            UWidgetAnimation* Anim = FPsdWidgetAnimationBuilder::CreateColorAnim(
+                WBP, RequestedAnimName, TextWidgetName,
+                NormalColor, PressedText->Text.Color, /*DurationSec=*/0.10f);
+            if (Anim)
+            {
+                // Pitfall 4: propagate resolved name (may differ from RequestedAnimName
+                // if MakeUniqueObjectName added a suffix due to CleanName collision).
+                Result.PressedAnim = Anim->GetFName().ToString();
+                UE_LOG(LogPSD2UMG, Log,
+                    TEXT("BuildButtonStateAnimations: created '%s' on widget '%s' (requested '%s')"),
+                    *Result.PressedAnim, *TextWidgetName.ToString(), *RequestedAnimName);
+            }
+        }
+        else
+        {
+            UE_LOG(LogPSD2UMG, Log,
+                TEXT("BuildButtonStateAnimations: button '%s' @state:pressed has no text child; pressed anim skipped (D-07)"),
+                *BtnClean);
+        }
+    }
+
+    // D-02: UButton exposes no delegate for the disabled state; Disabled animations are deferred.
+    return Result;
+}
+
+// Inject one event→PlayAnimation / ReverseAnimation pair into the Event Graph.
+// Runs AFTER first CompileBlueprint so SkeletonGeneratedClass has UButton FObjectProperty
+// + animation UPROPERTIES. Idempotent via FindBoundEventForComponent (Pitfall 3).
+static void WireButtonEvent(
+    UWidgetBlueprint* WBP,
+    UEdGraph* EventGraph,
+    FObjectProperty* BtnProp,
+    const FName& BtnFName,
+    const FName& DelegateName,   // OnHovered / OnUnhovered / OnPressed / OnReleased
+    const FName& FunctionName,   // PlayAnimation / ReverseAnimation
+    const FString& AnimName)
+{
+    if (!WBP || !EventGraph || !BtnProp || AnimName.IsEmpty()) { return; }
+
+    // Idempotency: skip if already wired (reimport safety, Pitfall 3)
+    if (FKismetEditorUtilities::FindBoundEventForComponent(WBP, DelegateName, BtnFName))
+    {
+        UE_LOG(LogPSD2UMG, Log,
+            TEXT("WireButtonEvent: '%s.%s' already wired — skipping (idempotent)"),
+            *BtnFName.ToString(), *DelegateName.ToString());
+        return;
+    }
+
+    FKismetEditorUtilities::CreateNewBoundEventForClass(
+        UButton::StaticClass(), DelegateName, WBP, BtnProp);
+
+    // Re-find the event node we just created.
+    const UK2Node_ComponentBoundEvent* EventNodeConst =
+        FKismetEditorUtilities::FindBoundEventForComponent(WBP, DelegateName, BtnFName);
+    UK2Node_ComponentBoundEvent* EventNode = const_cast<UK2Node_ComponentBoundEvent*>(EventNodeConst);
+    if (!EventNode)
+    {
+        UE_LOG(LogPSD2UMG, Error,
+            TEXT("WireButtonEvent: CreateNewBoundEventForClass succeeded but FindBoundEventForComponent returned null ('%s.%s')"),
+            *BtnFName.ToString(), *DelegateName.ToString());
+        return;
+    }
+
+    // CallFunction node
+    UFunction* Fn = UUserWidget::StaticClass()->FindFunctionByName(FunctionName);
+    if (!Fn)
+    {
+        UE_LOG(LogPSD2UMG, Error,
+            TEXT("WireButtonEvent: UUserWidget::%s not found"), *FunctionName.ToString());
+        return;
+    }
+    UK2Node_CallFunction* CallNode = NewObject<UK2Node_CallFunction>(EventGraph);
+    CallNode->FunctionReference.SetFromField<UFunction>(Fn, /*bIsConsideredSelfContext=*/true);
+    EventGraph->AddNode(CallNode, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+    CallNode->CreateNewGuid();
+    CallNode->PostPlacedNewNode();
+    CallNode->AllocateDefaultPins();
+
+    UEdGraphPin* ThenPin = EventNode->FindPin(UEdGraphSchema_K2::PN_Then);
+    UEdGraphPin* ExecPin = CallNode->FindPin(UEdGraphSchema_K2::PN_Execute);
+    if (ThenPin && ExecPin) { ThenPin->MakeLinkTo(ExecPin); }
+
+    // Animation reference
+    UK2Node_VariableGet* GetAnim = NewObject<UK2Node_VariableGet>(EventGraph);
+    GetAnim->VariableReference.SetSelfMember(FName(*AnimName));
+    EventGraph->AddNode(GetAnim, /*bFromUI=*/false, /*bSelectNewNode=*/false);
+    GetAnim->CreateNewGuid();
+    GetAnim->PostPlacedNewNode();
+    GetAnim->AllocateDefaultPins();
+
+    UEdGraphPin* AnimOutPin = GetAnim->GetValuePin();
+    UEdGraphPin* AnimInPin = CallNode->FindPin(TEXT("InAnimation"));
+    if (AnimOutPin && AnimInPin) { AnimOutPin->MakeLinkTo(AnimInPin); }
+
+    UE_LOG(LogPSD2UMG, Log,
+        TEXT("WireButtonEvent: %s.%s → %s(%s) wired"),
+        *BtnFName.ToString(), *DelegateName.ToString(),
+        *FunctionName.ToString(), *AnimName);
+}
+
+static void InjectButtonEventGraphWiring(
+    UWidgetBlueprint* WBP,
+    const FString& CleanName,
+    const FString& HoverAnimName,
+    const FString& PressedAnimName)
+{
+    if (!WBP) { return; }
+    if (HoverAnimName.IsEmpty() && PressedAnimName.IsEmpty()) { return; }
+
+    UEdGraph* EventGraph = FBlueprintEditorUtils::FindEventGraph(WBP);
+    if (!EventGraph)
+    {
+        UE_LOG(LogPSD2UMG, Warning,
+            TEXT("InjectButtonEventGraphWiring: button '%s' — no event graph on WBP"), *CleanName);
+        return;
+    }
+
+    const FName BtnFName(*CleanName);
+    FObjectProperty* BtnProp =
+        FindFProperty<FObjectProperty>(WBP->SkeletonGeneratedClass, BtnFName);
+    if (!BtnProp)
+    {
+        UE_LOG(LogPSD2UMG, Warning,
+            TEXT("InjectButtonEventGraphWiring: button '%s' — no FObjectProperty on SkeletonGeneratedClass (bIsVariable not set? compile skipped?)"),
+            *CleanName);
+        return;
+    }
+
+    // D-01, D-03: event → function pairs (hover + pressed; disabled omitted per D-02).
+    if (!HoverAnimName.IsEmpty())
+    {
+        WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
+            TEXT("OnHovered"),   TEXT("PlayAnimation"),    HoverAnimName);
+        WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
+            TEXT("OnUnhovered"), TEXT("ReverseAnimation"), HoverAnimName);
+    }
+    if (!PressedAnimName.IsEmpty())
+    {
+        WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
+            TEXT("OnPressed"),   TEXT("PlayAnimation"),    PressedAnimName);
+        WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
+            TEXT("OnReleased"),  TEXT("ReverseAnimation"), PressedAnimName);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -852,6 +1159,22 @@ bool FWidgetBlueprintGenerator::Update(
     FSmartObjectImporter::SetCurrentPackagePath(ExistingWBP->GetOutermost()->GetName());
     FLayerMappingRegistry Registry;
     UpdateCanvas(Registry, ExistingWBP->WidgetTree, RootCanvas, NewDoc.RootLayers, NewDoc, NewDoc.CanvasSize, ExistingWidgets, SkippedLayerNames);
+
+    // Phase 17.2 — refresh button state animations on reimport (additive to Animations).
+    // Non-destructive reimport is explicitly deferred (17.2-CONTEXT deferred list), so K2 wiring
+    // is NOT re-injected on reimport: designer modifications to the Event Graph are preserved.
+    TArray<const FPsdLayer*> ButtonLayersForUpdate;
+    TraverseButtonLayers(NewDoc.RootLayers, ButtonLayersForUpdate);
+    for (const FPsdLayer* BtnLayer : ButtonLayersForUpdate)
+    {
+        BuildButtonStateAnimations(ExistingWBP, *BtnLayer);
+    }
+    if (ButtonLayersForUpdate.Num() > 0)
+    {
+        UE_LOG(LogPSD2UMG, Log,
+            TEXT("FWidgetBlueprintGenerator::Update: refreshed animations for %d @button layers; K2 wiring preserved (non-destructive reimport deferred)"),
+            ButtonLayersForUpdate.Num());
+    }
 
     // Compile, flush GC, then save — same pattern as Generate().
     FKismetEditorUtilities::CompileBlueprint(ExistingWBP, EBlueprintCompileOptions::SkipGarbageCollection);

@@ -115,7 +115,7 @@ void FButtonStateTextAnimSpec::Define()
             UWidgetBlueprint* WBP = NewObject<UWidgetBlueprint>();
             WBP->WidgetTree = NewObject<UWidgetTree>(WBP);
             const FName LabelName(TEXT("Label"));
-            WBP->WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), LabelName);
+            (void)WBP->WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), LabelName);
 
             const FLinearColor From(0.25f, 0.50f, 0.75f, 1.00f);
             const FLinearColor To  (0.90f, 0.10f, 0.20f, 0.80f);

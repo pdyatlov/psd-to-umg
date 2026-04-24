@@ -62,6 +62,9 @@ public class PSD2UMG : ModuleRules
                 "EnhancedInput",
                 "CommonUI",
                 "InputCore",
+                // Phase 17.2 (BTN-ANIM-03) — UK2Node_ComponentBoundEvent, UK2Node_CallFunction,
+                // UK2Node_VariableGet, UEdGraphSchema_K2 for button event graph wiring.
+                "BlueprintGraph",
             }
         );
     }

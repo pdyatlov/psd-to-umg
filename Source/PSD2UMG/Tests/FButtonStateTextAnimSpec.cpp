@@ -31,6 +31,11 @@
 #include "Sections/MovieSceneColorSection.h"
 #include "Channels/MovieSceneFloatChannel.h"
 #include "WidgetBlueprint.h"
+#include "Generator/FWidgetBlueprintGenerator.h"
+#include "EdGraph/EdGraph.h"
+#include "K2Node_ComponentBoundEvent.h"
+#include "K2Node_CallFunction.h"
+#include "Kismet2/BlueprintEditorUtils.h"
 
 BEGIN_DEFINE_SPEC(FButtonStateTextAnimSpec, "PSD2UMG.ButtonStateTextAnim",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -189,31 +194,77 @@ void FButtonStateTextAnimSpec::Define()
 
         It("Full-generator: hover animation named {CleanName}_Hover exists on WBP", [this]()
         {
-            // Integration stub. Plan 03 wires the real generator path. Until then,
-            // asserting the target condition fails cleanly.
-
+            // Phase 17.2 Plan 03 — live full-generator integration.
             FPsdLayer Btn = MakeButtonWithStateColors(
                 TEXT("MyBtn @button"),
                 FLinearColor::White,
                 FLinearColor::Red);
-            (void)Btn;
 
-            // RED: Plan 03 replaces nullptr with FWidgetBlueprintGenerator::Generate(...) output.
-            UWidgetBlueprint* WBP = nullptr;
+            FPsdDocument Doc;
+            Doc.SourcePath = TEXT("C:/test/ButtonStateAnim.psd");
+            Doc.CanvasSize = FIntPoint(256, 64);
+            Doc.RootLayers.Add(MoveTemp(Btn));
 
-            if (!WBP)
-            {
-                TestFalse(TEXT("BTN-ANIM-02 full-generator integration — RED pending Plan 03"), true);
-                return;
-            }
+            // Use /Engine/Transient to avoid on-disk artefacts; unique asset name per spec run.
+            const FString PkgPath = TEXT("/Engine/Transient");
+            const FString AssetName = FString::Printf(TEXT("WBP_BtnStateAnim_%s"),
+                *FGuid::NewGuid().ToString(EGuidFormats::Short));
 
-            // The live assertions Plan 03 exercises:
+            UWidgetBlueprint* WBP =
+                FWidgetBlueprintGenerator::Generate(Doc, PkgPath, AssetName);
+            TestNotNull(TEXT("Generator returned a WBP"), WBP);
+            if (!WBP) { return; }
+
+            // BTN-ANIM-02 — animation named MyBtn_Hover exists.
             bool bFoundHoverAnim = false;
             for (const UWidgetAnimation* A : WBP->Animations)
             {
-                if (A && A->GetFName() == FName(TEXT("MyBtn_Hover"))) { bFoundHoverAnim = true; break; }
+                if (A && A->GetFName() == FName(TEXT("MyBtn_Hover")))
+                {
+                    bFoundHoverAnim = true;
+                    TestEqual(TEXT("Hover anim has one binding"), A->AnimationBindings.Num(), 1);
+                    if (A->AnimationBindings.Num() == 1)
+                    {
+                        TestEqual(TEXT("Hover anim binding targets 'Label'"),
+                            A->AnimationBindings[0].WidgetName, FName(TEXT("Label")));
+                    }
+                    break;
+                }
             }
-            TestTrue(TEXT("MyBtn_Hover animation present"), bFoundHoverAnim);
+            TestTrue(TEXT("MyBtn_Hover animation present on WBP"), bFoundHoverAnim);
+
+            // BTN-ANIM-03 smoke — Event Graph has OnHovered event node wired to a PlayAnimation call.
+            UEdGraph* EventGraph = FBlueprintEditorUtils::FindEventGraph(WBP);
+            TestNotNull(TEXT("Event Graph exists"), EventGraph);
+            if (EventGraph)
+            {
+                bool bFoundOnHovered = false;
+                bool bFoundPlayAnim = false;
+                for (UEdGraphNode* N : EventGraph->Nodes)
+                {
+                    if (UK2Node_ComponentBoundEvent* E = Cast<UK2Node_ComponentBoundEvent>(N))
+                    {
+                        // Field access verified compile-safe per 17.2-03 revision:
+                        //   DelegatePropertyName — public UPROPERTY FName (K2Node_ComponentBoundEvent.h:35-36, no getter exposed).
+                        //   GetComponentPropertyName() — public getter (K2Node_ComponentBoundEvent.h:82) wrapping the
+                        //     public UPROPERTY FName ComponentPropertyName (line 43-44). Prefer the getter for resilience.
+                        if (E->DelegatePropertyName == FName(TEXT("OnHovered"))
+                            && E->GetComponentPropertyName() == FName(TEXT("MyBtn")))
+                        {
+                            bFoundOnHovered = true;
+                        }
+                    }
+                    if (UK2Node_CallFunction* C = Cast<UK2Node_CallFunction>(N))
+                    {
+                        if (C->GetFunctionName() == FName(TEXT("PlayAnimation")))
+                        {
+                            bFoundPlayAnim = true;
+                        }
+                    }
+                }
+                TestTrue(TEXT("OnHovered ComponentBoundEvent on Event Graph"), bFoundOnHovered);
+                TestTrue(TEXT("PlayAnimation CallFunction on Event Graph"), bFoundPlayAnim);
+            }
         });
     });
 }

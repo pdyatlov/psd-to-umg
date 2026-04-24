@@ -22,6 +22,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Animation/FPsdWidgetAnimationBuilder.h"
+#include "Animation/WidgetAnimation.h"
 #include "K2Node_ComponentBoundEvent.h"
 #include "K2Node_CallFunction.h"
 #include "K2Node_VariableGet.h"

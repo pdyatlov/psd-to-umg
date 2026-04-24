@@ -58,6 +58,12 @@
 - [x] **BTN-STATE-01**: A PSD layer tagged `@button @variants` resolves deterministically to `FButtonLayerMapper` (produces `UButton`), never to `FVariantsSuffixMapper` (`UWidgetSwitcher`). `FVariantsSuffixMapper::CanMap` returns `false` when `Layer.ParsedTags.HasType()` is `true` — an explicit type tag always beats the `@variants` modifier (D-01). No warning or error is emitted when `@button` and `@variants` coexist on one layer (D-02, silent accept consistent with `@9s` on non-image layers).
 - [x] **BTN-STATE-02**: Child layers `@state:normal`, `@state:hover`, `@state:pressed`, `@state:disabled` on a `@button` group wire to `FButtonStyle::Normal/Hovered/Pressed/Disabled` via `FLayerTagParser::FindChildByState` (D-12 explicit match, D-13 Normal fallback to first untagged image child). When fewer than four slots are populated, `FButtonLayerMapper::Map` emits one aggregate `UE_LOG(LogPSD2UMG, Warning, ...)` naming the layer and listing missing slots (D-03); import does NOT abort and unfilled slots retain the default `FButtonStyle` brush.
 
+### Button State Text Animation (BTN-ANIM-*)
+
+- [ ] **BTN-ANIM-01**: `FPsdWidgetAnimationBuilder::CreateColorAnim` produces a `UWidgetAnimation` whose `MovieScene` contains exactly one `UMovieSceneColorTrack` bound via the possessable GUID to the target widget name. The track's single `UMovieSceneColorSection` holds four `FMovieSceneFloatChannel` accessors (R, G, B, A) each with a linear key at `StartFrame=0` (FromColor) and a linear key at `EndFrame = RoundToInt(DurationSec * 24000)` (ToColor). `WBP->Animations` contains the animation and `AnimationBindings` has one entry with `WidgetName == TargetWidgetName` and `SlotWidgetName == NAME_None`. Property path is `"ColorAndOpacity"`.
+- [ ] **BTN-ANIM-02**: Given a `@button` group containing `@state:normal` and `@state:hover` child groups, each with a text layer carrying a different `FPsdTextRun::Color`, the generator produces a `UButton` with the `@state:normal` text content as its child AND creates a `UWidgetAnimation` named `{CleanName}_Hover` targeting that text widget, with start-key colour equal to the normal text colour and end-key colour equal to the hover text colour. If the `@state:hover` group has no text layer (D-07), no hover animation is created (silent skip). When parent widget IS a `UButton`, `PopulateChildren` skips all `@state:*` direct children (D-08/D-09) and never adds them as widget children — the button's single child comes from `@state:normal` content only.
+- [ ] **BTN-ANIM-03**: After `FWidgetBlueprintGenerator::Generate` returns a WBP for a `@button` PSD with `@state:normal`/`@state:hover`/`@state:pressed` text colours (manual-only — UE Editor UI verification): the WBP's Event Graph contains a `UK2Node_ComponentBoundEvent` for `OnHovered` bound to the button variable, wired (then-pin → exec-pin) to a `UK2Node_CallFunction` targeting `UUserWidget::PlayAnimation`, whose `InAnimation` pin is fed by a `UK2Node_VariableGet` referencing the `{CleanName}_Hover` animation. Symmetric pairs exist for `OnUnhovered→ReverseAnimation`, `OnPressed→PlayAnimation({CleanName}_Pressed)`, `OnReleased→ReverseAnimation({CleanName}_Pressed)`. `Disabled` animation is intentionally NOT wired (D-02 limitation — UButton has no disabled delegate). In PIE: hovering the button plays the colour transition on the text widget.
+
 ## Traceability
 
 | REQ-ID | Assigned Phase | Status |
@@ -81,7 +87,10 @@
 | FONT-02 | Phase 17 | Complete (already implemented in FontResolver.cpp DefaultFont fallback; D-06 marks it closed) |
 | BTN-STATE-01 | Phase 17.1 | Complete (verified 2026-04-22 via PSD2UMG.Mapper.ButtonLayerMapper BTN-STATE-01 — FVariantsSuffixMapper::CanMap HasType guard lands in 17.1-02) |
 | BTN-STATE-02 | Phase 17.1 | Complete (verified 2026-04-22 via PSD2UMG.Mapper.ButtonLayerMapper BTN-STATE-02 — D-03 aggregate missing-slots warning in FButtonLayerMapper::Map lands in 17.1-02) |
+| BTN-ANIM-01 | Phase 17.2 | Pending (GREEN lands in 17.2-02 CreateColorAnim) |
+| BTN-ANIM-02 | Phase 17.2 | Pending (GREEN lands in 17.2-02 skip guard + 17.2-03 color extraction) |
+| BTN-ANIM-03 | Phase 17.2 | Pending (GREEN lands in 17.2-03 K2 node injection; manual UE Editor verify in 17.2-04) |
 
 ---
 
-*Last updated: 2026-04-22*
+*Last updated: 2026-04-24*

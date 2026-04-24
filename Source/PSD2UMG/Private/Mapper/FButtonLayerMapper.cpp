@@ -11,6 +11,7 @@
 #include "Misc/Paths.h"
 #include "Styling/SlateBrush.h"
 #include "Styling/SlateTypes.h"
+#include "Components/TextBlock.h"
 
 int32 FButtonLayerMapper::GetPriority() const { return 200; }
 
@@ -78,6 +79,12 @@ UWidget* FButtonLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc
 {
     UButton* Btn = Tree->ConstructWidget<UButton>(UButton::StaticClass(), FName(*Layer.ParsedTags.CleanName));
 
+    // Phase 17.2 — required for K2 event wiring (Plan 03). WidgetBlueprintCompiler only
+    // emits an FObjectProperty for the button on SkeletonGeneratedClass when bIsVariable
+    // is true, and FindBoundEventForComponent/CreateNewBoundEventForClass need that
+    // property to exist. See 17.2-RESEARCH Pitfall 1.
+    Btn->bIsVariable = true;
+
     FButtonStyle Style = FButtonStyle::GetDefault();
 
     const FString PsdName = FPaths::GetBaseFilename(Doc.SourcePath);
@@ -108,6 +115,57 @@ UWidget* FButtonLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& Doc
             *Layer.ParsedTags.CleanName,
             4 - MissingSlots.Num(),
             *FString::Join(MissingSlots, TEXT(", ")));
+    }
+
+    // Phase 17.2 D-08 — attach UButton's single child from @state:normal's non-background,
+    // non-image content. The generator's PopulateChildren skip guard (Plan 02 Task 4) prevents
+    // @state:* groups from becoming widget children, so the button would otherwise have no
+    // inner content. Scope: Phase 17.2 supports Text only (D-05); other types are logged + skipped.
+    if (const FPsdLayer* NormalGroup =
+            FLayerTagParser::FindChildByState(Layer.Children, EPsdStateTag::Normal))
+    {
+        if (NormalGroup->Type == EPsdLayerType::Group)
+        {
+            const FPsdLayer* Content = nullptr;
+            for (const FPsdLayer& NChild : NormalGroup->Children)
+            {
+                if (NChild.ParsedTags.bIsBackground) { continue; }
+                if (NChild.Type == EPsdLayerType::Image) { continue; }
+                Content = &NChild;
+                break;
+            }
+
+            if (!Content)
+            {
+                UE_LOG(LogPSD2UMG, Log,
+                    TEXT("FButtonLayerMapper: button '%s' has no @state:normal text child; UButton left without content (D-07 silent)"),
+                    *Layer.ParsedTags.CleanName);
+            }
+            else if (Content->Type == EPsdLayerType::Text)
+            {
+                UTextBlock* Label = Tree->ConstructWidget<UTextBlock>(
+                    UTextBlock::StaticClass(),
+                    FName(*Content->ParsedTags.CleanName));
+                Label->SetText(FText::FromString(Content->Text.Content));
+                FSlateFontInfo FontInfo = Label->GetFont();
+                if (Content->Text.SizePx > 0.f)
+                {
+                    FontInfo.Size = static_cast<int32>(Content->Text.SizePx);
+                }
+                Label->SetFont(FontInfo);
+                Label->SetColorAndOpacity(FSlateColor(Content->Text.Color));
+                Label->SetJustification(Content->Text.Alignment);
+                // Phase 17.2 Plan 03 animations target this widget by name — mark as variable.
+                Label->bIsVariable = true;
+                Btn->AddChild(Label);
+            }
+            else
+            {
+                UE_LOG(LogPSD2UMG, Log,
+                    TEXT("FButtonLayerMapper: @state:normal child '%s' type=%d not supported for UButton content (Phase 17.2 = Text only); skipped"),
+                    *Content->ParsedTags.CleanName, static_cast<int32>(Content->Type));
+            }
+        }
     }
 
     Btn->SetStyle(Style);

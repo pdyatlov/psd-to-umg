@@ -193,13 +193,13 @@ Plans:
 | 17.1. Button+Variants State Wiring Validation | 2/2 | Complete | 2026-04-27 |
 | 17.2. Button State Text Animation | 4/4 | Complete | 2026-04-27 |
 | 18. Hidden-Layer Filtering + 17.1 Close-out | 0/TBD | Pending | — |
-| 19. Text + Layout Correctness Fixes | 1/3 | In Progress|  |
+| 19. Text + Layout Correctness Fixes | 3/3 | Complete   | 2026-04-27 |
 | 20. Integration Stability Fixes | 0/TBD | Pending | — |
 
 ## v1.1 / v1.2 Gap Closure (Phases 18-20)
 
 - [ ] **Phase 18: Hidden-Layer Filtering + 17.1 Close-out** — Close HIDDEN-01/FILTER-01/FILTER-02 (import dialog hidden-layer filtering); formally close Phase 17.1 with VERIFICATION.md confirming BTN-STATE-01/02 code that landed during 17.2
-- [ ] **Phase 19: Text + Layout Correctness Fixes** — Color Overlay priority for text, All Caps text transform, @vbox/@hbox child order reversal fix
+- [x] **Phase 19: Text + Layout Correctness Fixes** — Color Overlay priority for text, All Caps text transform, @vbox/@hbox child order reversal fix (completed 2026-04-27)
 - [ ] **Phase 20: Integration Stability Fixes** — Raise fill/shape mapper priorities to 101, add reimport cache invalidation
 
 ### Phase 18: Hidden-Layer Filtering + 17.1 Close-out
@@ -229,8 +229,8 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 19-01-PLAN.md — TXT-FX-01 close-out: dedicated overlay-vs-fill spec assertion + dead-branch contract comment in FTextLayerMapper (no code change to ternary)
-- [ ] 19-02-PLAN.md — TXT-CAPS-01: bAllCaps on FPsdTextRun + style_run_font_caps parse + SetTextTransformPolicy(ToUpper); Wave-0 RED specs + Typography.psd text_caps fixture layer
-- [ ] 19-03-PLAN.md — LAYOUT-ORDER-01: RED slot-0 identity spec for VBoxGroup/HBoxGroup; conditional minimal fix (Option A reverse-for-non-canvas in PopulateChildren) only if RED
+- [x] 19-02-PLAN.md — TXT-CAPS-01: bAllCaps on FPsdTextRun + style_run_font_caps parse + SetTextTransformPolicy(ToUpper); Wave-0 RED specs + Typography.psd text_caps fixture layer
+- [x] 19-03-PLAN.md — LAYOUT-ORDER-01: RED slot-0 identity spec for VBoxGroup/HBoxGroup; conditional minimal fix (Option A reverse-for-non-canvas in PopulateChildren) only if RED
 
 ### Phase 20: Integration Stability Fixes
 **Goal**: Eliminate the mapper priority collision (non-stable sort risk for gradient/shape/fill layers) and reimport cache leak (fonts added between reimports invisible until engine restart).

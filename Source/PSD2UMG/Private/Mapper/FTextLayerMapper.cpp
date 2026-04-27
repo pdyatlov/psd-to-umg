@@ -11,6 +11,7 @@
 #include "Engine/Font.h"
 #include "Math/UnrealMathUtility.h"
 #include "Styling/SlateColor.h"
+#include "Styling/SlateTypes.h"
 
 int32 FTextLayerMapper::GetPriority() const { return 100; }
 
@@ -142,6 +143,15 @@ UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc
 
     // Justification (Phase 3 baseline).
     TextWidget->SetJustification(Layer.Text.Alignment);
+
+    // TXT-CAPS-01 — Photoshop All Caps character-panel transform routes to
+    // UMG's native locale-correct uppercase policy. Layers without All Caps keep
+    // ETextTransformPolicy::None (default), so we only set when the flag is true
+    // — avoids stomping a default that the Blueprint asset already encodes.
+    if (Layer.Text.bAllCaps)
+    {
+        TextWidget->SetTextTransformPolicy(ETextTransformPolicy::ToUpper);
+    }
 
     return TextWidget;
 }

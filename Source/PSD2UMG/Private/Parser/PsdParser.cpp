@@ -371,6 +371,13 @@ namespace PSD2UMG::Parser::Internal
 			{
 				OutLayer.Text.bItalic = *Italic;
 			}
+			// Phase 19 / TXT-CAPS-01 — All Caps character-panel transform.
+			// Mirror the FauxBold/FauxItalic dominant-run pattern (Pitfall 1: must
+			// use DominantRunIdx, not hardcoded 0 — multi-run fixtures rely on this).
+			if (auto Caps = Text->style_run_font_caps(DominantRunIdx); Caps.has_value())
+			{
+				OutLayer.Text.bAllCaps = (*Caps == TextLayerEnum::FontCaps::AllCaps);
+			}
 			// Also detect bold/italic from the PostScript font name itself
 			// (e.g. "Arial-BoldMT", "Arial-ItalicMT") — covers real bold/italic
 			// fonts where Faux flags are not set.

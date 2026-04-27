@@ -66,6 +66,14 @@ struct PSD2UMG_API FPsdTextRun
 	bool bBold = false;
 	bool bItalic = false;
 
+	// Phase 19 / TXT-CAPS-01 — Photoshop "All Caps" character-panel transform.
+	// Set true when style_run_font_caps(DominantRunIdx) returns
+	// TextLayerEnum::FontCaps::AllCaps. FTextLayerMapper translates this into
+	// UTextBlock::SetTextTransformPolicy(ETextTransformPolicy::ToUpper) so the
+	// Content string itself is preserved as authored (UMG handles locale-correct
+	// uppercasing at render time, mirroring Photoshop behaviour).
+	bool bAllCaps = false;
+
 	// Phase 4 additions -- layout
 	bool bHasExplicitWidth = false;
 	float BoxWidthPx = 0.f;

@@ -15,10 +15,12 @@
 #include "Sections/MovieSceneColorSection.h"
 #include "MovieSceneBinding.h"
 
-// Helper: build a UMovieScene with the standard UMG tick/display settings
-static UMovieScene* CreateMovieScene(UWidgetBlueprint* WBP, float DurationSec)
+// Helper: build a UMovieScene with the standard UMG tick/display settings.
+// Outer must be the owning UWidgetAnimation and name must match the animation FName so
+// BindAnimationsStatic can locate the UPROPERTY via Animation->GetMovieScene()->GetFName().
+static UMovieScene* CreateMovieScene(UWidgetAnimation* Anim, float DurationSec)
 {
-    UMovieScene* Scene = NewObject<UMovieScene>(WBP, MakeUniqueObjectName(WBP, UMovieScene::StaticClass()), RF_Transactional);
+    UMovieScene* Scene = NewObject<UMovieScene>(Anim, Anim->GetFName(), RF_Transactional);
 
     // Standard UMG MovieScene settings: 24000 ticks per second, 30 fps display rate
     Scene->SetTickResolutionDirectly(FFrameRate(24000, 1));
@@ -75,7 +77,7 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateOpacityFade(
         FName(*AnimName),
         RF_Transactional | RF_Public);
 
-    UMovieScene* Scene = CreateMovieScene(WBP, DurationSec);
+    UMovieScene* Scene = CreateMovieScene(Anim, DurationSec);
     Anim->MovieScene = Scene;
 
     const FGuid ObjectGuid = Scene->AddPossessable(TargetWidgetName.ToString(), UObject::StaticClass());
@@ -112,7 +114,7 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateScaleAnim(
         FName(*AnimName),
         RF_Transactional | RF_Public);
 
-    UMovieScene* Scene = CreateMovieScene(WBP, DurationSec);
+    UMovieScene* Scene = CreateMovieScene(Anim, DurationSec);
     Anim->MovieScene = Scene;
 
     const FGuid ObjectGuid = Scene->AddPossessable(TargetWidgetName.ToString(), UObject::StaticClass());
@@ -165,7 +167,7 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateColorAnim(
         ActualName,
         RF_Transactional | RF_Public);
 
-    UMovieScene* Scene = CreateMovieScene(WBP, DurationSec);
+    UMovieScene* Scene = CreateMovieScene(Anim, DurationSec);
     Anim->MovieScene = Scene;
 
     const FGuid ObjectGuid = Scene->AddPossessable(

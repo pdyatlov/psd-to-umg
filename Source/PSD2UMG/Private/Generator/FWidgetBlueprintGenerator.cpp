@@ -35,6 +35,9 @@
 #include "Blueprint/UserWidget.h"
 #include "EditorAssetLibrary.h"
 #include "Engine/Blueprint.h"
+#include "Engine/BlueprintGeneratedClass.h"
+#include "Engine/DynamicBlueprintBinding.h"
+#include "Engine/ComponentDelegateBinding.h"
 #include "WidgetBlueprint.h"
 
 // ---------------------------------------------------------------------------
@@ -532,7 +535,14 @@ static void TraverseButtonLayers(
 // Build {CleanName}_Hover / {CleanName}_Pressed animations from per-state text colors.
 // Returns: pair of animation names (empty string = skipped — no text in that state group
 // per D-07). D-02: Disabled state not handled — UButton exposes no disabled delegate.
-struct FButtonAnimResult { FString HoverAnim; FString PressedAnim; FString TextWidgetName; };
+struct FButtonAnimResult
+{
+    FString HoverAnim;
+    FString PressedAnim;
+    FString TextWidgetName;
+    float HoverDuration    = 0.15f;
+    float PressedDuration  = 0.10f;
+};
 
 static FButtonAnimResult BuildButtonStateAnimations(
     UWidgetBlueprint* WBP,
@@ -580,12 +590,14 @@ static FButtonAnimResult BuildButtonStateAnimations(
                     *BtnClean,
                     NormalColor.R, NormalColor.G, NormalColor.B, NormalColor.A);
             }
+            const float HoverDurationSec = 0.15f;
             const FString RequestedAnimName = BtnClean + TEXT("_Hover");
             UWidgetAnimation* Anim = FPsdWidgetAnimationBuilder::CreateColorAnim(
                 WBP, RequestedAnimName, TextWidgetName,
-                NormalColor, HoverText->Text.Color, /*DurationSec=*/0.15f);
+                NormalColor, HoverText->Text.Color, HoverDurationSec);
             if (Anim)
             {
+                Result.HoverDuration = HoverDurationSec;
                 // Pitfall 4: Builder uses MakeUniqueObjectName — the actual asset name
                 // may have a numeric suffix if two buttons share a CleanName.
                 // Propagate the RESOLVED name so K2 wiring references the real animation.
@@ -619,12 +631,14 @@ static FButtonAnimResult BuildButtonStateAnimations(
                     TEXT("BuildButtonStateAnimations: button '%s' pressed text color == normal color — animation will produce no visible change"),
                     *BtnClean);
             }
+            const float PressedDurationSec = 0.10f;
             const FString RequestedAnimName = BtnClean + TEXT("_Pressed");
             UWidgetAnimation* Anim = FPsdWidgetAnimationBuilder::CreateColorAnim(
                 WBP, RequestedAnimName, TextWidgetName,
-                NormalColor, PressedText->Text.Color, /*DurationSec=*/0.10f);
+                NormalColor, PressedText->Text.Color, PressedDurationSec);
             if (Anim)
             {
+                Result.PressedDuration = PressedDurationSec;
                 // Pitfall 4: propagate resolved name (may differ from RequestedAnimName
                 // if MakeUniqueObjectName added a suffix due to CleanName collision).
                 Result.PressedAnim = Anim->GetFName().ToString();
@@ -648,7 +662,12 @@ static FButtonAnimResult BuildButtonStateAnimations(
     return Result;
 }
 
-// Inject one event→PlayAnimation / ReverseAnimation pair into the Event Graph.
+// Inject one event→PlayAnimation node into the Event Graph.
+// bReverse=false: PlayAnimation(anim, 0, Forward) — forward play, holds at end frame.
+// bReverse=true:  PlayAnimation(anim, StartAtTime, Reverse) — starts from StartAtTime and plays
+//                 backward to frame 0, returning the widget to idle regardless of whether a
+//                 previous forward play is still active. Avoids ReverseAnimation which silently
+//                 no-ops when the forward play has already stopped and left ActiveAnimations.
 // Runs AFTER first CompileBlueprint so SkeletonGeneratedClass has UButton FObjectProperty
 // + animation UPROPERTIES. Idempotent via FindBoundEventForComponent (Pitfall 3).
 static void WireButtonEvent(
@@ -656,9 +675,10 @@ static void WireButtonEvent(
     UEdGraph* EventGraph,
     FObjectProperty* BtnProp,
     const FName& BtnFName,
-    const FName& DelegateName,   // OnHovered / OnUnhovered / OnPressed / OnReleased
-    const FName& FunctionName,   // PlayAnimation / ReverseAnimation
-    const FString& AnimName)
+    const FName& DelegateName,
+    const FString& AnimName,
+    bool bReverse,
+    float StartAtTime)
 {
     if (!WBP || !EventGraph || !BtnProp || AnimName.IsEmpty()) { return; }
 
@@ -686,12 +706,13 @@ static void WireButtonEvent(
         return;
     }
 
-    // CallFunction node
-    UFunction* Fn = UUserWidget::StaticClass()->FindFunctionByName(FunctionName);
+    // Always wire PlayAnimation (never ReverseAnimation): reverse is expressed via PlayMode=Reverse
+    // + StartAtTime=DurationSec on the same function, so it always creates a fresh animation state.
+    static const FName PlayAnimFn(TEXT("PlayAnimation"));
+    UFunction* Fn = UUserWidget::StaticClass()->FindFunctionByName(PlayAnimFn);
     if (!Fn)
     {
-        UE_LOG(LogPSD2UMG, Error,
-            TEXT("WireButtonEvent: UUserWidget::%s not found"), *FunctionName.ToString());
+        UE_LOG(LogPSD2UMG, Error, TEXT("WireButtonEvent: UUserWidget::PlayAnimation not found"));
         return;
     }
     UK2Node_CallFunction* CallNode = NewObject<UK2Node_CallFunction>(EventGraph);
@@ -701,11 +722,25 @@ static void WireButtonEvent(
     CallNode->PostPlacedNewNode();
     CallNode->AllocateDefaultPins();
 
+    // Set reverse-play pin defaults before linking so compile #2 bakes them correctly.
+    if (bReverse)
+    {
+        if (UEdGraphPin* StartAtPin = CallNode->FindPin(TEXT("StartAtTime")))
+        {
+            StartAtPin->DefaultValue = FString::SanitizeFloat(StartAtTime);
+        }
+        if (UEdGraphPin* PlayModePin = CallNode->FindPin(TEXT("PlayMode")))
+        {
+            // EUMGSequencePlayMode::Reverse = 1 (K2 enum pin stores the numeric value as string)
+            PlayModePin->DefaultValue = TEXT("Reverse");
+        }
+    }
+
     UEdGraphPin* ThenPin = EventNode->FindPin(UEdGraphSchema_K2::PN_Then);
     UEdGraphPin* ExecPin = CallNode->FindPin(UEdGraphSchema_K2::PN_Execute);
     if (ThenPin && ExecPin) { ThenPin->MakeLinkTo(ExecPin); }
 
-    // Animation reference
+    // Animation reference via VariableGet
     UK2Node_VariableGet* GetAnim = NewObject<UK2Node_VariableGet>(EventGraph);
     GetAnim->VariableReference.SetSelfMember(FName(*AnimName));
     EventGraph->AddNode(GetAnim, /*bFromUI=*/false, /*bSelectNewNode=*/false);
@@ -724,16 +759,18 @@ static void WireButtonEvent(
     if (AnimOutPin && AnimInPin) { AnimOutPin->MakeLinkTo(AnimInPin); }
 
     UE_LOG(LogPSD2UMG, Log,
-        TEXT("WireButtonEvent: %s.%s → %s(%s) wired"),
+        TEXT("WireButtonEvent: %s.%s → PlayAnimation(%s, StartAt=%s, %s) wired"),
         *BtnFName.ToString(), *DelegateName.ToString(),
-        *FunctionName.ToString(), *AnimName);
+        *AnimName,
+        *FString::SanitizeFloat(StartAtTime),
+        bReverse ? TEXT("Reverse") : TEXT("Forward"));
 }
 
 static void InjectButtonEventGraphWiring(
     UWidgetBlueprint* WBP,
     const FString& CleanName,
-    const FString& HoverAnimName,
-    const FString& PressedAnimName)
+    const FString& HoverAnimName,  float HoverDuration,
+    const FString& PressedAnimName, float PressedDuration)
 {
     if (!WBP) { return; }
     if (HoverAnimName.IsEmpty() && PressedAnimName.IsEmpty()) { return; }
@@ -757,20 +794,24 @@ static void InjectButtonEventGraphWiring(
         return;
     }
 
-    // D-01, D-03: event → function pairs (hover + pressed; disabled omitted per D-02).
+    // D-01, D-03: event → PlayAnimation pairs (disabled omitted per D-02).
+    // Reverse events use PlayAnimation(StartAtTime=Duration, PlayMode=Reverse) rather than
+    // ReverseAnimation() because ReverseAnimation silently no-ops when the forward play has
+    // already stopped and been removed from ActiveAnimations (e.g. user hovers and pauses
+    // > duration seconds before unhovering).
     if (!HoverAnimName.IsEmpty())
     {
         WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
-            TEXT("OnHovered"),   TEXT("PlayAnimation"),    HoverAnimName);
+            TEXT("OnHovered"),   HoverAnimName, /*bReverse=*/false, 0.0f);
         WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
-            TEXT("OnUnhovered"), TEXT("ReverseAnimation"), HoverAnimName);
+            TEXT("OnUnhovered"), HoverAnimName, /*bReverse=*/true,  HoverDuration);
     }
     if (!PressedAnimName.IsEmpty())
     {
         WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
-            TEXT("OnPressed"),   TEXT("PlayAnimation"),    PressedAnimName);
+            TEXT("OnPressed"),   PressedAnimName, /*bReverse=*/false, PressedDuration);
         WireButtonEvent(WBP, EventGraph, BtnProp, BtnFName,
-            TEXT("OnReleased"),  TEXT("ReverseAnimation"), PressedAnimName);
+            TEXT("OnReleased"), HoverAnimName, /*bReverse=*/false,  0.0f);
     }
 }
 
@@ -890,8 +931,8 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
         InjectButtonEventGraphWiring(
             WBP,
             ButtonLayers[i]->ParsedTags.CleanName,
-            R.HoverAnim,
-            R.PressedAnim);
+            R.HoverAnim,    R.HoverDuration,
+            R.PressedAnim,  R.PressedDuration);
     }
 
     // Step 5c: Phase 17.2 — second CompileBlueprint bakes K2 nodes into GeneratedClass.
@@ -900,6 +941,28 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
         UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5c CompileBlueprint #2 start (bake K2 nodes)"));
         FKismetEditorUtilities::CompileBlueprint(WBP, EBlueprintCompileOptions::SkipGarbageCollection);
         UE_LOG(LogPSD2UMG, Log, TEXT("FWidgetBlueprintGenerator: Step 5c CompileBlueprint #2 done"));
+
+        // Diagnostic: verify DynamicBindingObjects populated by UK2Node_ComponentBoundEvent::RegisterDynamicBinding
+        if (UBlueprintGeneratedClass* BPGC = Cast<UBlueprintGeneratedClass>(WBP->GeneratedClass))
+        {
+            UE_LOG(LogPSD2UMG, Log,
+                TEXT("FWidgetBlueprintGenerator [Diag]: GeneratedClass DynamicBindingObjects.Num()=%d"),
+                BPGC->DynamicBindingObjects.Num());
+            for (UDynamicBlueprintBinding* DBB : BPGC->DynamicBindingObjects)
+            {
+                if (UComponentDelegateBinding* CDB = Cast<UComponentDelegateBinding>(DBB))
+                {
+                    for (const FBlueprintComponentDelegateBinding& B : CDB->ComponentDelegateBindings)
+                    {
+                        UE_LOG(LogPSD2UMG, Log,
+                            TEXT("FWidgetBlueprintGenerator [Diag]:   ComponentDelegateBinding: Component='%s' Delegate='%s' -> Function='%s'"),
+                            *B.ComponentPropertyName.ToString(),
+                            *B.DelegatePropertyName.ToString(),
+                            *B.FunctionNameToBind.ToString());
+                    }
+                }
+            }
+        }
     }
 
     // Set design canvas size to match PSD so the WBP designer view shows the correct layout.

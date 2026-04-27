@@ -3,6 +3,7 @@
 #include "Reimport/FPsdReimportHandler.h"
 
 #include "Generator/FWidgetBlueprintGenerator.h"
+#include "Mapper/FontResolver.h"
 #include "Parser/PsdParser.h"
 #include "Parser/PsdDiagnostics.h"
 #include "Parser/PsdTypes.h"
@@ -16,6 +17,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
+#include "Misc/ScopeExit.h"
 #include "UObject/MetaData.h"
 #include "Widgets/SWindow.h"
 
@@ -61,6 +63,18 @@ void FPsdReimportHandler::SetReimportPaths(UObject* Obj, const TArray<FString>& 
 // ---------------------------------------------------------------------------
 EReimportResult::Type FPsdReimportHandler::Reimport(UObject* Obj)
 {
+    // Phase 20 / D-03: mirror the PsdImportFactory.cpp:278 pattern — clear the
+    // FFontResolver auto-discovery cache unconditionally on every exit path
+    // (early-return failures, user cancel, Update failure, success). Cache state
+    // must never outlive a single PSD reimport operation, otherwise a UFont asset
+    // added between an initial import and a reimport stays invisible until engine
+    // restart. RAII via ON_SCOPE_EXIT is the cleanest single-statement placement
+    // (D-04 — Claude's discretion picks RAII over single-exit restructuring).
+    ON_SCOPE_EXIT
+    {
+        PSD2UMG::FFontResolver::InvalidateDiscoveryCache();
+    };
+
     UWidgetBlueprint* WBP = Cast<UWidgetBlueprint>(Obj);
     if (!WBP)
     {

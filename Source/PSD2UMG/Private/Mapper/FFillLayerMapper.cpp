@@ -13,7 +13,11 @@
 #include "Components/Image.h"
 #include "Misc/Paths.h"
 
-int32 FFillLayerMapper::GetPriority() const { return 100; }
+// Phase 20 / D-01: priority bumped from 100 to 101 to win the FImageLayerMapper
+// collision (FLayerTagParser maps EPsdLayerType::Gradient -> EPsdTagType::Image
+// per Phase 16.1 D-02, so FImageLayerMapper::CanMap also returns true for these
+// layers; equal-priority TArray::Sort is non-stable). 101 makes the win deterministic.
+int32 FFillLayerMapper::GetPriority() const { return 101; }
 
 bool FFillLayerMapper::CanMap(const FPsdLayer& Layer) const
 {

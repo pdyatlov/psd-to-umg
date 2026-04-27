@@ -12,7 +12,11 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/Image.h"
 
-int32 FSolidFillLayerMapper::GetPriority() const { return 100; }
+// Phase 20 / D-01: priority bumped from 100 to 101 to win the FImageLayerMapper
+// collision (FLayerTagParser maps EPsdLayerType::SolidFill -> EPsdTagType::Image
+// per Phase 16.1 D-02). 101 makes the specialized-mapper win deterministic
+// regardless of TArray::Sort introsort ordering at equal keys.
+int32 FSolidFillLayerMapper::GetPriority() const { return 101; }
 
 bool FSolidFillLayerMapper::CanMap(const FPsdLayer& Layer) const
 {

@@ -37,13 +37,17 @@ void FLayerMappingRegistry::RegisterDefaults()
     // Suffix mappers (priority 200 — same tier as prefix mappers)
     Mappers.Add(MakeUnique<FVariantsSuffixMapper>());
 
-    // Type-based mappers (priority 100) + rich text variant (priority 110)
-    Mappers.Add(MakeUnique<FImageLayerMapper>());
-    Mappers.Add(MakeUnique<FRichTextLayerMapper>()); // Phase 16 / RICH-01, RICH-02 -- priority 110 (multi-run text)
+    // Type-based mappers — image (priority 100) + rich text (priority 110) + fill/shape (priority 101, Phase 20)
+    Mappers.Add(MakeUnique<FImageLayerMapper>());                                        // priority 100 (default image)
+    Mappers.Add(MakeUnique<FRichTextLayerMapper>()); // Phase 16 / RICH-01, RICH-02      // priority 110 (multi-run text)
     Mappers.Add(MakeUnique<FTextLayerMapper>());     // priority 100 (single-run text; CanMap narrowed to Spans.Num() <= 1)
-    Mappers.Add(MakeUnique<FFillLayerMapper>());        // Phase 13 / GRAD-01, GRAD-02 -- gradient fill
-    Mappers.Add(MakeUnique<FSolidFillLayerMapper>());   // Phase 13 / GRAD-01 -- solid color fill
-    Mappers.Add(MakeUnique<FShapeLayerMapper>());       // Phase 14 / SHAPE-01 -- drawn vector shape, solid-color fill (vscg)
+    // Phase 20 / D-01: fill / shape mappers run at priority 101 (above FImageLayerMapper)
+    // because Phase 16.1 D-02 maps EPsdLayerType::Gradient/SolidFill/Shape to EPsdTagType::Image,
+    // making FImageLayerMapper::CanMap also return true for these layers. Priority delta
+    // makes the specialized mapper win deterministically regardless of sort stability.
+    Mappers.Add(MakeUnique<FFillLayerMapper>());        // Phase 13 / GRAD-01, GRAD-02 -- gradient fill (priority 101)
+    Mappers.Add(MakeUnique<FSolidFillLayerMapper>());   // Phase 13 / GRAD-01 -- solid color fill (priority 101)
+    Mappers.Add(MakeUnique<FShapeLayerMapper>());       // Phase 14 / SHAPE-01 -- drawn vector shape, solid-color fill (vscg) (priority 101)
 
     // Default group mapper (priority 50)
     Mappers.Add(MakeUnique<FGroupLayerMapper>());

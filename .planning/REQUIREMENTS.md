@@ -89,7 +89,7 @@
 | GRPFX-02 | Phase 15 | Complete (verified 2026-04-22) |
 | RICH-01 | Phase 16 | Complete (verified 2026-04-22) |
 | RICH-02 | Phase 16 | Complete (verified 2026-04-22) |
-| FONT-01 | Phase 17 | Complete (verified 2026-04-22 — AssetRegistry scan cache lands in 17-02 Task 1; cache lifecycle hook in 17-02 Task 2) |
+| FONT-01 | Phase 17 / Phase 20 | Complete (verified 2026-04-22 — AssetRegistry scan cache lands in 17-02 Task 1; cache lifecycle hook in 17-02 Task 2; Phase 20 hardened reimport path with ON_SCOPE_EXIT InvalidateDiscoveryCache in FPsdReimportHandler::Reimport so a UFont asset added between import and reimport is picked up without engine restart) |
 | FONT-02 | Phase 17 | Complete (already implemented in FontResolver.cpp DefaultFont fallback; D-06 marks it closed) |
 | BTN-STATE-01 | Phase 17.1 | Complete (verified 2026-04-22 via PSD2UMG.Mapper.ButtonLayerMapper BTN-STATE-01 — FVariantsSuffixMapper::CanMap HasType guard lands in 17.1-02) |
 | BTN-STATE-02 | Phase 17.1 | Complete (verified 2026-04-22 via PSD2UMG.Mapper.ButtonLayerMapper BTN-STATE-02 — D-03 aggregate missing-slots warning in FButtonLayerMapper::Map lands in 17.1-02) |

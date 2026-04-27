@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: "Checkpoint: 17.2-03 Task 4 — awaiting UE Editor full rebuild + 4/4 BTN-ANIM tests GREEN confirmation"
-last_updated: "2026-04-24T15:04:09.386Z"
-last_activity: 2026-04-24
+stopped_at: "Completed 19-03-PLAN.md: LAYOUT-ORDER-01 Outcome A — spec added, requirement closed, no production change"
+last_updated: "2026-04-27T14:29:16.152Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 2
   completed_phases: 1
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 17.2 (button-state-text-animation) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-04-24
+Last activity: 2026-04-27
 
 ## Performance Metrics
 
@@ -95,6 +95,7 @@ Last activity: 2026-04-24
 | Phase 17-automated-font-matching P02 | 3min | 3 tasks | 4 files |
 | Phase 17.1-button-variants-state-wiring P01 | 2min | 2 tasks | 2 files |
 | Phase 17.2 P03 | 15min | 3 tasks | 4 files |
+| Phase 19-text-layout-correctness-fixes P03 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -174,6 +175,7 @@ Recent decisions affecting current work:
 - [Phase 17.2]: Two-compile sequence mandatory for K2 node injection: animations in WBP->Animations before compile #1, K2 nodes injected after compile #1 SkeletonGeneratedClass has UButton property, compile #2 bakes K2 into GeneratedClass
 - [Phase 17.2]: Disabled state (D-02): UButton has no disabled delegate — no Disabled animation or K2 injection attempted; wiring deferred to future phase
 - [Phase 17.2]: Non-destructive reimport: Update() refreshes animations additively but does NOT re-inject K2 wiring; designer Event Graph modifications preserved
+- [Phase 19-text-layout-correctness-fixes]: LAYOUT-ORDER-01 Outcome A: Phase 10 PopulateChildren forward iteration already preserves PSD layer-panel reading order; no production code change needed; requirement was stale
 
 ### Roadmap Evolution
 
@@ -192,6 +194,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-24T15:04:09.381Z
-Stopped at: Checkpoint: 17.2-03 Task 4 — awaiting UE Editor full rebuild + 4/4 BTN-ANIM tests GREEN confirmation
+Last session: 2026-04-27T14:29:16.148Z
+Stopped at: Completed 19-03-PLAN.md: LAYOUT-ORDER-01 Outcome A — spec added, requirement closed, no production change
 Resume file: None

@@ -193,12 +193,14 @@ Plans:
 | 17.1. Button+Variants State Wiring Validation | 2/2 | Complete | 2026-04-27 |
 | 17.2. Button State Text Animation | 4/4 | Complete | 2026-04-27 |
 | 18. Hidden-Layer Filtering + 17.1 Close-out | 0/TBD | Pending | — |
-| 19. Integration Stability Fixes | 0/TBD | Pending | — |
+| 19. Text + Layout Correctness Fixes | 0/TBD | Pending | — |
+| 20. Integration Stability Fixes | 0/TBD | Pending | — |
 
-## v1.1 / v1.2 Gap Closure (Phases 18-19)
+## v1.1 / v1.2 Gap Closure (Phases 18-20)
 
 - [ ] **Phase 18: Hidden-Layer Filtering + 17.1 Close-out** — Close HIDDEN-01/FILTER-01/FILTER-02 (import dialog hidden-layer filtering); formally close Phase 17.1 with VERIFICATION.md confirming BTN-STATE-01/02 code that landed during 17.2
-- [ ] **Phase 19: Integration Stability Fixes** — Raise fill/shape mapper priorities to 101, add reimport cache invalidation
+- [ ] **Phase 19: Text + Layout Correctness Fixes** — Color Overlay priority for text, All Caps text transform, @vbox/@hbox child order reversal fix
+- [ ] **Phase 20: Integration Stability Fixes** — Raise fill/shape mapper priorities to 101, add reimport cache invalidation
 
 ### Phase 18: Hidden-Layer Filtering + 17.1 Close-out
 **Goal**: Two work streams merged:
@@ -216,7 +218,17 @@ Plans:
   6. REQUIREMENTS.md HIDDEN-01, FILTER-01, FILTER-02 marked Complete
 **Plans**: TBD
 
-### Phase 19: Integration Stability Fixes
+### Phase 19: Text + Layout Correctness Fixes
+**Goal**: Fix three correctness bugs affecting text rendering and layout child order.
+**Depends on**: Phase 12 (text pipeline), Phase 3 (mapper pipeline)
+**Requirements**: TXT-FX-01, TXT-CAPS-01, LAYOUT-ORDER-01 (new — to be added to REQUIREMENTS.md)
+**Success Criteria** (what must be TRUE):
+  1. Text layer with a Color Overlay effect uses the overlay color for UTextBlock::ColorAndOpacity, not the PSD text color property — Color Overlay wins when present
+  2. Text layer with All Caps transformation enabled sets UTextBlock::TextTransformPolicy = ETextTransformPolicy::ToUpper
+  3. Children added to UHorizontalBox (@hbox) and UVerticalBox (@vbox) panels appear in the same visual order as in the Photoshop layer stack (top layer in PS = first/top child in UE)
+**Plans**: TBD
+
+### Phase 20: Integration Stability Fixes
 **Goal**: Eliminate the mapper priority collision (non-stable sort risk for gradient/shape/fill layers) and reimport cache leak (fonts added between reimports invisible until engine restart).
 **Depends on**: Phase 13, Phase 14, Phase 17
 **Requirements**: GRAD-01, SHAPE-01, FONT-01 (integration hardening)

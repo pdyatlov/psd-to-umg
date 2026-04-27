@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: "Checkpoint: 17.2-03 Task 4 — awaiting UE Editor full rebuild + 4/4 BTN-ANIM tests GREEN confirmation"
-last_updated: "2026-04-24T15:04:09.386Z"
-last_activity: 2026-04-24
+stopped_at: "Phase 17.2 Plan 03 complete — 4/4 BTN-ANIM GREEN; Plan 04 (human PIE verify) is next"
+last_updated: "2026-04-27T00:00:00.000Z"
+last_activity: 2026-04-27
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 3
+  completed_plans: 3
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 17.2 (button-state-text-animation) — EXECUTING
-Plan: 2 of 4
-Status: Ready to execute
-Last activity: 2026-04-24
+Plan: 4 of 4 (human PIE verification)
+Status: Awaiting human verify
+Last activity: 2026-04-27
 
 ## Performance Metrics
 
@@ -174,6 +174,7 @@ Recent decisions affecting current work:
 - [Phase 17.2]: Two-compile sequence mandatory for K2 node injection: animations in WBP->Animations before compile #1, K2 nodes injected after compile #1 SkeletonGeneratedClass has UButton property, compile #2 bakes K2 into GeneratedClass
 - [Phase 17.2]: Disabled state (D-02): UButton has no disabled delegate — no Disabled animation or K2 injection attempted; wiring deferred to future phase
 - [Phase 17.2]: Non-destructive reimport: Update() refreshes animations additively but does NOT re-inject K2 wiring; designer Event Graph modifications preserved
+- [Phase 17.2]: GIsAutomationTesting guard around SaveLoadedAsset in Generate() — P4 MarkForAdd on /Engine/Transient test packages emits Error-level log that automation framework treats as test failure even when all TestTrue assertions pass
 
 ### Roadmap Evolution
 
@@ -192,6 +193,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-24T15:04:09.381Z
-Stopped at: Checkpoint: 17.2-03 Task 4 — awaiting UE Editor full rebuild + 4/4 BTN-ANIM tests GREEN confirmation
+Last session: 2026-04-27
+Stopped at: 4/4 BTN-ANIM GREEN. Root cause of test failure: P4 MarkForAdd Error log on /Engine/Transient paths captured by automation framework as test failure; fixed with GIsAutomationTesting save guard. Plan 04 (human PIE verify) is next.
 Resume file: None

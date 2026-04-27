@@ -2,9 +2,9 @@
 
 ## Current State
 
-**v1.0.1 shipped 2026-04-17.**
+**v1.0.1 shipped 2026-04-17. Phase 19 (text + layout correctness) complete 2026-04-27.**
 
-The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirely in C++20. It delivers a complete one-click PSD-to-Widget-Blueprint import pipeline: a native PhotoshopAPI-backed parser (FPsdParser), a pluggable layer-mapper registry with 15 widget types, full typography support including Layer-Style stroke and drop shadow routing, layer effects with flatten fallback, 9-slice borders, Smart Object recursive import, row/column anchor heuristics, an SPsdImportPreviewDialog, non-destructive reimport, CommonUI/animation interop, a comprehensive automation spec suite, and a unified `@`-tag grammar. Non-canvas panel child attachment (`@vbox`, `@hbox`, `@scrollbox`, `@overlay`) now correctly dispatches via `UPanelWidget::AddChild` — the v1.0 silent-drop bug is fixed. All 75 v1 + 7 v1.0.1 requirements satisfied.
+The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirely in C++20. It delivers a complete one-click PSD-to-Widget-Blueprint import pipeline: a native PhotoshopAPI-backed parser (FPsdParser), a pluggable layer-mapper registry with 15 widget types, full typography support including Layer-Style stroke and drop shadow routing, layer effects with flatten fallback, 9-slice borders, Smart Object recursive import, row/column anchor heuristics, an SPsdImportPreviewDialog, non-destructive reimport, CommonUI/animation interop, a comprehensive automation spec suite, and a unified `@`-tag grammar. Non-canvas panel child attachment (`@vbox`, `@hbox`, `@scrollbox`, `@overlay`) now correctly dispatches via `UPanelWidget::AddChild` — the v1.0 silent-drop bug is fixed. All 75 v1 + 7 v1.0.1 requirements satisfied. Phase 19 added: Color Overlay priority for text (TXT-FX-01), All Caps TextTransformPolicy mapping (TXT-CAPS-01), and empirical confirmation that VBox/HBox child slot order is already correct (LAYOUT-ORDER-01).
 
 See `.planning/milestones/v1.0.1-ROADMAP.md` for the v1.0.1 archive.
 

@@ -1,6 +1,7 @@
 // Copyright 2018-2021 - John snow wind
 
 #include "Animation/FPsdWidgetAnimationBuilder.h"
+#include "PSD2UMGLog.h"
 
 #include "Animation/WidgetAnimation.h"
 #include "WidgetBlueprint.h"
@@ -145,14 +146,22 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateColorAnim(
         return nullptr;
     }
 
-    // Pitfall 4: MakeUniqueObjectName guarantees no silent overwrite if two buttons
-    // share a CleanName within the same PSD (e.g. two "MyBtn @button" groups).
-    // The actual resolved name is readable via Anim->GetFName() after construction.
-    const FName UniqueName = MakeUniqueObjectName(
-        WBP, UWidgetAnimation::StaticClass(), FName(*AnimName));
+    // Pitfall 4: use the exact requested name when available; only generate a unique
+    // suffix when StaticFindObjectFast confirms a real naming conflict (e.g. two
+    // @button groups share a CleanName in the same PSD). MakeUniqueObjectName in
+    // UE5 always appends _0 even for fresh names, so we must guard it with an
+    // explicit conflict check.
+    FName ActualName(*AnimName);
+    if (UObject* Existing = StaticFindObjectFast(nullptr, WBP, ActualName))
+    {
+        UE_LOG(LogPSD2UMG, Warning,
+            TEXT("[DBG] CreateColorAnim: '%s' name conflict (existing class=%s) — generating unique suffix"),
+            *AnimName, *Existing->GetClass()->GetName());
+        ActualName = MakeUniqueObjectName(WBP, UWidgetAnimation::StaticClass(), FName(*AnimName));
+    }
     UWidgetAnimation* Anim = NewObject<UWidgetAnimation>(
         WBP,
-        UniqueName,
+        ActualName,
         RF_Transactional | RF_Public);
 
     UMovieScene* Scene = CreateMovieScene(WBP, DurationSec);

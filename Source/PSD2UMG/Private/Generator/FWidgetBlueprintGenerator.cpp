@@ -847,8 +847,8 @@ UWidgetBlueprint* FWidgetBlueprintGenerator::Generate(
         ButtonAnimResults.Add(BuildButtonStateAnimations(WBP, *BtnLayer));
     }
     UE_LOG(LogPSD2UMG, Log,
-        TEXT("FWidgetBlueprintGenerator: Step 4b — built animations for %d @button layers"),
-        ButtonLayers.Num());
+        TEXT("FWidgetBlueprintGenerator: Step 4b — built animations for %d @button layers; WBP->Animations.Num()=%d"),
+        ButtonLayers.Num(), WBP->Animations.Num());
 
     // Step 5: First CompileBlueprint — SkeletonGeneratedClass gets UButton FObjectProperty
     // (bIsVariable=true from FButtonLayerMapper) and UWidgetAnimation UPROPERTIES.

@@ -122,10 +122,19 @@ UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc
         TextWidget->SetShadowColorAndOpacity(Layer.Text.ShadowColor);
     }
 
-    // Color: prefer Color Overlay effect color over text fill color.
-    // In Photoshop, Color Overlay on a text layer completely replaces the displayed
-    // color (same as on image layers). The fill color stored in text style runs is
-    // the underlying value; the overlay is what the designer actually sees and intends.
+    // TXT-FX-01 — Color Overlay priority for text.
+    // PsdParser::RouteTextEffects (Phase 12) already copies Effects.ColorOverlayColor
+    // into Text.Color and clears bHasColorOverlay (D-13 double-render guard) for every
+    // text layer. By the time we get here, Text.Color ALWAYS carries the final
+    // designer-intended display color (overlay if present, fill otherwise) and
+    // Effects.bHasColorOverlay is ALWAYS false for text.
+    //
+    // The ternary below is therefore dead in the true branch at runtime — it is kept
+    // intentionally as a defensive belt-and-braces guard so that if a future change
+    // ever removes or skips RouteTextEffects, overlay priority is preserved here
+    // instead of silently regressing to the underlying fill color. Do not "simplify"
+    // this to `Layer.Text.Color` without first re-validating PsdParserSpec
+    // "text_overlay_gray" and FTextPipelineSpec "text_overlay_gray uses OVERLAY color".
     const FLinearColor& TextColor = Layer.Effects.bHasColorOverlay
         ? Layer.Effects.ColorOverlayColor
         : Layer.Text.Color;

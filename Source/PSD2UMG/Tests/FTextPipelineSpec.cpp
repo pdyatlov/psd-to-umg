@@ -176,13 +176,52 @@ void FTextPipelineSpec::Define()
             }
         });
 
+        It("text_overlay_gray uses OVERLAY color, not white character fill (TXT-FX-01 priority)", [this]()
+        {
+            if (!bParsed) return;
+
+            UWidgetBlueprint* WBP = FWidgetBlueprintGenerator::Generate(
+                Doc,
+                TEXT("/Game/_Test/WBPGen"),
+                TEXT("WBP_Typography_Spec_Overlay"));
+
+            if (!TestNotNull(TEXT("WBP"), WBP)) return;
+            UWidgetTree* Tree = WBP->WidgetTree.Get();
+            if (!TestNotNull(TEXT("WidgetTree"), Tree)) return;
+
+            UTextBlock* T = FindText(Tree, TEXT("text_overlay_gray"));
+            if (!TestNotNull(TEXT("text_overlay_gray UTextBlock exists"), T)) return;
+
+            // TXT-FX-01: text_overlay_gray was authored with WHITE (#FFFFFF) character
+            // fill in Photoshop and a GRAY (#808080) Layer Style Color Overlay. The
+            // overlay must win — UTextBlock ColorAndOpacity must be gray, NEVER white.
+            // This pins overlay-wins-over-fill, complementing the existing "is gray"
+            // assertion above which proves the value but not the priority.
+            const FSlateColor SC = T->GetColorAndOpacity();
+            const FLinearColor LC = SC.GetSpecifiedColor();
+
+            // Hard upper bound: a true white-fill leak would have R near 1.0.
+            // sRGB #808080 -> linear ~0.2159 ; we use < 0.6 as a generous "definitely
+            // not white" guard while preserving a margin for ColorAndOpacity precision.
+            TestTrue(TEXT("R < 0.6 — overlay (gray) won, NOT white character fill"),
+                LC.R < 0.6f);
+
+            // Defensive lower bound: if overlay routing failed differently and produced
+            // black, this catches it. Linear gray ~0.2159 must be well above 0.05.
+            TestTrue(TEXT("R > 0.05 — overlay produced gray, NOT zero/black"),
+                LC.R > 0.05f);
+        });
+
         AfterEach([this]()
         {
-            const FString AssetPath = TEXT("/Game/_Test/WBPGen/WBP_Typography_Spec.WBP_Typography_Spec");
-            if (UObject* Existing = FindObject<UObject>(nullptr, *AssetPath))
+            for (const TCHAR* Name : { TEXT("WBP_Typography_Spec"), TEXT("WBP_Typography_Spec_Overlay") })
             {
-                TArray<UObject*> ToDelete = { Existing };
-                ObjectTools::ForceDeleteObjects(ToDelete, /*bShowConfirmation=*/false);
+                const FString AssetPath = FString::Printf(TEXT("/Game/_Test/WBPGen/%s.%s"), Name, Name);
+                if (UObject* Existing = FindObject<UObject>(nullptr, *AssetPath))
+                {
+                    TArray<UObject*> ToDelete = { Existing };
+                    ObjectTools::ForceDeleteObjects(ToDelete, /*bShowConfirmation=*/false);
+                }
             }
         });
     });

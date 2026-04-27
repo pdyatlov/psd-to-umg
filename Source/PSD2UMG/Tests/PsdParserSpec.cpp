@@ -234,7 +234,7 @@ void FPsdParserTypographySpec::Define()
         {
             TestTrue(TEXT("bParsed"), bParsed);
             TestFalse(TEXT("Diag.HasErrors()"), Diag.HasErrors());
-            TestEqual(TEXT("RootLayers.Num"), Doc.RootLayers.Num(), 8);
+            TestEqual(TEXT("RootLayers.Num"), Doc.RootLayers.Num(), 9);
         });
 
         It("text_regular has bBold=false, bItalic=false, bHasExplicitWidth=false", [this]()
@@ -364,6 +364,25 @@ void FPsdParserTypographySpec::Define()
             // layer ignored" warning. Mirrors stroke + shadow routing.
             TestFalse(TEXT("Effects.bHasColorOverlay was cleared by RouteTextEffects"),
                 L->Effects.bHasColorOverlay);
+        });
+
+        It("text_regular has bAllCaps=false (TXT-CAPS-01 default)", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_regular"));
+            if (!TestNotNull(TEXT("text_regular"), L)) return;
+#if 1  // TXT-CAPS-01 RED — Task 3 leaves this enabled (assertion goes GREEN once field is wired)
+            TestFalse(TEXT("Text.bAllCaps default false on non-All-Caps layer"), L->Text.bAllCaps);
+#endif
+        });
+
+        It("text_caps has bAllCaps=true (TXT-CAPS-01 parser)", [this]()
+        {
+            const FPsdLayer* L = FindLayerByName(Doc.RootLayers, TEXT("text_caps"));
+            if (!TestNotNull(TEXT("text_caps exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::Text);
+#if 1  // TXT-CAPS-01 RED — Task 3 leaves this enabled (assertion goes GREEN once field is wired)
+            TestTrue(TEXT("Text.bAllCaps true for All Caps layer"), L->Text.bAllCaps);
+#endif
         });
     });
 }

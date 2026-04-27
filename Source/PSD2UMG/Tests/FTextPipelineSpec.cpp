@@ -14,6 +14,7 @@
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/TextBlock.h"
+#include "Styling/SlateTypes.h"
 #include "UObject/UnrealType.h"
 #include "ObjectTools.h"
 #include "Components/RichTextBlock.h"
@@ -173,6 +174,34 @@ void FTextPipelineSpec::Define()
             else
             {
                 AddError(TEXT("text_overlay_gray widget not found in generated WBP"));
+            }
+
+            // text_caps — TXT-CAPS-01 All Caps -> ETextTransformPolicy::ToUpper.
+            if (UTextBlock* T = FindText(Tree, TEXT("text_caps")))
+            {
+#if 1  // TXT-CAPS-01 RED — Task 3 leaves enabled; goes GREEN after mapper wires SetTextTransformPolicy
+                TestEqual(TEXT("text_caps TextTransformPolicy is ToUpper"),
+                    (int32)T->GetTextTransformPolicy(),
+                    (int32)ETextTransformPolicy::ToUpper);
+#endif
+            }
+            else
+            {
+                AddError(TEXT("text_caps widget not found in generated WBP"));
+            }
+
+            // text_regular — TXT-CAPS-01 default-policy negative.
+            if (UTextBlock* T = FindText(Tree, TEXT("text_regular")))
+            {
+#if 1  // TXT-CAPS-01 RED — Task 3 leaves enabled
+                TestEqual(TEXT("text_regular TextTransformPolicy is None (default)"),
+                    (int32)T->GetTextTransformPolicy(),
+                    (int32)ETextTransformPolicy::None);
+#endif
+            }
+            else
+            {
+                AddError(TEXT("text_regular widget not found in generated WBP"));
             }
         });
 

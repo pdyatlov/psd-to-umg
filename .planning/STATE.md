@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: Completed 19-01-PLAN.md — TXT-FX-01 closed, Plan 02 (TXT-CAPS-01) is next
-last_updated: "2026-04-27T14:22:43.379Z"
+stopped_at: "Plans 19-01 + 19-03 complete; 19-02 (TXT-CAPS-01) awaiting Photoshop fixture edit"
+last_updated: "2026-04-27T14:29:16.152Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 2
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 19 (text-layout-correctness-fixes) — EXECUTING
-Plan: 2 of 3
+Plan: 2 of 3 (19-01 ✓, 19-02 pending checkpoint, 19-03 ✓)
 Status: Ready to execute
 Last activity: 2026-04-27
 
@@ -96,6 +96,7 @@ Last activity: 2026-04-27
 | Phase 17.1-button-variants-state-wiring P01 | 2min | 2 tasks | 2 files |
 | Phase 17.2 P03 | 15min | 3 tasks | 4 files |
 | Phase 19-text-layout-correctness-fixes P01 | 10min | 2 tasks | 3 files |
+| Phase 19-text-layout-correctness-fixes P03 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -178,6 +179,7 @@ Recent decisions affecting current work:
 - [Phase 17.2]: GIsAutomationTesting guard around SaveLoadedAsset in Generate() — P4 MarkForAdd on /Engine/Transient test packages emits Error-level log that automation framework treats as test failure even when all TestTrue assertions pass
 - [Phase 19-01]: TXT-FX-01 closed by leveraging Phase 12 RouteTextEffects routing — no new production code path needed
 - [Phase 19-01]: FTextLayerMapper dead ternary branch kept intentionally as belt-and-braces guard; comment names TXT-FX-01 and warns against removal without re-running named specs
+- [Phase 19-03]: LAYOUT-ORDER-01 Outcome A: Phase 10 PopulateChildren forward iteration already preserves PSD layer-panel reading order; no production code change needed; requirement was stale
 
 ### Roadmap Evolution
 
@@ -196,6 +198,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-27T14:22:43.375Z
-Stopped at: Completed 19-01-PLAN.md — TXT-FX-01 closed, Plan 02 (TXT-CAPS-01) is next
+Last session: 2026-04-27T14:29:16.148Z
+Stopped at: Plans 19-01 + 19-03 complete; 19-02 (TXT-CAPS-01) awaiting Photoshop fixture edit for text_caps layer
 Resume file: None

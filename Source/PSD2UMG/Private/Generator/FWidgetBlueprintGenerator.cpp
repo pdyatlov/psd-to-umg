@@ -56,6 +56,11 @@ static void PopulateChildren(
     const TSet<FString>& SkippedLayerNames = TSet<FString>(),
     const FIntPoint& ParentOffset = FIntPoint::ZeroValue)
 {
+    // LAYOUT-ORDER-01 (Phase 19): forward iteration of Layers[0..N) preserves
+    // PSD layer-panel reading order -- Layers[0] is the topmost PSD layer and
+    // becomes WBP slot 0 via AddChild append. Verified empirically by
+    // FPanelAttachmentSpec "VBoxGroup_Slot0IsItemA_LAYOUT-ORDER-01" /
+    // "HBoxGroup_Slot0IsTopmostPSDLayer_LAYOUT-ORDER-01".
     const int32 TotalLayers = Layers.Num();
     for (int32 i = 0; i < TotalLayers; ++i)
     {

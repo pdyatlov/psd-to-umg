@@ -66,7 +66,7 @@
 
 ### Text + Layout Correctness (TXT-FX-*, TXT-CAPS-*, LAYOUT-ORDER-*)
 
-- [ ] **TXT-FX-01**: When a text layer has a Color Overlay effect (`FPsdLayerEffects::ColorOverlay` present and enabled), the overlay color is used for `UTextBlock::SetColorAndOpacity` instead of the PSD text color property (`FPsdTextRun::Color`). Color Overlay takes priority; the base text color is ignored when an overlay is present.
+- [x] **TXT-FX-01**: When a text layer has a Color Overlay effect (`FPsdLayerEffects::ColorOverlay` present and enabled), the overlay color is used for `UTextBlock::SetColorAndOpacity` instead of the PSD text color property (`FPsdTextRun::Color`). Color Overlay takes priority; the base text color is ignored when an overlay is present.
 - [ ] **TXT-CAPS-01**: When a text layer has the All Caps transformation enabled in Photoshop, the generated `UTextBlock` has `TextTransformPolicy` set to `ETextTransformPolicy::ToUpper`. Layers without All Caps produce `ETextTransformPolicy::None` (default).
 - [ ] **LAYOUT-ORDER-01**: Children added to `UHorizontalBox` (`@hbox`) and `UVerticalBox` (`@vbox`) panels appear in the same visual order as the Photoshop layer stack — the topmost layer in the PSD panel corresponds to the first child slot in UE. Currently the order is reversed.
 
@@ -96,7 +96,8 @@
 | BTN-ANIM-01 | Phase 17.2 | Complete (verified 2026-04-24 via PSD2UMG.ButtonStateTextAnim — CreateColorAnim landed in 17.2-02) |
 | BTN-ANIM-02 | Phase 17.2 | Complete (verified 2026-04-24 via PSD2UMG.ButtonStateTextAnim — skip guard in 17.2-02 + generator integration in 17.2-03) |
 | BTN-ANIM-03 | Phase 17.2 | Complete (verified 2026-04-27 manual PIE — K2 nodes visible, text colour transitions in PIE) |
+| TXT-FX-01 | Phase 12 / Phase 19 | Complete (verified 2026-04-27 — Phase 12 RouteTextEffects routing chain proven by PSD2UMG.Parser.Typography "text_overlay_gray" + PSD2UMG.TextPipeline "text_overlay_gray uses OVERLAY color, not white character fill (TXT-FX-01 priority)" added in Phase 19-01) |
 
 ---
 
-*Last updated: 2026-04-24*
+*Last updated: 2026-04-27*

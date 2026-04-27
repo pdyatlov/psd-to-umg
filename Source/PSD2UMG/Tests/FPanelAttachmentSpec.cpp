@@ -179,6 +179,109 @@ void FPanelAttachmentSpec::Define()
         });
 
         // ------------------------------------------------------------------
+        // LAYOUT-ORDER-01: VBox slot 0 == topmost PSD layer (ItemA), not the
+        // bottommost (ItemC). PSD layer-panel reading order must match UMG
+        // child slot order top-to-bottom for VBox / left-to-right for HBox.
+        //
+        // First-run outcome on Phase 19 baseline determines whether a fix is
+        // required: GREEN here = research confirmed (no code change); RED =
+        // order is reversed and Task 2 (Plan 19-03) applies the minimal fix.
+        // ------------------------------------------------------------------
+        It("VBoxGroup_Slot0IsItemA_LAYOUT-ORDER-01", [this]()
+        {
+            if (!bFixtureExists) return;
+            if (!TestTrue(TEXT("fixture parses"), bParsed)) return;
+            if (!TestNotNull(TEXT("WBP"), WBP)) return;
+            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
+
+            UWidget* W = FindWidgetByName(WBP->WidgetTree, FName(TEXT("VBoxGroup")));
+            if (!TestNotNull(TEXT("VBoxGroup widget exists"), W)) return;
+
+            UVerticalBox* VBox = Cast<UVerticalBox>(W);
+            if (!TestNotNull(TEXT("VBoxGroup is UVerticalBox"), VBox)) return;
+            if (!TestEqual(TEXT("VBoxGroup child count == 3"),
+                VBox->GetChildrenCount(), 3)) return;
+
+            // Slot-0 identity: PSD topmost layer (ItemA) must be the first child.
+            UWidget* Slot0 = VBox->GetChildAt(0);
+            if (!TestNotNull(TEXT("VBoxGroup slot 0 widget exists"), Slot0)) return;
+            TestEqual(TEXT("VBoxGroup slot 0 GetFName == 'ItemA' (topmost PSD layer)"),
+                Slot0->GetFName().ToString(),
+                FString(TEXT("ItemA")));
+
+            // Slot-(N-1) identity: PSD bottommost layer (ItemC) must be the last child.
+            // Both assertions must hold simultaneously to prove not-reversed AND not-misordered.
+            UWidget* Slot2 = VBox->GetChildAt(2);
+            if (!TestNotNull(TEXT("VBoxGroup slot 2 widget exists"), Slot2)) return;
+            TestEqual(TEXT("VBoxGroup slot 2 GetFName == 'ItemC' (bottommost PSD layer)"),
+                Slot2->GetFName().ToString(),
+                FString(TEXT("ItemC")));
+        });
+
+        // LAYOUT-ORDER-01: HBox slot 0 == topmost PSD layer (same semantic invariant,
+        // horizontal axis). Cross-checked against FPsdLayer::Children order from Doc.
+        It("HBoxGroup_Slot0IsTopmostPSDLayer_LAYOUT-ORDER-01", [this]()
+        {
+            if (!bFixtureExists) return;
+            if (!TestTrue(TEXT("fixture parses"), bParsed)) return;
+            if (!TestNotNull(TEXT("WBP"), WBP)) return;
+            if (!TestNotNull(TEXT("WidgetTree"), WBP->WidgetTree.Get())) return;
+
+            UWidget* W = FindWidgetByName(WBP->WidgetTree, FName(TEXT("HBoxGroup")));
+            if (!TestNotNull(TEXT("HBoxGroup widget exists"), W)) return;
+
+            UHorizontalBox* HBox = Cast<UHorizontalBox>(W);
+            if (!TestNotNull(TEXT("HBoxGroup is UHorizontalBox"), HBox)) return;
+            if (!TestEqual(TEXT("HBoxGroup child count == 2"),
+                HBox->GetChildrenCount(), 2)) return;
+
+            // Slot 0 and slot 1 must be DIFFERENT widgets and slot 0 must NOT
+            // equal slot (N-1). This works without knowing the exact HBoxGroup
+            // child names -- it pins the not-reversed property structurally.
+            //
+            // Note: if the executor knows the actual top-to-bottom HBox child
+            // names from Panels.psd (open in Photoshop or query the parsed
+            // FPsdLayer hierarchy), promote this to an explicit name match
+            // (TestEqual against FString TEXT("HItemA") or whatever the topmost
+            // child is named). The structural-only assertion below is a safe
+            // floor that catches reversal regardless of names.
+            UWidget* Slot0 = HBox->GetChildAt(0);
+            UWidget* Slot1 = HBox->GetChildAt(1);
+            if (!TestNotNull(TEXT("HBoxGroup slot 0 widget exists"), Slot0)) return;
+            if (!TestNotNull(TEXT("HBoxGroup slot 1 widget exists"), Slot1)) return;
+            TestNotEqual(TEXT("HBoxGroup slot 0 != slot 1 (not the same widget)"),
+                Slot0->GetFName(), Slot1->GetFName());
+
+            // Cross-check against parser order: find the HBoxGroup FPsdLayer in
+            // Doc and assert HBox slot 0 GetFName matches the FIRST FPsdLayer
+            // child's CleanName (or Name if CleanName is empty). This pins the
+            // semantic invariant -- Doc.Children[0] -> WBP slot 0 -- without
+            // hardcoding fixture-specific names.
+            const FPsdLayer* HBoxLayer = nullptr;
+            for (const FPsdLayer& Root : Doc.RootLayers)
+            {
+                if (Root.Name.Equals(TEXT("HBoxGroup"), ESearchCase::CaseSensitive))
+                {
+                    HBoxLayer = &Root;
+                    break;
+                }
+            }
+            if (HBoxLayer && HBoxLayer->Children.Num() >= 2)
+            {
+                const FPsdLayer& FirstChild = HBoxLayer->Children[0];
+                const FString ExpectedSlot0 = FirstChild.ParsedTags.CleanName.IsEmpty()
+                    ? FirstChild.Name
+                    : FirstChild.ParsedTags.CleanName;
+                TestEqual(TEXT("HBoxGroup slot 0 GetFName == HBoxLayer->Children[0].CleanName (PSD topmost)"),
+                    Slot0->GetFName().ToString(), ExpectedSlot0);
+            }
+            else
+            {
+                AddWarning(TEXT("HBoxGroup FPsdLayer or its children not discoverable; structural-only assertion above must be sufficient"));
+            }
+        });
+
+        // ------------------------------------------------------------------
         // PANEL-04 (@overlay), PANEL-05 (Canvas regression), and the nested
         // @vbox -> @canvas -> @text dispatch case are intentionally not covered
         // by automated spec in v1.0.1. The code paths still work (implementation

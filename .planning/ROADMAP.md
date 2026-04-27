@@ -193,7 +193,7 @@ Plans:
 | 17.1. Button+Variants State Wiring Validation | 2/2 | Complete | 2026-04-27 |
 | 17.2. Button State Text Animation | 4/4 | Complete | 2026-04-27 |
 | 18. Hidden-Layer Filtering + 17.1 Close-out | 0/TBD | Pending | — |
-| 19. Text + Layout Correctness Fixes | 3/3 | Complete   | 2026-04-27 |
+| 19. Text + Layout Correctness Fixes | 3/3 | Complete    | 2026-04-27 |
 | 20. Integration Stability Fixes | 0/TBD | Pending | — |
 
 ## v1.1 / v1.2 Gap Closure (Phases 18-20)

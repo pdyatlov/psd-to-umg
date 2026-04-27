@@ -5,6 +5,7 @@
 
 #include "Animation/WidgetAnimation.h"
 #include "WidgetBlueprint.h"
+#include "Components/TextBlock.h"
 
 #include "MovieScene.h"
 #include "Tracks/MovieSceneFloatTrack.h"
@@ -155,7 +156,7 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateColorAnim(
     if (UObject* Existing = StaticFindObjectFast(nullptr, WBP, ActualName))
     {
         UE_LOG(LogPSD2UMG, Warning,
-            TEXT("[DBG] CreateColorAnim: '%s' name conflict (existing class=%s) — generating unique suffix"),
+            TEXT("CreateColorAnim: '%s' name conflict (existing class=%s) — generating unique suffix"),
             *AnimName, *Existing->GetClass()->GetName());
         ActualName = MakeUniqueObjectName(WBP, UWidgetAnimation::StaticClass(), FName(*AnimName));
     }
@@ -168,7 +169,7 @@ UWidgetAnimation* FPsdWidgetAnimationBuilder::CreateColorAnim(
     Anim->MovieScene = Scene;
 
     const FGuid ObjectGuid = Scene->AddPossessable(
-        TargetWidgetName.ToString(), UObject::StaticClass());
+        TargetWidgetName.ToString(), UTextBlock::StaticClass());
 
     const FFrameNumber StartFrame(0);
     const FFrameNumber EndFrame(FMath::RoundToInt(DurationSec * 24000.0f));

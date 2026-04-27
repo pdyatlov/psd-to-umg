@@ -573,6 +573,13 @@ static FButtonAnimResult BuildButtonStateAnimations(
         if (const FPsdLayer* HoverText =
                 FindTextInStateGroup(*HoverGroup, NormalText->ParsedTags.CleanName))
         {
+            if (NormalColor == HoverText->Text.Color)
+            {
+                UE_LOG(LogPSD2UMG, Warning,
+                    TEXT("BuildButtonStateAnimations: button '%s' hover text color (%f,%f,%f,%f) == normal color — animation will produce no visible change; update the PSD if a color transition is desired"),
+                    *BtnClean,
+                    NormalColor.R, NormalColor.G, NormalColor.B, NormalColor.A);
+            }
             const FString RequestedAnimName = BtnClean + TEXT("_Hover");
             UWidgetAnimation* Anim = FPsdWidgetAnimationBuilder::CreateColorAnim(
                 WBP, RequestedAnimName, TextWidgetName,
@@ -584,8 +591,11 @@ static FButtonAnimResult BuildButtonStateAnimations(
                 // Propagate the RESOLVED name so K2 wiring references the real animation.
                 Result.HoverAnim = Anim->GetFName().ToString();
                 UE_LOG(LogPSD2UMG, Log,
-                    TEXT("BuildButtonStateAnimations: created '%s' on widget '%s' (requested '%s')"),
-                    *Result.HoverAnim, *TextWidgetName.ToString(), *RequestedAnimName);
+                    TEXT("BuildButtonStateAnimations: created '%s' on widget '%s'; Normal=(%f,%f,%f,%f) Hover=(%f,%f,%f,%f) (requested '%s')"),
+                    *Result.HoverAnim, *TextWidgetName.ToString(),
+                    NormalColor.R, NormalColor.G, NormalColor.B, NormalColor.A,
+                    HoverText->Text.Color.R, HoverText->Text.Color.G, HoverText->Text.Color.B, HoverText->Text.Color.A,
+                    *RequestedAnimName);
             }
         }
         else
@@ -603,6 +613,12 @@ static FButtonAnimResult BuildButtonStateAnimations(
         if (const FPsdLayer* PressedText =
                 FindTextInStateGroup(*PressedGroup, NormalText->ParsedTags.CleanName))
         {
+            if (NormalColor == PressedText->Text.Color)
+            {
+                UE_LOG(LogPSD2UMG, Warning,
+                    TEXT("BuildButtonStateAnimations: button '%s' pressed text color == normal color — animation will produce no visible change"),
+                    *BtnClean);
+            }
             const FString RequestedAnimName = BtnClean + TEXT("_Pressed");
             UWidgetAnimation* Anim = FPsdWidgetAnimationBuilder::CreateColorAnim(
                 WBP, RequestedAnimName, TextWidgetName,
@@ -613,8 +629,11 @@ static FButtonAnimResult BuildButtonStateAnimations(
                 // if MakeUniqueObjectName added a suffix due to CleanName collision).
                 Result.PressedAnim = Anim->GetFName().ToString();
                 UE_LOG(LogPSD2UMG, Log,
-                    TEXT("BuildButtonStateAnimations: created '%s' on widget '%s' (requested '%s')"),
-                    *Result.PressedAnim, *TextWidgetName.ToString(), *RequestedAnimName);
+                    TEXT("BuildButtonStateAnimations: created '%s' on widget '%s'; Normal=(%f,%f,%f,%f) Pressed=(%f,%f,%f,%f) (requested '%s')"),
+                    *Result.PressedAnim, *TextWidgetName.ToString(),
+                    NormalColor.R, NormalColor.G, NormalColor.B, NormalColor.A,
+                    PressedText->Text.Color.R, PressedText->Text.Color.G, PressedText->Text.Color.B, PressedText->Text.Color.A,
+                    *RequestedAnimName);
             }
         }
         else
@@ -696,6 +715,12 @@ static void WireButtonEvent(
 
     UEdGraphPin* AnimOutPin = GetAnim->GetValuePin();
     UEdGraphPin* AnimInPin = CallNode->FindPin(TEXT("InAnimation"));
+    if (!AnimOutPin)
+    {
+        UE_LOG(LogPSD2UMG, Warning,
+            TEXT("WireButtonEvent: '%s.%s' — VariableGet('%s') produced no value pin; InAnimation will be unconnected (variable not in SkeletonGeneratedClass?)"),
+            *BtnFName.ToString(), *DelegateName.ToString(), *AnimName);
+    }
     if (AnimOutPin && AnimInPin) { AnimOutPin->MakeLinkTo(AnimInPin); }
 
     UE_LOG(LogPSD2UMG, Log,

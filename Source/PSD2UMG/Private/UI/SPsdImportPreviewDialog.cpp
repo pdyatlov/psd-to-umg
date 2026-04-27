@@ -168,6 +168,11 @@ TArray<FString> SPsdImportPreviewDialog::ReconstructTagChips(const FParsedLayerT
         Chips.Add(TEXT("@variants"));
     }
 
+    if (Tags.bIsBackground)
+    {
+        Chips.Add(TEXT("@background"));
+    }
+
     if (Tags.SmartObjectTypeName.IsSet())
     {
         Chips.Add(FString::Printf(TEXT("@smartobject:%s"), *Tags.SmartObjectTypeName.GetValue()));
@@ -179,6 +184,11 @@ TArray<FString> SPsdImportPreviewDialog::ReconstructTagChips(const FParsedLayerT
 FString SPsdImportPreviewDialog::InferWidgetTypeName(const FPsdLayer& Layer)
 {
     // Tag-based dispatch (Phase 9 D-15 hard cutover — no legacy prefix fallback).
+    if (Layer.ParsedTags.bIsBackground)
+    {
+        return TEXT("→ Brush");
+    }
+
     if (Layer.ParsedTags.bIsVariants)
     {
         return TEXT("WidgetSwitcher");
@@ -220,6 +230,10 @@ FString SPsdImportPreviewDialog::InferWidgetTypeName(const FPsdLayer& Layer)
 
 FLinearColor SPsdImportPreviewDialog::BadgeColorForType(const FString& WidgetTypeName)
 {
+    if (WidgetTypeName == TEXT("→ Brush"))
+    {
+        return FLinearColor(0.75f, 0.40f, 0.10f, 1.f);  // orange — consumed as brush, no widget
+    }
     if (WidgetTypeName.Contains(TEXT("Button")))
     {
         return FLinearColor(0.2f, 0.5f, 0.9f, 1.f);   // blue
@@ -694,12 +708,17 @@ TSharedRef<SWidget> SPsdImportPreviewDialog::BuildTagChipsForItem(const TSharedP
     // Neutral chips — parser-recognized tags (D-26).
     for (const FString& Chip : RecognizedChips)
     {
+        const FText ChipTooltip = (Chip == TEXT("@background"))
+            ? LOCTEXT("BackgroundChipTip", "@background — this image layer will become the FSlateBrush for its parent @state slot on the @button. It will NOT appear as a UImage widget in the blueprint.")
+            : FText::GetEmpty();
+
         Wrap->AddSlot()
         [
             SNew(SBorder)
             .BorderImage(FAppStyle::GetBrush(TEXT("Border")))
             .BorderBackgroundColor(RecognizedColor)
             .Padding(FMargin(5.f, 1.f))
+            .ToolTipText(ChipTooltip)
             [
                 SNew(STextBlock)
                 .Text(FText::FromString(Chip))

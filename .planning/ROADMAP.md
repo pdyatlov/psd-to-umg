@@ -69,7 +69,7 @@ Plans:
 - [x] **Phase 16: Rich Text / Multiple Text Runs** - Text layers with mixed styles (bold/italic/color spans) imported as URichTextBlock with inline style definitions (completed 2026-04-22)
 - [x] **Phase 16.1: LayerTag Fix + Requirements Traceability** - FLayerTagParser type-inference fix for Gradient/SolidFill/Shape layers; HIDDEN-02 row dimming; REQUIREMENTS.md extended with v1.2 requirements and corrected traceability (completed 2026-04-22)
 - [x] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback (completed 2026-04-22)
-- [ ] **Phase 17.1: Button+Variants State Wiring Validation** (INSERTED) — Verify `@button`+`@variants` can co-exist on one layer, and that all four UE Button child states (`@state:normal/hover/pressed/disabled`) wire correctly
+- [x] **Phase 17.1: Button+Variants State Wiring Validation** (INSERTED) — Verify `@button`+`@variants` can co-exist on one layer, and that all four UE Button child states (`@state:normal/hover/pressed/disabled`) wire correctly (code landed in 17.2; formally closed in Phase 18)
 - [x] **Phase 17.2: Button State Text Animation** (INSERTED) — When `@button` `@state:*` groups contain text layers with different ColorAndOpacity across states, generate UWidgetAnimation color tracks and wire OnHovered/OnPressed delegates via K2 Blueprint graph nodes (completed 2026-04-27)
 
 ### Phase 13: Gradient Layers
@@ -158,7 +158,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 17.1-01-PLAN.md — Wave 0 RED: FButtonLayerMapperSpec.cpp + REQUIREMENTS.md BTN-STATE-01/02 entries (Wave 1)
-- [ ] 17.1-02-PLAN.md — GREEN: FVariantsSuffixMapper HasType guard (D-01) + FButtonLayerMapper aggregate missing-slots warning (D-03) + REQUIREMENTS close-out (Wave 2)
+- [x] 17.1-02-PLAN.md — GREEN: FVariantsSuffixMapper HasType guard (D-01) + FButtonLayerMapper aggregate missing-slots warning (D-03) landed organically during Phase 17.2; BTN-STATE-01/02 verified 2026-04-22; formal close-out folded into Phase 18
 
 ### Phase 17.2: Button State Text Animation (INSERTED)
 **Goal**: When a @button layer contains @state:* child groups that include text layers with different ColorAndOpacity values across states, auto-generate UWidgetAnimation color tracks and wire UButton event delegates (OnHovered/OnUnhovered/OnPressed/OnReleased) to PlayAnimation/ReverseAnimation calls via K2 Blueprint graph nodes injected into the WBP Event Graph — so the generated WBP works at runtime without any designer hand-wiring.
@@ -190,27 +190,30 @@ Plans:
 | 16. Rich Text / Multiple Text Runs | 3/3 | Complete    | 2026-04-22 |
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
 | 17. Automated Font Matching | 2/2 | Complete    | 2026-04-22 |
-| 17.1. Button+Variants State Wiring Validation | 1/2 | In Progress|  |
+| 17.1. Button+Variants State Wiring Validation | 2/2 | Complete | 2026-04-27 |
 | 17.2. Button State Text Animation | 4/4 | Complete | 2026-04-27 |
-| 18. Phase 11 Verification Backfill | 0/TBD | Pending | — |
+| 18. Hidden-Layer Filtering + 17.1 Close-out | 0/TBD | Pending | — |
 | 19. Integration Stability Fixes | 0/TBD | Pending | — |
 
 ## v1.1 / v1.2 Gap Closure (Phases 18-19)
 
-- [ ] **Phase 18: Phase 11 Verification Backfill** — Execute Phase 11 plans, produce VERIFICATION.md, document headless path limitation, close HIDDEN-01/FILTER-01/FILTER-02
+- [ ] **Phase 18: Hidden-Layer Filtering + 17.1 Close-out** — Close HIDDEN-01/FILTER-01/FILTER-02 (import dialog hidden-layer filtering); formally close Phase 17.1 with VERIFICATION.md confirming BTN-STATE-01/02 code that landed during 17.2
 - [ ] **Phase 19: Integration Stability Fixes** — Raise fill/shape mapper priorities to 101, add reimport cache invalidation
 
-### Phase 18: Phase 11 Verification Backfill
-**Goal**: Formally close HIDDEN-01, FILTER-01, and FILTER-02 by executing the already-written Phase 11 plans in UE Editor, producing a VERIFICATION.md, and documenting the headless import path limitation.
-**Depends on**: Phase 11 (code complete; this phase verifies and documents)
-**Requirements**: HIDDEN-01, FILTER-01, FILTER-02
-**Gap Closure**: Closes gaps from v1.1/v1.2 audit
+### Phase 18: Hidden-Layer Filtering + 17.1 Close-out
+**Goal**: Two work streams merged:
+  (A) Phase 17.1 close-out — HasType guard + aggregate warning already implemented; produce 17.1-VERIFICATION.md and mark BTN-STATE-01/02 formally verified.
+  (B) Phase 11 — PSD layers with bVisible=false shown unchecked in import dialog; unchecked layers/subtrees excluded from generated WBP. Close HIDDEN-01, FILTER-01, FILTER-02.
+**Depends on**: Phase 17.1 (code already landed), Phase 11 (plans and code already written)
+**Requirements**: BTN-STATE-01, BTN-STATE-02, HIDDEN-01, FILTER-01, FILTER-02
+**Gap Closure**: Closes Phase 17.1 documentation gap + Phase 11 hidden-layer filtering gap
 **Success Criteria** (what must be TRUE):
-  1. Phase 11 plans 11-01 and 11-02 executed and confirmed working in UE Editor
-  2. VERIFICATION.md exists for Phase 11 with all criteria passing
-  3. Headless path limitation (bShowPreviewDialog=false skips filtering) formally documented
-  4. REQUIREMENTS.md HIDDEN-01, FILTER-01, FILTER-02 marked Complete
-  5. ROADMAP Phase 11 plans checked [x]
+  1. 17.1-VERIFICATION.md confirms FVariantsSuffixMapper CanMap guard and FButtonLayerMapper aggregate warning pass spec
+  2. Phase 11 plans 11-01 and 11-02 confirmed working in UE Editor
+  3. Hidden layers default unchecked in import dialog; unchecked layers absent from generated WBP
+  4. Group subtree excluded when parent group unchecked (FILTER-02)
+  5. Headless path limitation (bShowPreviewDialog=false skips filtering) documented
+  6. REQUIREMENTS.md HIDDEN-01, FILTER-01, FILTER-02 marked Complete
 **Plans**: TBD
 
 ### Phase 19: Integration Stability Fixes

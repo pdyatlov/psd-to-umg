@@ -64,6 +64,12 @@
 - [x] **BTN-ANIM-02**: Given a `@button` group containing `@state:normal` and `@state:hover` child groups, each with a text layer carrying a different `FPsdTextRun::Color`, the generator produces a `UButton` with the `@state:normal` text content as its child AND creates a `UWidgetAnimation` named `{CleanName}_Hover` targeting that text widget, with start-key colour equal to the normal text colour and end-key colour equal to the hover text colour. If the `@state:hover` group has no text layer (D-07), no hover animation is created (silent skip). When parent widget IS a `UButton`, `PopulateChildren` skips all `@state:*` direct children (D-08/D-09) and never adds them as widget children — the button's single child comes from `@state:normal` content only.
 - [x] **BTN-ANIM-03**: After `FWidgetBlueprintGenerator::Generate` returns a WBP for a `@button` PSD with `@state:normal`/`@state:hover`/`@state:pressed` text colours (manual-only — UE Editor UI verification): the WBP's Event Graph contains a `UK2Node_ComponentBoundEvent` for `OnHovered` bound to the button variable, wired (then-pin → exec-pin) to a `UK2Node_CallFunction` targeting `UUserWidget::PlayAnimation`, whose `InAnimation` pin is fed by a `UK2Node_VariableGet` referencing the `{CleanName}_Hover` animation. Symmetric pairs exist for `OnUnhovered→PlayAnimation(Reverse)`, `OnPressed→PlayAnimation({CleanName}_Pressed)`, `OnReleased→PlayAnimation({CleanName}_Hover, Forward)`. `Disabled` animation is intentionally NOT wired (D-02 limitation — UButton has no disabled delegate). In PIE: hovering the button plays the colour transition on the text widget.
 
+### Text + Layout Correctness (TXT-FX-*, TXT-CAPS-*, LAYOUT-ORDER-*)
+
+- [ ] **TXT-FX-01**: When a text layer has a Color Overlay effect (`FPsdLayerEffects::ColorOverlay` present and enabled), the overlay color is used for `UTextBlock::SetColorAndOpacity` instead of the PSD text color property (`FPsdTextRun::Color`). Color Overlay takes priority; the base text color is ignored when an overlay is present.
+- [ ] **TXT-CAPS-01**: When a text layer has the All Caps transformation enabled in Photoshop, the generated `UTextBlock` has `TextTransformPolicy` set to `ETextTransformPolicy::ToUpper`. Layers without All Caps produce `ETextTransformPolicy::None` (default).
+- [x] **LAYOUT-ORDER-01**: Children added to `UHorizontalBox` (`@hbox`) and `UVerticalBox` (`@vbox`) panels appear in the same visual order as the Photoshop layer stack — the topmost layer in the PSD panel corresponds to the first child slot in UE.
+
 ## Traceability
 
 | REQ-ID | Assigned Phase | Status |
@@ -90,7 +96,10 @@
 | BTN-ANIM-01 | Phase 17.2 | Complete (verified 2026-04-24 via PSD2UMG.ButtonStateTextAnim — CreateColorAnim landed in 17.2-02) |
 | BTN-ANIM-02 | Phase 17.2 | Complete (verified 2026-04-24 via PSD2UMG.ButtonStateTextAnim — skip guard in 17.2-02 + generator integration in 17.2-03) |
 | BTN-ANIM-03 | Phase 17.2 | Complete (verified 2026-04-27 manual PIE — K2 nodes visible, text colour transitions in PIE) |
+| TXT-FX-01 | Phase 19 | Pending (Phase 19 Plan 01) |
+| TXT-CAPS-01 | Phase 19 | Pending (Phase 19 Plan 02) |
+| LAYOUT-ORDER-01 | Phase 19 | Complete (verified 2026-04-27 — empirical first-run of FPanelAttachmentSpec "VBoxGroup_Slot0IsItemA_LAYOUT-ORDER-01" + "HBoxGroup_Slot0IsTopmostPSDLayer_LAYOUT-ORDER-01" PASSED on Phase 19 baseline; Phase 10 PopulateChildren forward iteration already preserves PSD layer-panel reading order. No production-code change required; spec assertions retained as permanent regression guard) |
 
 ---
 
-*Last updated: 2026-04-24*
+*Last updated: 2026-04-27*

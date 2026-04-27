@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: executing
-stopped_at: "Phase 17.2 Plan 03 complete — 4/4 BTN-ANIM GREEN; Plan 04 (human PIE verify) is next"
-last_updated: "2026-04-27T00:00:00.000Z"
+stopped_at: Completed 19-01-PLAN.md — TXT-FX-01 closed, Plan 02 (TXT-CAPS-01) is next
+last_updated: "2026-04-27T14:22:43.379Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 2
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 2
+  completed_plans: 2
 ---
 
 # Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 17.2 — button-state-text-animation
+**Current focus:** Phase 19 — text-layout-correctness-fixes
 
 ## Current Position
 
-Phase: 17.2 (button-state-text-animation) — EXECUTING
-Plan: 4 of 4 (human PIE verification)
-Status: Awaiting human verify
+Phase: 19 (text-layout-correctness-fixes) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-27
 
 ## Performance Metrics
@@ -95,6 +95,7 @@ Last activity: 2026-04-27
 | Phase 17-automated-font-matching P02 | 3min | 3 tasks | 4 files |
 | Phase 17.1-button-variants-state-wiring P01 | 2min | 2 tasks | 2 files |
 | Phase 17.2 P03 | 15min | 3 tasks | 4 files |
+| Phase 19-text-layout-correctness-fixes P01 | 10min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,8 @@ Recent decisions affecting current work:
 - [Phase 17.2]: Disabled state (D-02): UButton has no disabled delegate — no Disabled animation or K2 injection attempted; wiring deferred to future phase
 - [Phase 17.2]: Non-destructive reimport: Update() refreshes animations additively but does NOT re-inject K2 wiring; designer Event Graph modifications preserved
 - [Phase 17.2]: GIsAutomationTesting guard around SaveLoadedAsset in Generate() — P4 MarkForAdd on /Engine/Transient test packages emits Error-level log that automation framework treats as test failure even when all TestTrue assertions pass
+- [Phase 19-01]: TXT-FX-01 closed by leveraging Phase 12 RouteTextEffects routing — no new production code path needed
+- [Phase 19-01]: FTextLayerMapper dead ternary branch kept intentionally as belt-and-braces guard; comment names TXT-FX-01 and warns against removal without re-running named specs
 
 ### Roadmap Evolution
 
@@ -193,6 +196,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-27
-Stopped at: 4/4 BTN-ANIM GREEN. Root cause of test failure: P4 MarkForAdd Error log on /Engine/Transient paths captured by automation framework as test failure; fixed with GIsAutomationTesting save guard. Plan 04 (human PIE verify) is next.
+Last session: 2026-04-27T14:22:43.375Z
+Stopped at: Completed 19-01-PLAN.md — TXT-FX-01 closed, Plan 02 (TXT-CAPS-01) is next
 Resume file: None

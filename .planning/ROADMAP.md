@@ -193,7 +193,7 @@ Plans:
 | 17.1. Button+Variants State Wiring Validation | 2/2 | Complete | 2026-04-27 |
 | 17.2. Button State Text Animation | 4/4 | Complete | 2026-04-27 |
 | 18. Hidden-Layer Filtering + 17.1 Close-out | 0/TBD | Pending | — |
-| 19. Text + Layout Correctness Fixes | 0/TBD | Pending | — |
+| 19. Text + Layout Correctness Fixes | 1/3 | In Progress|  |
 | 20. Integration Stability Fixes | 0/TBD | Pending | — |
 
 ## v1.1 / v1.2 Gap Closure (Phases 18-20)
@@ -228,7 +228,7 @@ Plans:
   3. Children added to UHorizontalBox (@hbox) and UVerticalBox (@vbox) panels appear in the same visual order as in the Photoshop layer stack (top layer in PS = first/top child in UE)
 **Plans**: 3 plans
 Plans:
-- [ ] 19-01-PLAN.md — TXT-FX-01 close-out: dedicated overlay-vs-fill spec assertion + dead-branch contract comment in FTextLayerMapper (no code change to ternary)
+- [x] 19-01-PLAN.md — TXT-FX-01 close-out: dedicated overlay-vs-fill spec assertion + dead-branch contract comment in FTextLayerMapper (no code change to ternary)
 - [ ] 19-02-PLAN.md — TXT-CAPS-01: bAllCaps on FPsdTextRun + style_run_font_caps parse + SetTextTransformPolicy(ToUpper); Wave-0 RED specs + Typography.psd text_caps fixture layer
 - [ ] 19-03-PLAN.md — LAYOUT-ORDER-01: RED slot-0 identity spec for VBoxGroup/HBoxGroup; conditional minimal fix (Option A reverse-for-non-canvas in PopulateChildren) only if RED
 

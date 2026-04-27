@@ -127,6 +127,38 @@ void FButtonLayerMapperSpec::Define()
             TestNull(TEXT("Disabled slot remains default/null"), Style.Disabled.GetResourceObject());
         });
     });
+
+    // ------------------------------------------------------------------
+    // Phase 20 / D-05 — Mapper priority hardening.
+    // FFillLayerMapper, FSolidFillLayerMapper, FShapeLayerMapper must
+    // run at strictly higher priority than FImageLayerMapper because
+    // FLayerTagParser (Phase 16.1 / D-02) maps EPsdLayerType::Gradient,
+    // SolidFill, and Shape to EPsdTagType::Image — so FImageLayerMapper::CanMap
+    // ALSO returns true for these layers. Without a priority delta, the
+    // TArray::Sort introsort (non-stable at equal keys) can pick the wrong
+    // mapper and produce wrong output. These three assertions pin the
+    // intent and fail loudly if any future refactor resets a priority to 100.
+    // ------------------------------------------------------------------
+    Describe("Phase 20: Mapper Priority Hardening", [this]()
+    {
+        It("FFillLayerMapper priority > FImageLayerMapper (no equal-key sort race)", [this]()
+        {
+            TestTrue(TEXT("FFillLayerMapper().GetPriority() > FImageLayerMapper().GetPriority()"),
+                FFillLayerMapper().GetPriority() > FImageLayerMapper().GetPriority());
+        });
+
+        It("FSolidFillLayerMapper priority > FImageLayerMapper (no equal-key sort race)", [this]()
+        {
+            TestTrue(TEXT("FSolidFillLayerMapper().GetPriority() > FImageLayerMapper().GetPriority()"),
+                FSolidFillLayerMapper().GetPriority() > FImageLayerMapper().GetPriority());
+        });
+
+        It("FShapeLayerMapper priority > FImageLayerMapper (no equal-key sort race)", [this]()
+        {
+            TestTrue(TEXT("FShapeLayerMapper().GetPriority() > FImageLayerMapper().GetPriority()"),
+                FShapeLayerMapper().GetPriority() > FImageLayerMapper().GetPriority());
+        });
+    });
 }
 
 #endif // WITH_DEV_AUTOMATION_TESTS

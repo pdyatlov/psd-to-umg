@@ -221,12 +221,16 @@ Plans:
 ### Phase 19: Text + Layout Correctness Fixes
 **Goal**: Fix three correctness bugs affecting text rendering and layout child order.
 **Depends on**: Phase 12 (text pipeline), Phase 3 (mapper pipeline)
-**Requirements**: TXT-FX-01, TXT-CAPS-01, LAYOUT-ORDER-01 (new — to be added to REQUIREMENTS.md)
+**Requirements**: TXT-FX-01, TXT-CAPS-01, LAYOUT-ORDER-01
 **Success Criteria** (what must be TRUE):
   1. Text layer with a Color Overlay effect uses the overlay color for UTextBlock::ColorAndOpacity, not the PSD text color property — Color Overlay wins when present
   2. Text layer with All Caps transformation enabled sets UTextBlock::TextTransformPolicy = ETextTransformPolicy::ToUpper
   3. Children added to UHorizontalBox (@hbox) and UVerticalBox (@vbox) panels appear in the same visual order as in the Photoshop layer stack (top layer in PS = first/top child in UE)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 19-01-PLAN.md — TXT-FX-01 close-out: dedicated overlay-vs-fill spec assertion + dead-branch contract comment in FTextLayerMapper (no code change to ternary)
+- [ ] 19-02-PLAN.md — TXT-CAPS-01: bAllCaps on FPsdTextRun + style_run_font_caps parse + SetTextTransformPolicy(ToUpper); Wave-0 RED specs + Typography.psd text_caps fixture layer
+- [ ] 19-03-PLAN.md — LAYOUT-ORDER-01: RED slot-0 identity spec for VBoxGroup/HBoxGroup; conditional minimal fix (Option A reverse-for-non-canvas in PopulateChildren) only if RED
 
 ### Phase 20: Integration Stability Fixes
 **Goal**: Eliminate the mapper priority collision (non-stable sort risk for gradient/shape/fill layers) and reimport cache leak (fonts added between reimports invisible until engine restart).

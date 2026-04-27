@@ -81,9 +81,9 @@
 | TEXT-F-01 | Phase 12 | Complete |
 | TEXT-F-02 | Phase 12 | Complete |
 | TEXT-F-03 | Phase 12 | Complete |
-| GRAD-01 | Phase 13 / Phase 16.1 | Complete (verified 2026-04-22 — Phase 16.1 FLayerTagParser fix closes the untagged-layer gap) |
+| GRAD-01 | Phase 13 / Phase 16.1 / Phase 20 | Complete (verified 2026-04-22 — Phase 16.1 FLayerTagParser fix closes the untagged-layer gap; Phase 20 hardened with priority 101 on FFillLayerMapper to eliminate sort-race vs FImageLayerMapper at priority 100) |
 | GRAD-02 | Phase 13 | Complete (verified 2026-04-22) |
-| SHAPE-01 | Phase 14 / Phase 16.1 | Complete (verified 2026-04-22 — Phase 16.1 FLayerTagParser fix closes the untagged-layer gap) |
+| SHAPE-01 | Phase 14 / Phase 16.1 / Phase 20 | Complete (verified 2026-04-22 — Phase 16.1 FLayerTagParser fix closes the untagged-layer gap; Phase 20 hardened with priority 101 on FShapeLayerMapper / FSolidFillLayerMapper to eliminate sort-race vs FImageLayerMapper at priority 100) |
 | SHAPE-02 | Phase 14 | Complete (verified 2026-04-22) |
 | GRPFX-01 | Phase 15 | Complete (verified 2026-04-22) |
 | GRPFX-02 | Phase 15 | Complete (verified 2026-04-22) |
@@ -102,4 +102,4 @@
 
 ---
 
-*Last updated: 2026-04-27*
+*Last updated: 2026-04-27 (Phase 20 mapper priority hardening)*

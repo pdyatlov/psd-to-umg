@@ -194,7 +194,7 @@ Plans:
 | 17.2. Button State Text Animation | 4/4 | Complete | 2026-04-27 |
 | 18. Hidden-Layer Filtering + 17.1 Close-out | 0/TBD | Pending | — |
 | 19. Text + Layout Correctness Fixes | 3/3 | Complete    | 2026-04-27 |
-| 20. Integration Stability Fixes | 0/TBD | Pending | — |
+| 20. Integration Stability Fixes | 1/2 | In Progress|  |
 
 ## v1.1 / v1.2 Gap Closure (Phases 18-20)
 
@@ -241,7 +241,10 @@ Plans:
   1. FFillLayerMapper, FSolidFillLayerMapper, FShapeLayerMapper registered at priority 101 (above FImageLayerMapper at 100)
   2. FPsdReimportHandler::Reimport calls FFontResolver::InvalidateDiscoveryCache() after FWidgetBlueprintGenerator::Update
   3. Existing gradient, shape, and font tests pass with no regressions
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 20-01-PLAN.md — Mapper priority hardening (FFillLayerMapper / FSolidFillLayerMapper / FShapeLayerMapper bump to 101) + 3 priority assertion specs (GRAD-01, SHAPE-01)
+- [x] 20-02-PLAN.md — FPsdReimportHandler::Reimport ON_SCOPE_EXIT cache invalidation hook (FONT-01)
 
 ## v1.3+ Backlog
 

@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
-status: executing
-stopped_at: Completed 19-02-PLAN.md (TXT-CAPS-01)
-last_updated: "2026-04-27T14:42:05.608Z"
+status: verifying
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-04-27T15:22:06.626Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 2
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 19 — text-layout-correctness-fixes
+**Current focus:** Phase 20 — integration-stability-fixes
 
 ## Current Position
 
-Phase: 19
-Plan: Not started
-Status: Ready to execute
+Phase: 20 (integration-stability-fixes) — EXECUTING
+Plan: 2 of 2
+Status: Phase complete — ready for verification
 Last activity: 2026-04-27
 
 ## Performance Metrics
@@ -98,6 +98,7 @@ Last activity: 2026-04-27
 | Phase 19-text-layout-correctness-fixes P01 | 10min | 2 tasks | 3 files |
 | Phase 19-text-layout-correctness-fixes P03 | 8min | 3 tasks | 3 files |
 | Phase 19-text-layout-correctness-fixes P02 | 15min | 3 tasks | 6 files |
+| Phase 20-integration-stability-fixes P02 | 5min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -182,6 +183,7 @@ Recent decisions affecting current work:
 - [Phase 19-01]: FTextLayerMapper dead ternary branch kept intentionally as belt-and-braces guard; comment names TXT-FX-01 and warns against removal without re-running named specs
 - [Phase 19-03]: LAYOUT-ORDER-01 Outcome A: Phase 10 PopulateChildren forward iteration already preserves PSD layer-panel reading order; no production code change needed; requirement was stale
 - [Phase 19-text-layout-correctness-fixes]: bAllCaps on FPsdTextRun is single source of truth; style_run_font_caps(DominantRunIdx) mirrors FauxBold/FauxItalic; SetTextTransformPolicy only called when bAllCaps true; FRichTextLayerMapper multi-run All Caps deferred (out of scope)
+- [Phase 20-integration-stability-fixes]: ON_SCOPE_EXIT RAII guard chosen over single-exit restructuring in FPsdReimportHandler::Reimport for D-03 cache invalidation — single statement covers all 7 exit paths cleanly (Phase 20 D-04)
 
 ### Roadmap Evolution
 
@@ -200,6 +202,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-27T14:38:34.068Z
-Stopped at: Completed 19-02-PLAN.md (TXT-CAPS-01)
+Last session: 2026-04-27T15:21:50.029Z
+Stopped at: Completed 20-02-PLAN.md
 Resume file: None

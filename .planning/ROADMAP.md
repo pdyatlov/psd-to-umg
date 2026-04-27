@@ -70,7 +70,7 @@ Plans:
 - [x] **Phase 16.1: LayerTag Fix + Requirements Traceability** - FLayerTagParser type-inference fix for Gradient/SolidFill/Shape layers; HIDDEN-02 row dimming; REQUIREMENTS.md extended with v1.2 requirements and corrected traceability (completed 2026-04-22)
 - [x] **Phase 17: Automated Font Matching** - Photoshop font names resolved to UE font assets automatically via a configurable name-mapping table with fuzzy fallback (completed 2026-04-22)
 - [ ] **Phase 17.1: Button+Variants State Wiring Validation** (INSERTED) — Verify `@button`+`@variants` can co-exist on one layer, and that all four UE Button child states (`@state:normal/hover/pressed/disabled`) wire correctly
-- [ ] **Phase 17.2: Button State Text Animation** (INSERTED) — When `@button` `@state:*` groups contain text layers with different ColorAndOpacity across states, generate UWidgetAnimation color tracks and wire OnHovered/OnPressed delegates via K2 Blueprint graph nodes
+- [x] **Phase 17.2: Button State Text Animation** (INSERTED) — When `@button` `@state:*` groups contain text layers with different ColorAndOpacity across states, generate UWidgetAnimation color tracks and wire OnHovered/OnPressed delegates via K2 Blueprint graph nodes (completed 2026-04-27)
 
 ### Phase 13: Gradient Layers
 **Goal**: Gradient fill layers from Photoshop import as usable UMG widgets — either pre-rendered as Texture2D or as a native gradient widget if available
@@ -176,7 +176,7 @@ Plans:
 - [x] 17.2-01-PLAN.md — Wave 1 RED: FButtonStateTextAnimSpec.cpp + REQUIREMENTS.md BTN-ANIM-01/02/03 entries
 - [x] 17.2-02-PLAN.md — Wave 2 GREEN: CreateColorAnim + FButtonLayerMapper bIsVariable + @state:normal content + PopulateChildren skip guard; spec 3/4 GREEN
 - [x] 17.2-03-PLAN.md — Wave 3 GREEN: BlueprintGraph dep + generator integration (TraverseButtonLayers + BuildButtonStateAnimations + InjectButtonEventGraphWiring + two-compile sequence); spec 4/4 GREEN; REQUIREMENTS BTN-ANIM-01/02 Complete
-- [ ] 17.2-04-PLAN.md — Wave 4 human verify: end-to-end PIE test + 17.2-VERIFICATION.md + REQUIREMENTS BTN-ANIM-03 Complete
+- [x] 17.2-04-PLAN.md — Wave 4 human verify: end-to-end PIE test + 17.2-VERIFICATION.md + REQUIREMENTS BTN-ANIM-03 Complete
 
 ## Progress
 
@@ -191,7 +191,7 @@ Plans:
 | 16.1. LayerTag Fix + Requirements Traceability | 1/1 | Complete    | 2026-04-22 |
 | 17. Automated Font Matching | 2/2 | Complete    | 2026-04-22 |
 | 17.1. Button+Variants State Wiring Validation | 1/2 | In Progress|  |
-| 17.2. Button State Text Animation | 3/4 | In Progress|  |
+| 17.2. Button State Text Animation | 4/4 | Complete | 2026-04-27 |
 | 18. Phase 11 Verification Backfill | 0/TBD | Pending | — |
 | 19. Integration Stability Fixes | 0/TBD | Pending | — |
 

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Import Fidelity Fixes
 status: verifying
-stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-04-27T15:22:06.626Z"
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-04-27T15:22:17.851Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 2
@@ -99,6 +99,7 @@ Last activity: 2026-04-27
 | Phase 19-text-layout-correctness-fixes P03 | 8min | 3 tasks | 3 files |
 | Phase 19-text-layout-correctness-fixes P02 | 15min | 3 tasks | 6 files |
 | Phase 20-integration-stability-fixes P02 | 5min | 2 tasks | 2 files |
+| Phase 20-integration-stability-fixes P01 | 5m | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -184,6 +185,8 @@ Recent decisions affecting current work:
 - [Phase 19-03]: LAYOUT-ORDER-01 Outcome A: Phase 10 PopulateChildren forward iteration already preserves PSD layer-panel reading order; no production code change needed; requirement was stale
 - [Phase 19-text-layout-correctness-fixes]: bAllCaps on FPsdTextRun is single source of truth; style_run_font_caps(DominantRunIdx) mirrors FauxBold/FauxItalic; SetTextTransformPolicy only called when bAllCaps true; FRichTextLayerMapper multi-run All Caps deferred (out of scope)
 - [Phase 20-integration-stability-fixes]: ON_SCOPE_EXIT RAII guard chosen over single-exit restructuring in FPsdReimportHandler::Reimport for D-03 cache invalidation — single statement covers all 7 exit paths cleanly (Phase 20 D-04)
+- [Phase 20-integration-stability-fixes]: Priority delta (100->101) chosen over sort-stability workaround for fill/shape mappers: deterministic, minimal-diff, CI-verifiable
+- [Phase 20-integration-stability-fixes]: Priority assertions added to existing FButtonLayerMapperSpec.cpp (AllMappers.h already included) to avoid new file/include overhead
 
 ### Roadmap Evolution
 
@@ -202,6 +205,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-27T15:21:50.029Z
-Stopped at: Completed 20-02-PLAN.md
+Last session: 2026-04-27T15:22:17.847Z
+Stopped at: Completed 20-01-PLAN.md
 Resume file: None

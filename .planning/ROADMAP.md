@@ -194,13 +194,13 @@ Plans:
 | 17.2. Button State Text Animation | 4/4 | Complete | 2026-04-27 |
 | 18. Hidden-Layer Filtering + 17.1 Close-out | 0/TBD | Pending | — |
 | 19. Text + Layout Correctness Fixes | 3/3 | Complete    | 2026-04-27 |
-| 20. Integration Stability Fixes | 1/2 | In Progress|  |
+| 20. Integration Stability Fixes | 2/2 | Complete   | 2026-04-27 |
 
 ## v1.1 / v1.2 Gap Closure (Phases 18-20)
 
 - [ ] **Phase 18: Hidden-Layer Filtering + 17.1 Close-out** — Close HIDDEN-01/FILTER-01/FILTER-02 (import dialog hidden-layer filtering); formally close Phase 17.1 with VERIFICATION.md confirming BTN-STATE-01/02 code that landed during 17.2
 - [x] **Phase 19: Text + Layout Correctness Fixes** — Color Overlay priority for text, All Caps text transform, @vbox/@hbox child order reversal fix (completed 2026-04-27)
-- [ ] **Phase 20: Integration Stability Fixes** — Raise fill/shape mapper priorities to 101, add reimport cache invalidation
+- [x] **Phase 20: Integration Stability Fixes** — Raise fill/shape mapper priorities to 101, add reimport cache invalidation (completed 2026-04-27)
 
 ### Phase 18: Hidden-Layer Filtering + 17.1 Close-out
 **Goal**: Two work streams merged:
@@ -243,7 +243,7 @@ Plans:
   3. Existing gradient, shape, and font tests pass with no regressions
 **Plans**: 2 plans
 Plans:
-- [ ] 20-01-PLAN.md — Mapper priority hardening (FFillLayerMapper / FSolidFillLayerMapper / FShapeLayerMapper bump to 101) + 3 priority assertion specs (GRAD-01, SHAPE-01)
+- [x] 20-01-PLAN.md — Mapper priority hardening (FFillLayerMapper / FSolidFillLayerMapper / FShapeLayerMapper bump to 101) + 3 priority assertion specs (GRAD-01, SHAPE-01)
 - [x] 20-02-PLAN.md — FPsdReimportHandler::Reimport ON_SCOPE_EXIT cache invalidation hook (FONT-01)
 
 ## v1.3+ Backlog

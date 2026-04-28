@@ -1022,6 +1022,103 @@ namespace PSD2UMG::Parser::Internal
 			}
 		};
 
+		// ----------------------------------------------------------------------
+		// FXFMT-01: extract one FrFX Objc descriptor item. Used by both the
+		// pre-CC2014 outer "Objc" branch and the new CC2014+ "VlLs" list branch.
+		//
+		// Captures all parser-state lambdas by reference (Pos, CheckRemaining,
+		// ReadU8/U32BE/DoubleBE, ReadPsString, SkipUnicodeString, SkipValueAfterOsType)
+		// plus the output struct `Out`. Does NOT capture `bFoundStroke` -- the caller
+		// is responsible for setting that from this lambda's bool return value
+		// (RESEARCH Pitfall 2 -- avoid double-mutation).
+		//
+		// Returns true iff the item parsed an enabled stroke (bEnab = true and
+		// Out.bEnabled has been written).
+		// ----------------------------------------------------------------------
+		auto ParseFrFXObjcItem = [&]() -> bool
+		{
+			SkipUnicodeString(); // class name
+			ReadPsString();       // classID ('FrFX')
+			uint32 FrFXCount = ReadU32BE();
+
+			bool   bEnab    = false;
+			double SzPx     = 0.0;
+			double OpctPct  = 100.0;
+			double Rd       = 0.0, Grn = 0.0, Bl = 0.0;
+
+			for (uint32 j = 0; j < FrFXCount && CheckRemaining(8); ++j)
+			{
+				std::string FKey = ReadPsString();
+
+				if (!CheckRemaining(4)) break;
+				char FOsType[5] = {};
+				for (int k = 0; k < 4; ++k)
+					FOsType[k] = static_cast<char>(Data[Pos + k]);
+				Pos += 4;
+
+				if (FKey == "enab" && FCStringAnsi::Strcmp(FOsType, "bool") == 0)
+				{
+					bEnab = (ReadU8() != 0);
+				}
+				else if (FKey == "Sz  " && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
+				{
+					Pos += 4; // skip unit tag (#Pxl)
+					SzPx = ReadDoubleBE();
+				}
+				else if (FKey == "Opct" && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
+				{
+					Pos += 4; // skip unit tag (#Prc)
+					OpctPct = ReadDoubleBE();
+				}
+				else if (FKey == "Clr " && FCStringAnsi::Strcmp(FOsType, "Objc") == 0)
+				{
+					// RGBC sub-descriptor: keys "Rd  ", "Grn ", "Bl  " -- doubles in 0..255
+					SkipUnicodeString();
+					ReadPsString(); // classID ('RGBC')
+					uint32 ClrCount = ReadU32BE();
+					for (uint32 c = 0; c < ClrCount && CheckRemaining(8); ++c)
+					{
+						std::string CKey = ReadPsString();
+						if (!CheckRemaining(4)) break;
+						char COsType[5] = {};
+						for (int k = 0; k < 4; ++k)
+							COsType[k] = static_cast<char>(Data[Pos + k]);
+						Pos += 4;
+						if (FCStringAnsi::Strcmp(COsType, "doub") == 0)
+						{
+							double V = ReadDoubleBE();
+							if      (CKey == "Rd  ") Rd  = V;
+							else if (CKey == "Grn ") Grn = V;
+							else if (CKey == "Bl  ") Bl  = V;
+						}
+						else
+						{
+							SkipValueAfterOsType(COsType);
+						}
+					}
+				}
+				else
+				{
+					SkipValueAfterOsType(FOsType);
+				}
+			}
+
+			if (bEnab)
+			{
+				Out.bEnabled = true;
+				Out.SizePx   = static_cast<float>(SzPx);
+				const float A = FMath::Clamp(static_cast<float>(OpctPct / 100.0), 0.f, 1.f);
+				Out.Color = FLinearColor::FromSRGBColor(
+					FColor(
+						static_cast<uint8>(FMath::Clamp(Rd  / 255.0, 0.0, 1.0) * 255.0),
+						static_cast<uint8>(FMath::Clamp(Grn / 255.0, 0.0, 1.0) * 255.0),
+						static_cast<uint8>(FMath::Clamp(Bl  / 255.0, 0.0, 1.0) * 255.0),
+						static_cast<uint8>(A * 255.0)));
+			}
+
+			return bEnab;
+		};
+
 		// ---- Walk the top-level descriptor ----
 		// Descriptor header: unicode_class_name, ps_string classID, uint32 item_count
 		SkipUnicodeString(); // class name (usually empty)
@@ -1039,90 +1136,11 @@ namespace PSD2UMG::Parser::Internal
 				OsType[k] = static_cast<char>(Data[Pos + k]);
 			Pos += 4;
 
-			// We are looking for 'FrFX' with ostype 'Objc' (the stroke sub-descriptor)
+			// FXFMT-01: pre-CC2014 path -- single Objc descriptor under FrFX.
 			if (ItemKey == "FrFX" && FCStringAnsi::Strcmp(OsType, "Objc") == 0)
 			{
-				// ---- Parse the FrFX Objc descriptor ----
-				SkipUnicodeString(); // class name
-				ReadPsString();       // classID ('FrFX')
-				uint32 FrFXCount = ReadU32BE();
-
-				bool   bEnab    = false;
-				double SzPx     = 0.0;
-				double OpctPct  = 100.0;
-				double Rd       = 0.0, Grn = 0.0, Bl = 0.0;
-
-				for (uint32 j = 0; j < FrFXCount && CheckRemaining(8); ++j)
-				{
-					std::string FKey = ReadPsString();
-
-					if (!CheckRemaining(4)) break;
-					char FOsType[5] = {};
-					for (int k = 0; k < 4; ++k)
-						FOsType[k] = static_cast<char>(Data[Pos + k]);
-					Pos += 4;
-
-					if (FKey == "enab" && FCStringAnsi::Strcmp(FOsType, "bool") == 0)
-					{
-						bEnab = (ReadU8() != 0);
-					}
-					else if (FKey == "Sz  " && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
-					{
-						Pos += 4; // skip unit tag (#Pxl)
-						SzPx = ReadDoubleBE();
-					}
-					else if (FKey == "Opct" && FCStringAnsi::Strcmp(FOsType, "UntF") == 0)
-					{
-						Pos += 4; // skip unit tag (#Prc)
-						OpctPct = ReadDoubleBE();
-					}
-					else if (FKey == "Clr " && FCStringAnsi::Strcmp(FOsType, "Objc") == 0)
-					{
-						// RGBC sub-descriptor: keys "Rd  ", "Grn ", "Bl  " -- doubles in 0..255
-						SkipUnicodeString();
-						ReadPsString(); // classID ('RGBC')
-						uint32 ClrCount = ReadU32BE();
-						for (uint32 c = 0; c < ClrCount && CheckRemaining(8); ++c)
-						{
-							std::string CKey = ReadPsString();
-							if (!CheckRemaining(4)) break;
-							char COsType[5] = {};
-							for (int k = 0; k < 4; ++k)
-								COsType[k] = static_cast<char>(Data[Pos + k]);
-							Pos += 4;
-							if (FCStringAnsi::Strcmp(COsType, "doub") == 0)
-							{
-								double V = ReadDoubleBE();
-								if      (CKey == "Rd  ") Rd  = V;
-								else if (CKey == "Grn ") Grn = V;
-								else if (CKey == "Bl  ") Bl  = V;
-							}
-							else
-							{
-								SkipValueAfterOsType(COsType);
-							}
-						}
-					}
-					else
-					{
-						SkipValueAfterOsType(FOsType);
-					}
-				}
-
-				if (bEnab)
-				{
-					Out.bEnabled = true;
-					Out.SizePx   = static_cast<float>(SzPx);
-					const float A = FMath::Clamp(static_cast<float>(OpctPct / 100.0), 0.f, 1.f);
-					Out.Color = FLinearColor::FromSRGBColor(
-						FColor(
-							static_cast<uint8>(FMath::Clamp(Rd  / 255.0, 0.0, 1.0) * 255.0),
-							static_cast<uint8>(FMath::Clamp(Grn / 255.0, 0.0, 1.0) * 255.0),
-							static_cast<uint8>(FMath::Clamp(Bl  / 255.0, 0.0, 1.0) * 255.0),
-							static_cast<uint8>(A * 255.0)));
-				}
-
-				bFoundStroke = true; // stop searching this descriptor
+				ParseFrFXObjcItem();
+				bFoundStroke = true; // stop searching this descriptor (matches legacy semantics)
 			}
 			else
 			{

@@ -1,265 +1,178 @@
-# Domain Pitfalls
+# Domain Pitfalls — v1.3 Advanced Effects
 
-**Domain:** UE5 Editor Plugin -- PSD to UMG Widget Blueprint Converter (C++ rewrite from UE4/Python baseline)
-**Researched:** 2026-04-07
+**Domain:** Adding stroke rendering (vstk/frameFXMulti), pattern fills (PtFl), lrFX channel-order verification, and non-ASCII rich text to PSD2UMG.
+**Researched:** 2026-04-28
+**Codebase revision studied:** Phase 20 complete (master, commit a816180)
+
+> This file supersedes the original v1.0 PITFALLS.md for the v1.3 milestone.
+> v1.0 pitfalls (Phase 0-8 porting, UE5 API, Widget Blueprint generation) remain valid
+> but are not repeated here. This document covers only pitfalls specific to the
+> four v1.3 feature areas.
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, editor crashes, or corrupt assets.
+These mistakes cause silent wrong output, incorrect visual rendering, or data corruption that is hard to diagnose after the fact.
 
 ---
 
-### Pitfall 1: WhitelistPlatforms Silently Ignored in UE5
+### CP-01: Confusing the vstk descriptor offset with the vscg offset
 
-**What goes wrong:** The current `.uplugin` uses `"WhitelistPlatforms": ["Win64", "Mac"]`. UE5 silently ignores this field -- it does not error, it does not warn. The result is that the plugin loads on ALL platforms (including unsupported ones like Linux, Android) where the ThirdParty static lib does not exist, causing linker failures or load-time crashes.
+**What goes wrong:** A new `ScanStrokeData` function for the `vstk` (vecStrokeData) block is written by copying `ScanSolidFillColor` or `ScanShapeFillColor` and uses `TryParseAt(4)` as the primary offset, which is the confirmed primary for `SoCo`. The vstk descriptor starts at a different location.
 
-**Why it happens:** UE5 renamed `WhitelistPlatforms` to `PlatformAllowList` and `BlacklistPlatforms` to `PlatformDenyList`. The old names are not recognized at all; they are treated as unknown JSON keys and discarded.
+**Why it happens:** The codebase has two confirmed descriptor patterns that look superficially identical:
+- `SoCo` (adjSolidColor): version prefix at `[0..3]`, descriptor at offset 4. Primary = `TryParseAt(4)`.
+- `vscg` (vecStrokeContentData): classID `'SoCo'` at `[0..3]`, version at `[4..7]`, descriptor at offset 8. Primary = `TryParseAt(8)`.
+- `vstk` (vecStrokeData): per Adobe spec the block carries a raw descriptor with no class-ID or version prefix. The descriptor begins at offset 0. This is NOT the same as either pattern above.
 
-**Consequences:** Plugin appears to work on Win64 during development. On distribution, users on unsupported platforms get confusing link errors or module-not-found crashes with no clear cause.
+**Consequences:** `TopCount` sanity check (`TopCount == 0 || TopCount > 256`) rejects the correct parse position and falls through to a fallback, producing `StrokeSize = 0` silently. The `bHasVectorStroke` flag (see CP-02) never gets set, so shape layers get no stroke border even when one was clearly authored.
 
 **Prevention:**
-```json
-"PlatformAllowList": ["Win64", "Mac"]
-```
-Replace in `.uplugin` immediately in Phase 0. Verify by checking `FModuleDescriptor::PlatformAllowList` is populated after load.
+1. Add the standard hex-dump diagnostic (mirror of `ScanSolidFillColor` lines 1113-1123) to emit `vstk payload[0..40]=` at Verbose before any other work.
+2. Import a known PSD with a vector shape that has a visible border stroke and inspect the log.
+3. Try `TryParseAt(0)` first. If `TopCount` is reasonable (2-10), the descriptor is at offset 0.
 
-**Detection:** Search `.uplugin` for any `Whitelist` or `Blacklist` strings. If found, they are silently broken.
+The offset order for the new function must be: `TryParseAt(0)` primary, `TryParseAt(4)` and `TryParseAt(8)` as defensive fallbacks — the exact reverse of SoCo's order.
 
-**Phase:** Phase 0 (UE 5.7 Port)
+**Detection:** Both fallback attempts return false; the Verbose hex dump shows `TopCount` would be correct at offset 0 but not at 4 or 8.
 
-**Confidence:** HIGH -- confirmed in UE5 documentation and multiple plugin migration reports.
+**Phase:** Stroke-rendering parser phase (first parser phase of v1.3).
 
 ---
 
-### Pitfall 2: Missing ShutdownModule Delegate Cleanup Causes Editor Crash on Plugin Reload
+### CP-02: Reusing `bHasStroke` for vstk stroke — double-populate collision with lfx2
 
-**What goes wrong:** The current `FAutoPSDUIModule::StartupModule()` registers a raw delegate via `ImportSubsystem->OnAssetReimport.AddRaw(this, &FAutoPSDUIModule::OnPSDImport)` but `ShutdownModule()` is empty. If the plugin is hot-reloaded or the module is unloaded, the delegate fires into a dangling `this` pointer, crashing the editor.
+**What goes wrong:** The existing `ScanRawLfx2Blocks` / `ParseFrFXDescriptor` pipeline already writes to `Effects.bHasStroke` / `Effects.StrokeSize` / `Effects.StrokeColor` for ALL layer types (PsdParser.cpp:1697-1699, and PsdTypes.h:117: "populated for ALL layer types"). If a new vstk scanner also writes to `bHasStroke`, one of two bugs results:
+- Overwrite collision: the vstk value silently replaces the lfx2 value (or vice versa, depending on call order).
+- Early skip: the mapper skips vstk because `bHasStroke` is already true from lfx2.
 
-**Why it happens:** UE4 plugins rarely got reloaded in practice. UE5 editor has more aggressive module lifecycle management, and Live Coding can trigger partial reloads.
+A vector shape layer can have BOTH: an lfx2 "Layer Style Stroke" (panel effect, any layer type) AND a vstk "Shape Stroke" (geometric stroke specific to vector shapes). Photoshop renders both simultaneously.
 
-**Consequences:** Editor crash-to-desktop on module reload. Hard to diagnose because the crash occurs in an unrelated reimport event, not during plugin shutdown.
+**Why it happens:** The lfx2 stroke path was designed with a comment "populated for ALL layer types; rendering on non-text is deferred." When vstk rendering is now implemented, the field conflict is invisible without reading that comment.
 
-**Prevention:**
+**Consequences:** Shape layer renders with wrong stroke width (lfx2 value wins or is lost), or the stroke never renders at all.
+
+**Prevention:** Add separate fields to `FPsdLayerEffects` for the vector geometry stroke:
 ```cpp
-void FPsd2UmgModule::ShutdownModule()
+// In FPsdLayerEffects (PsdTypes.h):
+bool bHasVectorStroke = false;      // from vstk (vecStrokeData) — shape layers only
+float VectorStrokeSize = 0.f;
+FLinearColor VectorStrokeColor = FLinearColor::Transparent;
+```
+Do NOT reuse `bHasStroke`. `FShapeLayerMapper::Map` reads `bHasVectorStroke`. The lfx2 `bHasStroke` stays for image/shape fallback effects and the existing text routing path remains untouched.
+
+**Phase:** Stroke-rendering parser phase and `FShapeLayerMapper` update phase.
+
+---
+
+### CP-03: frameFXMulti VlLs stroke — walking a list as if it were a single Objc
+
+**What goes wrong:** Newer Photoshop versions (CC 2014+) write stroke effects under the `"FrFX"` key with ostype `"VlLs"` (a list of effect objects) rather than `"Objc"` (a single sub-descriptor). The existing `ParseFrFXDescriptor` checks `ItemKey == "FrFX" && FCStringAnsi::Strcmp(OsType, "Objc") == 0` (PsdParser.cpp:983). When the block uses VlLs, the OsType match fails. The existing `SkipValueAfterOsType("VlLs")` walker silently skips the entire list, leaving `bFoundStroke = false`.
+
+**Why it happens:** The outer loop has `&& !bFoundStroke`, so it stops at first match. If the file was saved by older Photoshop (Objc format), the existing code works. If saved by newer Photoshop (VlLs format), the entire stroke list is skipped without any log warning.
+
+**Consequences:** PSDs saved with Photoshop CC 2014 through 2025 produce no stroke on any layer type. The silent path makes this extremely hard to diagnose; the developer must know to look for VlLs vs Objc format differences.
+
+**Prevention:** In `ParseFrFXDescriptor`, add a VlLs branch alongside the existing Objc branch. Factor the FrFX Objc body into a named lambda so both call it:
+```cpp
+// After the existing: if (ItemKey == "FrFX" && Strcmp(OsType, "Objc") == 0) { ... }
+else if (ItemKey == "FrFX" && FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
 {
-    if (GEditor)
+    const uint32 N = ReadU32BE();
+    for (uint32 k = 0; k < N && CheckRemaining(8) && !bFoundStroke; ++k)
     {
-        if (UImportSubsystem* ImportSubsystem = GEditor->GetEditorSubsystem<UImportSubsystem>())
-        {
-            ImportSubsystem->OnAssetReimport.RemoveAll(this);
-        }
+        char ElemOT[5] = {};
+        for (int c = 0; c < 4; ++c) ElemOT[c] = static_cast<char>(Data[Pos + c]);
+        Pos += 4;
+        if (FCStringAnsi::Strcmp(ElemOT, "Objc") == 0)
+            ParseFrFXObjc(); // the extracted lambda
+        else
+            SkipValueAfterOsType(ElemOT);
     }
 }
 ```
-Also store the delegate handle from `AddRaw` and use `Remove(Handle)` for precision.
 
-**Detection:** Enable `-stompmalloc` allocator during development; dangling pointer access will trigger immediate crash instead of silent corruption.
-
-**Phase:** Phase 0 (UE 5.7 Port)
-
-**Confidence:** HIGH -- this is a documented bug in CONCERNS.md and a known UE pattern.
+**Phase:** frameFXMulti support phase (can be part of the same stroke-rendering phase as CP-01/CP-02).
 
 ---
 
-### Pitfall 3: UWidgetBlueprint Created Without Compile Step Opens Corrupt in UMG Designer
+### CP-04: PtFl descriptor — walking for `"Clr "` when the block contains `"Ptrn"` 
 
-**What goes wrong:** Creating a `UWidgetBlueprint` programmatically, adding widgets to its `WidgetTree`, and saving it without calling `FKismetEditorUtilities::CompileBlueprint()` or `FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified()` produces a `.uasset` that:
-- Opens in UMG Designer but shows no widgets
-- Shows widgets but they cannot be selected
-- Crashes on next editor restart when the asset registry tries to load the generated class
+**What goes wrong:** `PtFl` (adjPattern, `TaggedBlockKey::adjPattern`) is recognized in PhotoshopAPI's enum (Enum.h:832) but not yet parsed by this codebase. A new `ScanPatternFillData` written by analogy with `ScanSolidFillColor` searches for key `"Clr "` / `"RGBC"` doubles. The PtFl descriptor does NOT contain a `"Clr "` key; it contains `"Ptrn"` (pattern reference Objc with `"Nm  "` and `"ID  "` TEXT fields), `"Scl "` (UntF scale), and `"Algn"` (bool). The color-hunting walker will find nothing and return false.
 
-**Why it happens:** `UWidgetBlueprint` is a Blueprint subclass. The `WidgetTree` is the design-time representation, but the `UWidgetBlueprintGeneratedClass` is what UMG actually uses. Without compilation, the generated class is stale or empty.
+**Why it happens:** SoCo and PtFl are both adjustment fill layers but they describe completely different data. The copy-paste reflex from SoCo is the trap.
 
-**Consequences:** Corrupted Widget Blueprints that look correct in Content Browser but crash or show empty in UMG Designer. Users lose trust in the tool.
-
-**Prevention:** Follow this exact order of operations:
-```cpp
-// 1. Create package and blueprint asset
-UPackage* Package = CreatePackage(*PackagePath);
-UWidgetBlueprint* WidgetBP = CastChecked<UWidgetBlueprint>(
-    FKismetEditorUtilities::CreateBlueprint(
-        UUserWidget::StaticClass(),
-        Package,
-        AssetName,
-        BPTYPE_Normal,
-        UWidgetBlueprint::StaticClass(),
-        UWidgetBlueprintGeneratedClass::StaticClass()
-    )
-);
-
-// 2. Build the widget tree using WidgetTree->ConstructWidget<T>()
-UCanvasPanel* RootCanvas = WidgetBP->WidgetTree->ConstructWidget<UCanvasPanel>(
-    UCanvasPanel::StaticClass(), TEXT("RootCanvas"));
-WidgetBP->WidgetTree->RootWidget = RootCanvas;
-
-// 3. Add child widgets via WidgetTree->ConstructWidget, NOT NewObject
-UImage* Img = WidgetBP->WidgetTree->ConstructWidget<UImage>(
-    UImage::StaticClass(), TEXT("MyImage"));
-UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(Img);
-
-// 4. Mark modified BEFORE compile
-WidgetBP->Modify();
-
-// 5. Compile the blueprint to regenerate the class
-FKismetEditorUtilities::CompileBlueprint(WidgetBP);
-
-// 6. Mark as structurally modified to update editor caches
-FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(WidgetBP);
-
-// 7. Save the package
-FSavePackageArgs SaveArgs;
-SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-UPackage::SavePackage(Package, WidgetBP, *PackageFilename, SaveArgs);
-```
-
-**Detection:** After generation, open the Widget Blueprint in UMG Designer. If widgets are not visible or selectable, the compile step was skipped or failed.
-
-**Phase:** Phase 2 (Layer Mapping / Widget Blueprint Generation)
-
-**Confidence:** HIGH -- verified through UE5 documentation and community tutorials.
-
----
-
-### Pitfall 4: Using NewObject Instead of WidgetTree->ConstructWidget for Child Widgets
-
-**What goes wrong:** Creating UMG widgets with `NewObject<UImage>(WidgetBP)` instead of `WidgetBP->WidgetTree->ConstructWidget<UImage>()` produces widgets that exist as UObjects but are NOT registered in the widget tree. They appear to work in code but:
-- Are invisible in UMG Designer's hierarchy panel
-- Cannot be selected or edited by the designer
-- May be garbage collected unexpectedly
-
-**Why it happens:** `WidgetTree` maintains an internal registry of all widgets it owns. `ConstructWidget` both creates the object AND registers it. `NewObject` only creates the object.
-
-**Consequences:** Widget Blueprints that look broken in the editor. Widgets randomly disappear. Extremely difficult to debug.
-
-**Prevention:** NEVER use `NewObject` for UMG widgets in a WidgetBlueprint. Always use:
-```cpp
-UWidget* Widget = WidgetBP->WidgetTree->ConstructWidget<UWidgetClass>(
-    UWidgetClass::StaticClass(), WidgetName);
-```
-
-**Detection:** After generation, verify `WidgetBP->WidgetTree->AllWidgets` count matches expected widget count.
-
-**Phase:** Phase 2 (Layer Mapping)
-
-**Confidence:** HIGH -- documented in UE5 source and confirmed by community tutorial.
-
----
-
-### Pitfall 5: PhotoshopAPI Bit-Depth Templates Force Compile-Time Branching
-
-**What goes wrong:** PhotoshopAPI uses template specialization for bit depths: `LayeredFile<bpp8_t>`, `LayeredFile<bpp16_t>`, `LayeredFile<bpp32_t>`. Opening a PSD requires knowing the bit depth upfront to instantiate the correct template. Developers write code for `bpp8_t` only, then encounter runtime crashes when a designer provides a 16-bit or 32-bit PSD.
-
-**Why it happens:** The library is designed for maximum performance via compile-time type safety. There is no `LayeredFile<auto>` or virtual base class.
-
-**Consequences:** 16-bit and 32-bit PSDs crash the parser or produce garbage data. Since many Photoshop users work in 16-bit for quality, this affects a significant percentage of real-world files.
-
-**Prevention:** Read bit depth from PSD header first, then branch:
-```cpp
-auto file = NAMESPACE_PSAPI::File(psdPath);
-auto header = file.readHeader(); // Peek at header without full parse
-switch (header.m_Depth)
-{
-case NAMESPACE_PSAPI::Enum::BitDepth::BD_8:
-    return ParseDocument<NAMESPACE_PSAPI::bpp8_t>(file);
-case NAMESPACE_PSAPI::Enum::BitDepth::BD_16:
-    return ParseDocument<NAMESPACE_PSAPI::bpp16_t>(file);
-case NAMESPACE_PSAPI::Enum::BitDepth::BD_32:
-    return ParseDocument<NAMESPACE_PSAPI::bpp32_t>(file);
-}
-```
-Internally, convert all pixel data to 8-bit for texture export (UE textures are typically 8-bit per channel). The parser wrapper should normalize to a common `FPsdDocument` representation regardless of source bit depth.
-
-**Detection:** Include test PSDs at all three bit depths in the test suite.
-
-**Phase:** Phase 1 (C++ PSD Parser)
-
-**Confidence:** HIGH -- documented in PhotoshopAPI README and API design.
-
----
-
-### Pitfall 6: PhotoshopAPI Transitive Dependencies Not Linked
-
-**What goes wrong:** PhotoshopAPI depends on several transitive libraries (c-blosc2, libdeflate, zlib-ng, possibly Iconv). Pre-building PhotoshopAPI as a static `.lib` does NOT bundle these dependencies into the output. The UE build links PhotoshopAPI.lib but gets unresolved external symbols for blosc2/zlib functions.
-
-**Why it happens:** Static libraries are just archives of `.obj` files from their own source; they do not recursively include their dependencies. This is a fundamental property of static linking that catches many developers.
-
-**Consequences:** Cryptic linker errors during UE build: `LNK2019: unresolved external symbol` for functions like `blosc2_decompress`, `libdeflate_zlib_decompress`, etc.
-
-**Prevention:** When pre-building PhotoshopAPI via CMake, also collect all transitive static libs:
-```
-ThirdParty/
-  PhotoshopAPI/
-    include/           # All PhotoshopAPI headers
-    lib/
-      Win64/
-        PhotoshopAPI.lib
-        blosc2.lib
-        libdeflate.lib
-        zlib.lib         # or zlib-ng
-      Mac/
-        libPhotoshopAPI.a
-        libblosc2.a
-        ...
-```
-In `Build.cs`, add ALL of them:
-```csharp
-string[] Libs = { "PhotoshopAPI.lib", "blosc2.lib", "libdeflate.lib", "zlib.lib" };
-foreach (string Lib in Libs)
-{
-    PublicAdditionalLibraries.Add(Path.Combine(ThirdPartyPath, "lib", Platform, Lib));
-}
-```
-Use CMake's `--target install` to get a complete set of outputs. Verify with `dumpbin /DEPENDENTS` on Windows.
-
-**Detection:** Build failure with `LNK2019` errors referencing symbols not from PhotoshopAPI itself.
-
-**Phase:** Phase 1 (C++ PSD Parser -- ThirdParty integration)
-
-**Confidence:** HIGH -- universal static linking behavior, confirmed by UE ThirdParty integration guides.
-
----
-
-### Pitfall 7: PSD Coordinate System vs UMG Canvas Panel Mismatch
-
-**What goes wrong:** PSD layer bounds are stored as absolute pixel coordinates relative to the document canvas (top, left, bottom, right). Direct use of these as UCanvasPanelSlot positions produces widgets that are offset, scaled wrong, or anchored incorrectly because:
-
-1. **DPI mismatch:** Photoshop defaults to 72 DPI; UMG operates at 96 DPI (Slate's native DPI). If the designer's PSD is at 72 DPI, all positions and sizes need scaling by `72/96 = 0.75`.
-2. **Anchor origin:** UMG Canvas Panel anchors default to (0,0) = top-left of the canvas, which matches PSD. BUT if you set anchors to anything other than top-left (e.g., center or stretch), the position/offset semantics change completely.
-3. **Negative coordinates:** PSD layers can extend beyond the canvas (negative top/left values). UMG widgets with negative positions work but may be clipped by parent containers.
-
-**Why it happens:** PSD and UMG use superficially similar coordinate systems (origin top-left, Y-down) but the units (pixels at different DPIs) and the anchor system (PSD has none, UMG has a complex anchor/alignment system) are fundamentally different.
-
-**Consequences:** Widgets appear in wrong positions, are wrong size, or overlap incorrectly. The import "works" but the output does not match the mockup.
+**Consequences:** Pattern fill layer produces no data; the mapper falls through to `EPsdLayerType::Unknown`, emitting a warning and generating nothing. The designer's repeating-tile background is completely lost.
 
 **Prevention:**
+1. Build a dedicated `ScanPatternFillData` that reads `"Ptrn"` → `"Nm  "` and `"ID  "` for the pattern reference. Store these in a new `FPsdPatternFill` struct on `FPsdLayer` (not in `FPsdLayerEffects` — this is layer-type payload, not a style effect).
+2. Add a hex-dump diagnostic and inspect the actual key sequence on a real PSD before writing any parsing logic.
+3. For pixel rasterization: verify whether `Layer.RGBAPixels` is populated for AdjustmentLayer pattern fills by PhotoshopAPI (see MP-02). If empty, fall back to the existing `bFlattenComplexEffects` path.
+
+**Phase:** Pattern fill parser phase. Requires empirical offset and key verification before implementation.
+
+---
+
+### CP-05: UTF-16 run-length slicing cuts mid-codepoint for emoji and supplementary-plane characters
+
+**What goes wrong:** `FString::Mid(CharOffset, RunLen)` at PsdParser.cpp:514 uses `RunLen` from `style_run_lengths()` which is a UTF-16 code-unit count per PSD spec. For ASCII and BMP CJK (each 1 UTF-16 code unit, decoded to 1 TCHAR on any UE platform), slicing is correct. For emoji and supplementary-plane characters (e.g. `U+1F600` = `😀` as a surrogate pair), each character is 2 UTF-16 code units but decodes to 1 or 2 TCHARs depending on platform `TCHAR` width (2 bytes on Win64 MSVC, 4 bytes on some Linux builds). The existing `TODO` at PsdParser.cpp:469-478 explicitly flags this and leaves it for a future phase.
+
+**Why it happens:** `Utf8ToFString` converts PSD UTF-8 content to FString. Then `FString::Mid` operates in TCHAR units. PhotoshopAPI's run lengths are in UTF-16 code-unit units. For pure ASCII/BMP these happen to match. For supplementary-plane code points the units diverge.
+
+**Consequences:** For a multi-run text layer containing emoji, `Spans[i].Text` strings have off-by-one TCHAR boundaries. The markup produced by `BuildMarkup` contains a misaligned split — one span has the leading surrogate and the other has the trailing surrogate, or a CJK character is split between two spans. `URichTextBlock` renders a replacement character box or crashes on the malformed surrogate.
+
+**Prevention:** Convert `FullUtf8` to a `std::u16string` before slicing, so that run-length indices operate on the same UTF-16 code-unit granularity as `style_run_lengths()`:
 ```cpp
-// Read PSD document DPI (usually 72 or 96)
-float PsdDpi = PsdDocument.GetResolution(); // Default: 72.0f
-float DpiScale = PsdDpi / 96.0f; // 72/96 = 0.75
-
-// Convert layer bounds to UMG position/size
-FVector2D Position(LayerBounds.Left * DpiScale, LayerBounds.Top * DpiScale);
-FVector2D Size((LayerBounds.Right - LayerBounds.Left) * DpiScale,
-               (LayerBounds.Bottom - LayerBounds.Top) * DpiScale);
-
-// Set slot with top-left anchor (0,0) -- safest default
-UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(Widget->Slot);
-Slot->SetAnchors(FAnchors(0.0f, 0.0f)); // Top-left
-Slot->SetPosition(Position);
-Slot->SetSize(Size);
-Slot->SetAutoSize(false); // Explicit size, not auto
+// Replace the existing FullText / FString::Mid path in the span extraction block:
+std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> Conv;
+const std::u16string Utf16Full = Conv.from_bytes(FullUtf8);
+// ... slice by code-unit index:
+std::u16string SliceU16 = Utf16Full.substr(U16Offset, RunLen);
+// Convert slice back to FString:
+Span.Text = FString(reinterpret_cast<const TCHAR*>(SliceU16.c_str())); // Win64 TCHAR=wchar_t=UTF-16
 ```
+Verify empirically that `style_run_lengths()` counts surrogate pairs as 2 units (expected per spec) vs 1 before finalizing. Log a hex dump of the UTF-16 slice boundary on a test PSD with emoji.
 
-IMPORTANT: The PROJECT.md says "DPI conversion: Photoshop 72 DPI -> UMG 96 DPI (multiply by 0.75)". This means PSD coordinates are LARGER than UMG coordinates at 72 DPI. A 720px-wide element in a 72 DPI PSD becomes 540px in UMG. This is correct for point-based sizing. However, if the designer works at 96 DPI in Photoshop (common for UI work), the scale factor is 1.0 and no conversion is needed. ALWAYS read the actual DPI from the PSD header; do not hardcode 72.
+**Detection:** Import a PSD with two differently-styled runs where the first run ends with an emoji. If `Spans[0].Text` contains a half-surrogate or `Spans[1].Text` begins with one, the offset is misaligned. `URichTextBlock::SetText` will silently render a replacement character.
 
-**Detection:** Visual comparison of imported Widget Blueprint against source PSD at 1:1 zoom. Misalignment of more than 1-2 pixels indicates a DPI or coordinate issue.
+**Phase:** Non-ASCII rich text phase (v1.3).
 
-**Phase:** Phase 2 (Layer Mapping) and Phase 3 (Text & Typography)
+---
 
-**Confidence:** HIGH -- confirmed by UMG documentation (Slate is 96 DPI) and Photoshop documentation (default 72 DPI).
+### CP-06: lrFX sofi handler does not branch on ColorSpace — HSB/CMYK overlay produces wrong color
+
+**What goes wrong:** `ExtractLayerEffects` (PsdParser.cpp:692-720) parses the `sofi` key (color overlay) by reading `ColorSpace` (2 bytes) then three 16-bit values `C0, C1, C2` and assigns `FLinearColor(C0, C1, C2, A)` unconditionally. If `ColorSpace == 0` (RGB), this is correct. If `ColorSpace == 1` (HSB) or `ColorSpace == 3` (CMYK), the values are in a different color space and must be converted before constructing the FLinearColor.
+
+**Why it happens:** The existing Verbose log at PsdParser.cpp:713-717 logs `colorSpace=` and the raw values, which is sufficient to diagnose the bug but does not fix it. Test fixtures in `Effects.psd` use RGB-mode documents so the bug is never triggered in automated specs.
+
+**Consequences:** A production PSD with an HSB or CMYK color overlay on a UImage or text widget produces a visually wrong tint. No error is logged. The developer must visually diff the PSD against the widget to notice.
+
+**Prevention:** In `ExtractLayerEffects`, add a branch after reading `ColorSpace`:
+```cpp
+FLinearColor OverlayLinear = FLinearColor::White;
+if (ColorSpace == 0) // RGB
+{
+    OverlayLinear = FLinearColor(C0, C1, C2, A);
+}
+else if (ColorSpace == 1) // HSB
+{
+    // C0=H(0..1 of 360), C1=S(0..1 of 100), C2=B(0..1 of 100)
+    FLinearColor HSV(C0 * 360.f, C1 * 100.f, C2 * 100.f, A);
+    OverlayLinear = HSV.HSVToLinearRGB(); // UE built-in
+}
+else
+{
+    OutDiag.AddWarning(OutLayer.Name,
+        FString::Printf(TEXT("sofi: unsupported ColorSpace=%u; color overlay may be wrong"), ColorSpace));
+    OverlayLinear = FLinearColor(C0, C1, C2, A); // best-effort
+}
+OutLayer.Effects.bHasColorOverlay = (Enabled != 0);
+OutLayer.Effects.ColorOverlayColor = OverlayLinear;
+```
+The same fix should be applied to the `dsdw` drop-shadow handler which has the same unconditional channel assignment.
+
+**Phase:** lrFX channel-order verification phase. The v1.3 "lrFX visual confirm" deliverable should include a deliberate HSB overlay test PSD to cover this path.
 
 ---
 
@@ -267,242 +180,71 @@ IMPORTANT: The PROJECT.md says "DPI conversion: Photoshop 72 DPI -> UMG 96 DPI (
 
 ---
 
-### Pitfall 8: FEditorStyle Replaced by FAppStyle -- Compilation Failure
+### MP-01: UImage has no native outline border — wrong rendering approach for image-layer stroke
 
-**What goes wrong:** Any code referencing `FEditorStyle::Get()`, `FEditorStyle::GetBrush()`, etc. fails to compile in UE5.1+. The class was deprecated and then removed.
+**What goes wrong:** A developer implements stroke rendering on image layers by setting a border or outline property on the `UImage` widget. `UImage` has no built-in stroke/outline property; its `FSlateBrush` only exposes `DrawAs` modes (Image, Box, Border, RoundedBox). None of these produce an outline on top of an arbitrary image without a dedicated 9-slice border texture.
 
-**Prevention:** Global find-and-replace:
-```
-FEditorStyle::Get()        -> FAppStyle::Get()
-FEditorStyle::GetBrush()   -> FAppStyle::GetBrush()
-FEditorStyle::GetStyleSetName() -> FAppStyle::GetAppStyleSetName()
-#include "EditorStyleSet.h" -> #include "Styling/AppStyle.h"
-```
+**Why it happens:** The text-layer stroke path works because `UTextBlock` exposes `FSlateFontInfo` outline support. The assumption that `UImage` has equivalent functionality is wrong.
 
-**Phase:** Phase 0 (UE 5.7 Port)
+**Consequences:** The stroke feature silently does nothing. The mapper compiles, imports without error, but the visual output shows no stroke border. The developer must compare visually against the PSD.
 
-**Confidence:** HIGH -- documented deprecation.
+**Prevention:** The correct approximation for image-layer stroke in UMG is one of:
+1. `UOverlay` wrapping two widgets: a slightly larger solid-color `UImage` (size = content_size + 2*stroke_px) underneath, and the original `UImage` on top.
+2. `DrawAs = ESlateBrushDrawType::RoundedBox` with `OutlineSettings.Color` and `OutlineSettings.Width` on a rectangular shape layer (`FSlateRoundedBoxBrush` supports this).
+
+The existing comment in `FShapeLayerMapper.cpp` line 13 — "Future stroke rendering (vstk -> UMG border/outline) will attach here" — is the correct location. The Overlay approach is more general; RoundedBox is cleaner for axis-aligned rectangles.
+
+**Phase:** Image-layer stroke mapper phase (after the parser correctly populates `bHasVectorStroke` per CP-02).
 
 ---
 
-### Pitfall 9: AssetRegistryModule.h Include Path Changed
+### MP-02: PtFl AdjustmentLayer RGBAPixels may be empty — pixels not rasterized by PhotoshopAPI
 
-**What goes wrong:** The current code uses `#include "AssetRegistryModule.h"` (line 11 of AutoPSDUI.cpp). In UE5, this header was moved. While it may still compile with a deprecation warning, some UE5 versions remove the redirect entirely.
+**What goes wrong:** The new pattern-fill mapper assumes it can read `Layer.RGBAPixels` to produce a tiled `UTexture2D`, as `EPsdLayerType::Gradient` works by compositing channels into pixels during `ConvertLayerRecursive`. Pattern fill layers are `AdjustmentLayer` instances in PhotoshopAPI; their pixel channels represent the composited output, but PhotoshopAPI may not rasterize the pattern tile into `m_ImageData` the same way it composites gradient fills.
 
-**Prevention:**
+**Why it happens:** Gradient fill has a bespoke code path in the existing parser that handles GdFl channel data. No equivalent path exists for PtFl, so `RGBAPixels` will be empty unless PhotoshopAPI automatically provides composited pixel data for AdjustmentLayers.
+
+**Consequences:** The pattern fill mapper creates a zero-size or blank `UTexture2D` asset. The designer's repeating-tile background appears white or is missing from the widget.
+
+**Prevention:** Before writing the mapper, verify empirically: import any PSD with a `PtFl` layer and log `Layer.RGBAPixels.Num()`, `Layer.PixelWidth`, `Layer.PixelHeight` in `ConvertLayerRecursive`. If they are non-zero, the existing pixel path is sufficient. If zero, use the existing `bFlattenComplexEffects` flatten-rasterize path (bake the layer's composited appearance to PNG) as the v1.3 fallback — consistent with the flatten-fallback design decision already in place.
+
+**Phase:** Pattern fill parser verification phase — must be done empirically before writing the mapper.
+
+---
+
+### MP-03: D-13 guard missing for non-text layer stroke routing
+
+**What goes wrong:** `RouteTextEffects` (PsdParser.cpp:1706) clears `Effects.bHasStroke = false` after routing stroke to `Text.OutlineSize` (D-13 guard). If the new vstk stroke is stored in a separate `bHasVectorStroke` field (per CP-02), this is moot. But if `bHasStroke` is reused, the FX-03 block in `FWidgetBlueprintGenerator` processes `bHasColorOverlay` for shape layers and also iterates effects — it may encounter a residual `bHasStroke=true` from lfx2 on a shape layer and attempt to apply it as if it were the per-widget stroke, causing the effect to be applied twice or producing an unexpected UImage outline.
+
+**Why it happens:** The D-13 guard was built for the text routing path. The generator's FX-03 path (lines 326-340) processes `bHasColorOverlay` on non-text layers but was written before stroke rendering on shape layers existed.
+
+**Prevention:** The cleanest prevention is CP-02's separate-field recommendation. If that is not used, add a `RouteShapeEffects` function mirroring `RouteTextEffects` that clears `bHasStroke` after the shape mapper reads it, exactly as D-13 does for text. The guard must run before `PopulateChildren` in the generator.
+
+**Phase:** Stroke mapper phase.
+
+---
+
+### MP-04: Non-ASCII markup not HTML-escaped at the surrogate-pair level
+
+**What goes wrong:** `EscapeMarkup` in `FRichTextLayerMapper.cpp` (lines 34-40) escapes `&`, `<`, `>`. After the CP-05 fix, non-ASCII characters in `Span.Text` may include surrogate pairs or combining characters that are valid Unicode but would appear as raw byte values in the markup string passed to `URichTextBlock::SetText`. `URichTextBlock`'s markup parser is not a full HTML parser and may misinterpret certain byte sequences as markup delimiters in edge cases.
+
+**Why it happens:** The markup escaping was written assuming ASCII-range span text (the existing RichText.psd fixture uses only ASCII). The behavior with multi-byte TCHAR sequences was never tested.
+
+**Prevention:** After applying the CP-05 fix, add a post-fix sanitizer in `BuildMarkup` that replaces any TCHAR value below U+0020 (control characters) with a space, and replaces any isolated surrogate TCHAR (U+D800–U+DFFF) with the Unicode replacement character U+FFFD. This is defensive hygiene:
 ```cpp
-// Old (UE4):
-#include "AssetRegistryModule.h"
-
-// New (UE5):
-#include "AssetRegistry/AssetRegistryModule.h"
-// Or for direct registry access:
-#include "AssetRegistry/IAssetRegistry.h"
-```
-
-Also update module access pattern:
-```cpp
-// Old:
-FAssetRegistryModule& Module = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-IAssetRegistry& Registry = Module.Get();
-
-// New (UE5 preferred):
-IAssetRegistry& Registry = IAssetRegistry::GetChecked();
-```
-
-**Phase:** Phase 0 (UE 5.7 Port)
-
-**Confidence:** HIGH -- confirmed in multiple UE5 migration reports.
-
----
-
-### Pitfall 10: PythonScriptPlugin Dependency Must Be Fully Removed
-
-**What goes wrong:** The current plugin declares `PythonScriptPlugin` as both a `.uplugin` dependency and a `Build.cs` `PrivateDependencyModuleNames` entry. In the C++ rewrite, simply removing the Python code is not enough -- if the dependency declarations remain, the plugin will fail to load in projects that do not have PythonScriptPlugin enabled.
-
-**Prevention:** Remove from three locations:
-1. `.uplugin` `Plugins` array -- delete the `PythonScriptPlugin` entry
-2. `Build.cs` `PrivateDependencyModuleNames` -- remove `"PythonScriptPlugin"`
-3. Any `#include` of PythonScriptPlugin headers in C++ files
-4. Also remove `EditorScriptingUtilities` dependency if it was only needed for the Python workflow
-
-**Detection:** Try loading the plugin in a blank project with PythonScriptPlugin disabled. If the plugin fails to load, the dependency was not fully removed.
-
-**Phase:** Phase 0 (UE 5.7 Port)
-
-**Confidence:** HIGH -- directly visible in current codebase.
-
----
-
-### Pitfall 11: ThirdParty Header Include Order Conflicts with UE Macros
-
-**What goes wrong:** PhotoshopAPI headers include standard C++ headers and define their own macros. UE defines macros like `check`, `verify`, `TEXT`, `PI`, etc. in global scope. Including PhotoshopAPI headers after UE headers causes macro conflicts. Including them before UE headers causes missing UE type definitions.
-
-**Prevention:** Always wrap ThirdParty includes:
-```cpp
-// In a dedicated wrapper header: PsdApiIncludes.h
-
-#pragma once
-
-// Save and undefine conflicting UE macros
-#pragma push_macro("check")
-#pragma push_macro("verify")
-#pragma push_macro("TEXT")
-#undef check
-#undef verify
-#undef TEXT
-
-THIRD_PARTY_INCLUDES_START
-// Disable UE warnings for third-party code
-#include "Macros.h"  // or whatever PhotoshopAPI's root header is
-#include "LayeredFile/LayeredFile.h"
-#include "PhotoshopFile/PhotoshopFile.h"
-THIRD_PARTY_INCLUDES_END
-
-// Restore UE macros
-#pragma pop_macro("TEXT")
-#pragma pop_macro("verify")
-#pragma pop_macro("check")
-```
-
-Also add to `Build.cs`:
-```csharp
-bEnableUndefinedIdentifierWarnings = false; // Suppress warnings from third-party headers
-PublicDefinitions.Add("NOMINMAX"); // Prevent Windows.h min/max conflicts
-```
-
-**Detection:** Compilation errors like `'check' : redefinition` or `'TEXT' : macro redefinition`, or mysterious behavior where standard C++ `check` is accidentally calling UE's `check` macro.
-
-**Phase:** Phase 1 (C++ PSD Parser)
-
-**Confidence:** HIGH -- universal UE plugin problem with any non-UE C++ library.
-
----
-
-### Pitfall 12: PhotoshopAPI Text Layer Support is Newly Shipped and May Have Edge Cases
-
-**What goes wrong:** PhotoshopAPI merged editable text layer support (PR #205) on March 30, 2026 -- only 8 days before this research. The feature is in milestone 0.7.0. While functional, it is new code and:
-- Issue #208 reports `Layer` object lacks a `LayerType` enum to distinguish text from image layers
-- Edge cases with complex text (mixed fonts in one layer, right-to-left text, vertical text) may not be handled
-- The TySh descriptor format in PSD is notoriously complex and poorly documented
-
-**Prevention:**
-1. Pin to a specific PhotoshopAPI release tag (0.7.0 or later), not `main` branch
-2. Implement a fallback: if text extraction fails, rasterize the text layer as an image (same as any other layer)
-3. Write defensive parsing: wrap all text property extraction in try/catch with per-property fallbacks
-4. Test with diverse text: CJK characters, mixed formatting runs, paragraph text vs point text
-
-**Detection:** Test PSD with complex text formatting. If font name, size, or color are wrong/missing, the TySh parsing has a gap.
-
-**Phase:** Phase 1 (C++ PSD Parser) and Phase 3 (Text & Typography)
-
-**Confidence:** MEDIUM -- text layer API exists and works for basic cases, but edge case coverage is unverified given its recency.
-
----
-
-### Pitfall 13: PSD Layer Order is Bottom-to-Top, UMG Z-Order Follows Add Order
-
-**What goes wrong:** In Photoshop, layers in the Layers panel are ordered top-to-bottom visually, but the PSD file format stores them bottom-to-top (the first layer in the file is the bottom-most visually). Developers iterate layers in file order and add them to UMG in that order, resulting in REVERSED z-ordering where background elements appear on top.
-
-**Prevention:** When traversing the PhotoshopAPI layer tree, either:
-1. Reverse the iteration order before adding to the Canvas Panel, OR
-2. Use `UCanvasPanelSlot::SetZOrder(int32)` to explicitly set z-order based on the layer's visual position
-
-```cpp
-// Approach: iterate layers and assign z-order from PSD visual order
-int32 ZOrder = 0;
-// Iterate in reverse if PhotoshopAPI returns bottom-to-top
-for (int32 i = Layers.Num() - 1; i >= 0; --i)
+static FString SanitizeSpanText(const FString& In)
 {
-    UWidget* Widget = CreateWidgetForLayer(Layers[i]);
-    UCanvasPanelSlot* Slot = RootCanvas->AddChildToCanvas(Widget);
-    Slot->SetZOrder(ZOrder++);
+    FString Out = In;
+    for (TCHAR& Ch : Out)
+    {
+        if (Ch < 0x0020 && Ch != TEXT('\n')) Ch = TEXT(' ');
+        if (Ch >= 0xD800 && Ch <= 0xDFFF) Ch = 0xFFFD; // isolated surrogate
+    }
+    return Out;
 }
 ```
 
-IMPORTANT: Verify PhotoshopAPI's actual iteration order empirically with a test PSD that has distinct top/bottom layers. The convention varies between PSD libraries.
-
-**Detection:** Import a PSD with a known layer stack (e.g., background at bottom, text at top). If the result is visually inverted, layer order is wrong.
-
-**Phase:** Phase 2 (Layer Mapping)
-
-**Confidence:** MEDIUM -- PSD spec stores bottom-to-top but PhotoshopAPI may normalize this. Must verify empirically.
-
----
-
-### Pitfall 14: SavePackage API Changed in UE5
-
-**What goes wrong:** The old `UPackage::SavePackage(Package, Object, TopLevelFlags, *Filename)` 4-parameter overload is deprecated. Using it produces warnings or compilation failures depending on UE5 minor version.
-
-**Prevention:** Use `FSavePackageArgs`:
-```cpp
-FSavePackageArgs SaveArgs;
-SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-SaveArgs.Error = GError;
-SaveArgs.bForceByteSwapping = false;
-SaveArgs.bWarnOfLongFilename = true;
-
-FString PackageFilename = FPackageName::LongPackageNameToFilename(
-    PackagePath, FPackageName::GetAssetPackageExtension());
-bool bSaved = UPackage::SavePackage(Package, WidgetBP, *PackageFilename, SaveArgs);
-```
-
-**Phase:** Phase 2 (Widget Blueprint Generation)
-
-**Confidence:** HIGH -- documented API change.
-
----
-
-### Pitfall 15: Plugin Binary Distribution Requires Exact Engine Version Match
-
-**What goes wrong:** A plugin compiled against UE 5.7.3 will NOT load in UE 5.7.4 or 5.8.0. The engine checks module version stamps at load time. Distributing pre-compiled binaries on GitHub works only for the exact engine build they were compiled against.
-
-**Consequences:** Users download the plugin, drop it into their project, and get "module built with different engine version" errors. This is the #1 complaint for GitHub-distributed UE plugins.
-
-**Prevention:**
-1. **Source distribution (recommended for GitHub):** Distribute source code + pre-built ThirdParty libs. Users compile the plugin module locally against their engine version. The static ThirdParty libs (PhotoshopAPI, blosc2, etc.) are ABI-stable across UE versions since they do not use UE types.
-2. **Binary distribution (for Fab):** Build separate binaries for each supported UE version. Use `RunUAT BuildPlugin` to produce correct binaries.
-3. **Hybrid:** Ship source for the UE module, pre-built binaries for ThirdParty dependencies only.
-
-For GitHub release specifically:
-```
-PSD2UMG/
-  Source/           # Full C++ source, compiles on user's engine
-  ThirdParty/
-    Win64/          # Pre-built static libs (engine-independent)
-    Mac/
-    include/
-  PSD2UMG.uplugin
-```
-
-**Detection:** Test the distribution package in a clean project on a different UE patch version.
-
-**Phase:** Phase 8 (Testing, Docs & Release)
-
-**Confidence:** HIGH -- fundamental UE module system behavior, confirmed by Fab technical requirements.
-
----
-
-### Pitfall 16: C++20 Requirement Creates Build Compatibility Issues
-
-**What goes wrong:** PhotoshopAPI requires C++20 features (concepts, ranges, designated initializers). Setting `CppStandard = CppStandardVersion.Cpp20` in Build.cs is required. However:
-1. UE's own headers may emit warnings or behave differently under C++20 mode
-2. MSVC `/std:c++20` enables some features that can conflict with UE macro patterns (e.g., `<=>` spaceship operator, `char8_t`)
-3. Older UE5 versions (5.0-5.2) had issues with C++20 mode; UE 5.7 should be fine
-
-**Prevention:**
-```csharp
-CppStandard = CppStandardVersion.Cpp20;
-// Only needed for the module that includes PhotoshopAPI headers
-// Other modules in the plugin can stay at default C++ standard
-```
-If warnings are excessive, isolate PhotoshopAPI interaction into a single translation unit and use `THIRD_PARTY_INCLUDES_START/END` wrappers.
-
-**Detection:** Build with `/W4` or `/Wall` and check for C++20-related warnings in UE headers.
-
-**Phase:** Phase 1 (C++ PSD Parser)
-
-**Confidence:** MEDIUM -- UE 5.7 officially supports C++20 but specific interaction with PhotoshopAPI's usage patterns is unverified.
+**Phase:** Non-ASCII rich text phase (same phase as CP-05).
 
 ---
 
@@ -510,130 +252,86 @@ If warnings are excessive, isolate PhotoshopAPI interaction into a single transl
 
 ---
 
-### Pitfall 17: Widget Names Must Be Unique Within a WidgetTree
+### MiP-01: vstk `Sz  ` UntF tag may be `#Pnt` (points) not `#Pxl` (pixels)
 
-**What goes wrong:** If two PSD layers have the same name (common with auto-generated layers like "Layer 1", "Layer 1 copy"), calling `WidgetTree->ConstructWidget` with duplicate names causes one widget to overwrite the other silently, or a runtime assertion in debug builds.
+**What goes wrong:** In `ParseFrFXDescriptor`, `"Sz  "` with ostype `"UntF"` skips 4 bytes for the unit tag and reads a double (PsdParser.cpp:1011: `Pos += 4; // skip unit tag (#Pxl)`). In vstk descriptors for shape strokes, Photoshop may write `"#Pnt"` (points) rather than `"#Pxl"` (pixels). At 72 DPI, 1pt = 1px, so both give the same value. At 144 DPI PSD documents the values diverge by 2x.
 
-**Prevention:** Generate unique widget names by appending layer index or hash:
+**Prevention:** Read the 4-byte unit tag explicitly and convert:
 ```cpp
-FName WidgetName = MakeUniqueObjectName(WidgetBP->WidgetTree,
-    UImage::StaticClass(), FName(*LayerName));
+char UnitTag[5] = {};
+for (int k = 0; k < 4; ++k) UnitTag[k] = static_cast<char>(Data[Pos + k]);
+Pos += 4;
+const double SzRaw = ReadDoubleBE();
+// Convert to pixels:
+double SzPx = SzRaw;
+if (FCStringAnsi::Strcmp(UnitTag, "#Pnt") == 0)
+    SzPx = SzRaw * (72.0 / PsdDpi); // where PsdDpi comes from FPsdDocument
+else if (FCStringAnsi::Strcmp(UnitTag, "#Prc") == 0)
+    SzPx = SzRaw / 100.0 * ReferenceDimension;
 ```
+This same fix applies to any other `UntF` value read in vstk or PtFl descriptors (scale, etc.).
 
-**Phase:** Phase 2 (Layer Mapping)
-
-**Confidence:** HIGH -- documented UObject naming requirement.
+**Phase:** Stroke-rendering parser phase — low urgency for 72 DPI PSDs, but prevents silent 2x errors on high-DPI PSDs.
 
 ---
 
-### Pitfall 18: Texture Import Must Complete Before Widget Blueprint References It
+### MiP-02: `ScanRawLfx2Blocks` forward-luni heuristic may associate stroke with the wrong layer in dense PSDs
 
-**What goes wrong:** The PSD import flow needs to: (1) export layer images as PNGs, (2) import them as UTexture2D assets, (3) create the Widget Blueprint referencing those textures via SlateBrush. If step 3 runs before step 2 fully completes (including async texture processing), the SlateBrush references null textures.
+**What goes wrong:** `ScanRawLfx2Blocks` scans FORWARD from the lfx2 block's end to find the next `8BIM+luni` block and associates the stroke with that layer name (PsdParser.cpp:1646-1651). In dense PSDs (50+ layers), the forward scan may cross a layer record boundary and pick up a different layer's luni, producing a stroke attributed to the wrong layer name.
 
-**Prevention:** Use synchronous asset import with `FAssetImportTask::bAutomated = true` and `bSave = true`. Verify each texture is fully loaded before creating brush references:
+**Why it happens:** The raw byte scan was the only option because PhotoshopAPI v0.9 silently drops lfx2 blocks. This constraint does NOT apply to vstk: Enum.h:900 confirms `"vstk"` maps to `TaggedBlockKey::vecStrokeData`, meaning vstk IS accessible via `unparsed_tagged_blocks()`.
+
+**Prevention:** The new vstk scanner must use the structured API (not raw byte scanning):
 ```cpp
-UTexture2D* Texture = LoadObject<UTexture2D>(nullptr, *TexturePath);
-check(Texture != nullptr); // Must exist before Widget Blueprint creation
-```
-Alternatively, batch all texture imports first, flush the asset registry, then create the Widget Blueprint.
-
-**Detection:** Widget Blueprint opens but shows white/missing texture thumbnails.
-
-**Phase:** Phase 2 (Layer Mapping)
-
-**Confidence:** HIGH -- standard UE asset dependency ordering.
-
----
-
-### Pitfall 19: GEditor Pointer is Null in Commandlet/CI Context
-
-**What goes wrong:** The current code accesses `GEditor->GetEditorSubsystem<UImportSubsystem>()` directly. In commandlet mode (used in CI/CD, batch processing), `GEditor` is nullptr. This causes a null pointer crash during module startup.
-
-**Prevention:**
-```cpp
-void FPsd2UmgModule::StartupModule()
+for (const auto& Block : InLayer->unparsed_tagged_blocks())
 {
-    if (GEditor)
-    {
-        if (UImportSubsystem* ImportSubsystem = GEditor->GetEditorSubsystem<UImportSubsystem>())
-        {
-            ImportSubsystem->OnAssetReimport.AddRaw(this, &FPsd2UmgModule::OnPSDImport);
-        }
-    }
+    if (!Block || Block->getKey() != NAMESPACE_PSAPI::Enum::TaggedBlockKey::vecStrokeData)
+        continue;
+    // ... parse Block->m_Data
 }
 ```
+This is per-layer, scoped correctly, and cannot misattribute strokes. The raw scan technique should remain only for lfx2 where it is necessary.
 
-**Phase:** Phase 0 (UE 5.7 Port)
-
-**Confidence:** HIGH -- known UE pattern; the plugin type is "Editor" which helps, but commandlets can still load editor modules.
-
----
-
-### Pitfall 20: Hardcoded Plugin Path Breaks Outside ProjectPluginsDir
-
-**What goes wrong:** The current code uses `FPaths::ProjectPluginsDir() / TEXT("AutoPSDUI/...")`. This path is wrong if the plugin is installed in the Engine's Plugins directory (Fab/Marketplace distribution) or in a subfolder of the project's Plugins directory.
-
-**Prevention:** Use the module's own location:
-```cpp
-FString PluginBaseDir = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"))->GetBaseDir();
-```
-Or for the new C++ architecture, this is less relevant since Python file paths are eliminated. But any references to plugin content (test PSDs, default settings files) should use `IPluginManager`.
-
-**Phase:** Phase 0 (UE 5.7 Port) -- relevant even though Python is being removed, because the pattern may be reused for other content references.
-
-**Confidence:** HIGH -- documented in CONCERNS.md.
+**Phase:** Stroke-rendering parser phase.
 
 ---
 
-### Pitfall 21: No Progress Reporting for Large PSD Imports
+### MiP-03: `EPsdLayerType::PatternFill` missing — PtFl layers fall through to Unknown
 
-**What goes wrong:** A 100+ layer PSD with large image layers can take 10-30 seconds to import. Without progress feedback, users think the editor has frozen and force-quit, corrupting partially-written assets.
+**What goes wrong:** In `ConvertLayerRecursive`, the detection block at PsdParser.cpp:1777 checks `TaggedBlockKey::adjGradient` and `TaggedBlockKey::adjSolidColor` but not `TaggedBlockKey::adjPattern`. An AdjustmentLayer with PtFl has none of the checked keys, so it is classified `EPsdLayerType::Unknown`, emits a warning, and produces no widget.
 
-**Prevention:** Wrap the import pipeline in `FScopedSlowTask`:
-```cpp
-FScopedSlowTask SlowTask(TotalLayers, LOCTEXT("ImportingPSD", "Importing PSD layers..."));
-SlowTask.MakeDialog(true); // Show cancel button
+**Prevention:** Add `EPsdLayerType::PatternFill` to the `EPsdLayerType` enum in `PsdTypes.h`, add a `bIsPatternFill` detection branch in `ConvertLayerRecursive` alongside the existing GdFl/SoCo checks, and register `FPatternFillLayerMapper` at priority 101 (matching `FSolidFillLayerMapper` and `FShapeLayerMapper` post-Phase-20) to ensure deterministic dispatch ahead of `FImageLayerMapper`.
 
-for (const auto& Layer : Layers)
-{
-    if (SlowTask.ShouldCancel()) { break; }
-    SlowTask.EnterProgressFrame(1.0f, FText::FromString(Layer.Name));
-    // Process layer...
-}
-```
-
-**Phase:** Phase 2 (Layer Mapping) or Phase 6 (Editor UI)
-
-**Confidence:** HIGH -- standard UE editor UX pattern.
+**Phase:** Pattern fill mapper phase (follows parser verification in MP-02).
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase | Likely Pitfall | Mitigation |
-|-------|---------------|------------|
-| Phase 0 (UE 5.7 Port) | WhitelistPlatforms silently ignored (#1), FEditorStyle removed (#8), AssetRegistry include changed (#9), PythonScriptPlugin dep not fully removed (#10), GEditor null in commandlets (#19) | Systematic find-and-replace of all deprecated identifiers. Build + load test in clean UE 5.7 project. |
-| Phase 1 (C++ PSD Parser) | Transitive deps not linked (#6), bit-depth templates (#5), macro conflicts (#11), C++20 compat (#16), text layer edge cases (#12) | Build PhotoshopAPI with all deps first, verify linking before any parsing code. Create wrapper header for macro isolation. |
-| Phase 2 (Layer Mapping) | Widget Blueprint corruption (#3), NewObject vs ConstructWidget (#4), layer order inversion (#13), SavePackage API (#14), widget name uniqueness (#17), texture import ordering (#18) | Follow exact order-of-operations for WidgetBlueprint creation. Verify with visual comparison test. |
-| Phase 3 (Text & Typography) | DPI mismatch (#7), text parsing edge cases (#12) | Read actual DPI from PSD header. Test with diverse fonts and languages. |
-| Phase 5 (Anchors) | Anchor semantics change position meaning (#7) | Use top-left anchor as safe default; only apply complex anchors with explicit user override suffixes. |
-| Phase 8 (Release) | Binary version mismatch (#15), platform packaging (#1) | Ship source + pre-built ThirdParty. Test in multiple UE versions. |
+| Phase Topic | Likely Pitfall | Mitigation |
+|---|---|---|
+| vstk descriptor parser | CP-01: wrong offset (0 not 4 or 8) | Emit hex dump; try `TryParseAt(0)` first |
+| vstk / lfx2 stroke coexistence | CP-02: `bHasStroke` double-populated | Add separate `bHasVectorStroke` field |
+| frameFXMulti VlLs | CP-03: list silently skipped | Add VlLs branch in `ParseFrFXDescriptor` |
+| PtFl descriptor parser | CP-04: walks for `"Clr "`, finds `"Ptrn"` | Hex dump first; build dedicated walker for pattern reference keys |
+| Non-ASCII multi-run slicing | CP-05: TCHAR vs UTF-16 code-unit mismatch | Convert to `std::u16string` before slicing by run length |
+| lrFX visual confirm | CP-06: HSB/CMYK `sofi` produces wrong FLinearColor | Branch on `ColorSpace` in `sofi` and `dsdw` handlers |
+| Image-layer stroke mapper | MP-01: `UImage` has no native outline | Use Overlay + border UImage, or `DrawAs=RoundedBox` with `OutlineSettings` |
+| PtFl pixel rasterization | MP-02: `RGBAPixels` empty for AdjustmentLayer | Verify empirically; use flatten fallback if empty |
+| Non-text D-13 guard | MP-03: generator FX-03 processes residual `bHasStroke` | Use separate field (CP-02) or add `RouteShapeEffects` |
+| Non-ASCII markup | MP-04: half-surrogates in markup string | Sanitize `Span.Text` after CP-05 fix |
+| vstk UntF size units | MiP-01: `#Pnt` silently treated as `#Pxl` | Read and branch on unit tag |
+| lfx2 raw scan attribution | MiP-02: forward-luni misattributes in dense PSDs | Use `unparsed_tagged_blocks()` for vstk (structured API) |
+| PtFl dispatch | MiP-03: falls through to `EPsdLayerType::Unknown` | Add `EPsdLayerType::PatternFill` + detection branch |
 
 ---
 
 ## Sources
 
-- [Georgy's Tech Blog: Third-Party Integration](https://georgy.dev/posts/third-party-integration/) -- Build.cs patterns
-- [Unreal Garden: Build Widgets in Editor](https://unreal-garden.com/tutorials/build-widgets-in-editor/) -- WidgetTree programmatic API
-- [UE5 Official: Integrating Third-Party Libraries](https://dev.epicgames.com/documentation/en-us/unreal-engine/integrating-third-party-libraries-into-unreal-engine)
-- [UE5 Official: PlatformAllowList](https://docs.unrealengine.com/5.0/en-US/API/Runtime/Projects/FModuleDescriptor/PlatformAllowList/)
-- [PhotoshopAPI GitHub](https://github.com/EmilDohne/PhotoshopAPI) -- Library architecture and limitations
-- [Joyrok: UMG Layouts Tips](https://joyrok.com/UMG-Layouts-Tips-and-Tricks) -- UMG DPI and coordinate behavior
-- [Fab Technical Requirements](https://support.fab.com/s/article/FAB-TECHNICAL-REQUIREMENTS?language=en_US) -- Distribution requirements
-- [Epic Dev Community: Guide to Building and Packaging Plugins](https://dev.epicgames.com/community/learning/tutorials/Y4yO/epic-games-store-fab-guide-to-building-and-packaging-unreal-engine-plugins)
-- [CesiumGS/cesium-unreal #1314](https://github.com/CesiumGS/cesium-unreal/issues/1314) -- FEditorStyle deprecation example
-- [HttpGPT #75](https://github.com/lucoiso/UEHttpGPT/issues/75) -- WhitelistPlatforms vs PlatformAllowList
-
----
-
-*Concerns audit: 2026-04-07*
+All findings derived from direct codebase analysis:
+- `Source/PSD2UMG/Private/Parser/PsdParser.cpp` — lrFX walker (lines 618-804), lfx2 raw scanner (lines 806-1697), SoCo walker (lines 1076-1295), vscg walker (lines 1298-1547), UTF-16 span TODO (lines 469-478), multi-run slicing (lines 480-596)
+- `Source/PSD2UMG/Public/Parser/PsdTypes.h` — `FPsdLayerEffects`, `FPsdTextRunSpan`, `FPsdLayer` struct definitions
+- `Source/PSD2UMG/Private/Mapper/FRichTextLayerMapper.cpp` — `EscapeMarkup`, `BuildMarkup`, `CreateStyleTableAsset`
+- `Source/PSD2UMG/Private/Mapper/FShapeLayerMapper.cpp` — line 13 comment confirming vstk attachment point
+- `Source/ThirdParty/PhotoshopAPI/Win64/include/PhotoshopAPI/Util/Enum.h` — `TaggedBlockKey` enum (lines 751-925): `"vstk"` = `vecStrokeData` (line 900), `"vscg"` = `vecStrokeContentData` (line 901), `"PtFl"` = `adjPattern` (line 832), `"lrFX"` = `fxLayer` (line 850)
+- `.planning/PROJECT.md` — v1.3 scope definition, D-12/D-13 decisions log, Phase 20 state

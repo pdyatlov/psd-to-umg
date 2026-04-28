@@ -518,3 +518,256 @@ UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateL
 - [Unreal Garden: Build Widgets in Editor](https://unreal-garden.com/tutorials/build-widgets-in-editor/)
 - [UE Forum: WhitelistPlatforms to PlatformAllowList](https://forums.unrealengine.com/t/whitelist-blacklist-allow-for-uplugin/1392743)
 - [Compile UE5 with C++20](https://dev.epicgames.com/community/snippets/J72/compile-unreal-engine-5-1-with-c-20)
+
+---
+
+---
+
+# v1.3 Advanced Effects — Stack Additions
+
+**Milestone:** v1.3 Advanced Effects
+**Researched:** 2026-04-28
+**Scope:** Only what is NEW or CHANGED for the five v1.3 features. Everything in the section above is already shipping and is not repeated here.
+
+---
+
+## Feature 1 — vstk descriptor parsing (image/shape-layer stroke)
+
+### What vstk is
+
+`vstk` (key `"vstk"`, `TaggedBlockKey::vecStrokeData`) is a tagged block written to shape and image layers when the designer applies a vector stroke via the layer-properties panel (not the Layer Style dialog). It is distinct from:
+
+- `lfx2 / FrFX` — Layer Style stroke (already parsed by `ParseFrFXDescriptor`)
+- `vscg` (`vecStrokeContentData`) — stores the fill content of the stroke (solid color, gradient, pattern)
+
+PhotoshopAPI exposes `vstk` in `unparsed_tagged_blocks()` as a raw `TaggedBlock` with `m_Data` bytes. The library does NOT decode it; the full descriptor byte array is available for direct parsing. Confirmed present in `Enum.h` line 900: `{"vstk", TaggedBlockKey::vecStrokeData}`.
+
+### What vstk contains
+
+The `vstk` payload is a Photoshop object descriptor (same format family as `SoCo`/`vscg` already handled). The descriptor classID is `"strokeStyle"`. Relevant keys:
+
+| Key | ostype | Meaning |
+|-----|--------|---------|
+| `"strokeEnabled"` | `bool` | Whether stroke is on |
+| `"fillEnabled"` | `bool` | Whether fill is on (can coexist) |
+| `"strokeStyleLineWidth"` | `UntF` | Width, unit `#Pxl`, value is BE double after 4-byte unit tag |
+| `"strokeStyleLineAlignment"` | `enum` | `"strokeStyleAlignInside"` / `"strokeStyleAlignOutside"` / `"strokeStyleAlignCenter"` |
+| `"strokeStyleContent"` | `Objc` | Sub-descriptor; classID `"solidColorLayer"` → `"Clr " / Objc / "RGBC"` with `"Rd  "`, `"Grn "`, `"Bl  "` doubles 0–255 |
+
+### Integration with existing lrFX walker
+
+The existing `SkipValueAfterOsType` lambda in `ParseFrFXDescriptor` and `ScanSolidFillColor` already handles `UntF`, `enum`, and nested `Objc` / `VlLs`. No new descriptor-walking infrastructure is needed. The implementation is a new static function `ScanVstkStroke(...)` that mirrors `ScanSolidFillColor`'s `TryParseAt` pattern:
+
+1. Iterate `unparsed_tagged_blocks()` looking for `Block->getKey() == TaggedBlockKey::vecStrokeData`.
+2. Try offset 4 first (4-byte version prefix), fall back to 0 and 8.
+3. Walk the descriptor: read `"strokeEnabled"` bool; read `"strokeStyleLineWidth"` UntF (skip 4-byte unit tag, read 8-byte BE double); drill into `"strokeStyleContent"` Objc to extract `"Clr " / Objc / "RGBC"` using the same named-key pattern as `ScanSolidFillColor`.
+4. Write result into the existing `FPsdLayerEffects.bHasStroke`, `StrokeColor`, `StrokeSize` fields.
+
+`ScanVstkStroke` must be called before the `lfx2/FrFX` path so that vstk wins for shape/image layers (vstk is the newer and more authoritative format for these layer types).
+
+### Data model: no new fields
+
+`FPsdLayerEffects` already carries `bHasStroke`, `StrokeColor`, `StrokeSize`. These fields are reused.
+
+### Stroke rendering on image/shape layers (mapper side)
+
+Use the existing drop-shadow overlay pattern: create a slightly larger background `UImage` (stroke color tint, expanded by `StrokeSize` pixels on each side) placed behind the main image inside a `UOverlay`. Requires no new UMG modules.
+
+Do NOT attempt to use `UBorder` for stroke rendering — `UBorder` wraps a single child slot and does not compose cleanly with `UImage` in a canvas panel.
+
+**Confidence: HIGH** — confirmed from `Enum.h` (TaggedBlockKey) and the existing parallel descriptor walker structure in `ScanSolidFillColor`.
+
+---
+
+## Feature 2 — frameFXMulti / VlLs stroke (newer Photoshop format)
+
+### The problem
+
+Photoshop CC 2020+ serialises multiple layer effects as a `VlLs` list under `lfx2` key `"frameFXMulti"` instead of a single `"FrFX" Objc`. The existing `ParseFrFXDescriptor` handles `VlLs` as a skip target only; it does not inspect the list for stroke content.
+
+### Where and how to extend ParseFrFXDescriptor
+
+The fix lives entirely inside `ParseFrFXDescriptor`. After the existing `if (ItemKey == "FrFX" && OsType == "Objc")` branch, add:
+
+```cpp
+else if (ItemKey == "frameFXMulti" && FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
+{
+    uint32 ListCount = ReadU32BE();
+    for (uint32 e = 0; e < ListCount && CheckRemaining(4) && !bFoundStroke; ++e)
+    {
+        // Each element: 4-byte ostype tag (expected "Objc"), then FrFX Objc body
+        char ElemOT[5] = {};
+        for (int k = 0; k < 4; ++k) ElemOT[k] = static_cast<char>(Data[Pos + k]);
+        Pos += 4;
+        if (FCStringAnsi::Strcmp(ElemOT, "Objc") != 0) { SkipValueAfterOsType(ElemOT); continue; }
+        // Reuse the existing FrFX parse block verbatim (SkipUnicodeString + ReadPsString + inner loop)
+        // ... (duplicate of existing FrFX parse block; first enabled stroke wins)
+        bFoundStroke = true; // stop on first match
+    }
+}
+```
+
+The `SkipValueAfterOsType` lambda already handles unknown effect types (glow, inner shadow, etc.) inside the list via its `Objc` recursive branch — they will be skipped cleanly.
+
+### No changes to scan entry point or data model
+
+The raw lfx2 byte scan already locates the correct block. `FPsdLayerEffects` fields are unchanged.
+
+**Confidence: HIGH** — the PSD spec is clear; the extension is additive to the existing walker.
+
+---
+
+## Feature 3 — PtFl pattern fill descriptor
+
+### TaggedBlockKey confirmed
+
+`PtFl` maps to `TaggedBlockKey::adjPattern` in `Enum.h` line 832: `{"PtFl", TaggedBlockKey::adjPattern}`. Available as raw bytes via `unparsed_tagged_blocks()`.
+
+### What PtFl contains
+
+| Key | ostype | Meaning |
+|-----|--------|---------|
+| `"Ptrn"` | `Objc` | Pattern metadata sub-descriptor |
+| `"Ptrn" > "Nm  "` | `TEXT` | Pattern name (UTF-16 string) |
+| `"Ptrn" > "Idnt"` | `TEXT` | Pattern UUID |
+| `"Scl "` | `UntF` (`#Prc`) | Scale percentage |
+| `"Lnkd"` | `bool` | Linked-to-layer flag |
+| `"Angl"` | `doub` | Rotation angle |
+| `"Clr "` | `Objc` / `"RGBC"` | Tint color (often absent) |
+
+### Why pattern tile extraction is out of scope for v1.3
+
+Pattern tiles are stored in the global `Pat2`/`Pat3` tagged blocks at the document level, matched by the UUID in `PtFl`. Extracting pixel data requires walking a separate section, decoding a channel-format pixel array, and compositing. This is a substantial new parsing surface not justified by v1.3 scope.
+
+### v1.3 deliverable for PtFl
+
+1. Detect `PtFl` blocks and set `EPsdLayerType::PatternFill` (new enum value added alongside `SolidFill`).
+2. Extract `"Scl "` UntF value and `"Ptrn" > "Nm  "` TEXT string into new `FPsdLayerEffects` fields.
+3. Map `PatternFill` layers to a `UImage` with a 1×1 white placeholder texture. Emit a `UE_LOG(Warning)` naming the pattern so the user knows it was not embedded.
+
+### New fields required
+
+Add to `FPsdLayerEffects`:
+
+```cpp
+bool bHasPatternFill = false;
+FString PatternFillName;    // from Ptrn.Nm  (UTF-16 TEXT ostype decoded to FString)
+float PatternFillScale = 100.f;  // from Scl  UntF #Prc
+```
+
+Add `EPsdLayerType::PatternFill` to the enum.
+
+### New mapper
+
+`FPatternFillLayerMapper` at priority 101. `CanMap` checks `Layer.Type == EPsdLayerType::PatternFill`. Emits `UImage` with white placeholder. No new UE5 modules needed.
+
+**Confidence: MEDIUM** — TaggedBlockKey confirmed in `Enum.h`; descriptor layout cross-referenced from Adobe PSD spec and matches the SoCo/vscg pattern. Exact offset alignment needs verification against a real PtFl PSD block during implementation.
+
+---
+
+## Feature 4 — lrFX RGBC channel-order verification
+
+### Current parser is structurally correct
+
+The `lrFX` v0 `sofi` parser (PsdParser.cpp lines 700–721) reads `C0`, `C1`, `C2` from a `ColorSpace + 4×uint16` block and assigns:
+
+```cpp
+OutLayer.Effects.ColorOverlayColor = FLinearColor(C0, C1, C2, A);
+```
+
+For colorSpace = 0 (RGBC), the PSD spec defines the channel order as R, G, B, reserved. The code reads them in order: `C0=R`, `C1=G`, `C2=B`. This assignment is correct.
+
+The `dsdw` parser uses the same layout and the same positional assignment — also correct.
+
+All named-key paths (`FrFX`, `SoCo`, `vscg`, `vstk`) read `"Rd  "`, `"Grn "`, `"Bl  "` by key name. No channel-order risk exists on those paths.
+
+### No code change for this item
+
+The only v1.3 deliverable is:
+1. A PSD fixture with known solid-color lrFX sofi overlays (pure red `FF0000`, pure green `00FF00`, pure blue `0000FF`) on image layers.
+2. An automation spec `It()` block asserting `Effects.ColorOverlayColor.R > 0.9` for the red layer, `G > 0.9` for green, `B > 0.9` for blue. This provides a regression guard without requiring visual inspection.
+
+No changes to `PsdTypes.h`, `PsdParser.cpp`, or any mapper.
+
+**Confidence: HIGH** — Code confirms R=C0, G=C1, B=C2. Per PSD spec, RGBC colorSpace=0 lays out channels as R, G, B, reserved in that order. The existing code is correct.
+
+---
+
+## Feature 5 — UTF-16 code-unit slicing fix for non-ASCII URichTextBlock spans
+
+### Root cause
+
+`style_run_lengths()` returns `std::vector<int32_t>` of **UTF-16 code-unit counts** (PhotoshopAPI `TextLayer.h` comment: "Get the style run lengths as a list of code-unit counts"; `TextLayerRunSplitUtils.h` reads from `"RunLengthArray"` in EngineData verbatim, which per the PSD spec stores code-unit counts).
+
+The current slicing code (PsdParser.cpp span-extraction block):
+
+```cpp
+const FString FullText = FString(UTF8_TO_TCHAR(FullUtf8.c_str()));
+Span.Text = FullText.Mid(CharOffset, Clipped);
+CharOffset += Clipped;
+```
+
+On Windows, `FString` is UTF-16 internally (TCHAR = wchar_t = char16_t = 2 bytes). `FString::Len()` counts UTF-16 code units and `FString::Mid()` slices by code units. Since PhotoshopAPI run lengths are also UTF-16 code units, **the slicing is correct on Windows for all Unicode including CJK and emoji** (a CJK character is 1 code unit; an emoji outside BMP is 2 surrogate-pair code units, consistent on both sides).
+
+On Mac (where TCHAR = wchar_t = char32_t = 4 bytes on some compiler configurations), `FString::Len()` returns code-point count, which diverges from PhotoshopAPI's UTF-16 code-unit counts for any non-BMP character. This is where the bug manifests.
+
+### Fix
+
+Replace the `FString::Mid` slicing approach with `std::u16string::substr` directly against the UTF-16 representation:
+
+```cpp
+// Convert UTF-8 text to UTF-16LE once before the run loop.
+// UnicodeString::convertUTF8ToUTF16LE is available via the PhotoshopAPI headers
+// already included (TextLayerU16Utils.h includes UnicodeString.h).
+const std::u16string FullU16 = UnicodeString::convertUTF8ToUTF16LE(FullUtf8);
+size_t U16Offset = 0;
+
+for (size_t ri = 0; ri < RunCount; ++ri)
+{
+    // ... (existing per-run property extraction unchanged) ...
+    const int32 RunLen = LengthsOpt ? static_cast<int32>((*LengthsOpt)[ri]) : 0;
+    if (RunLen > 0)
+    {
+        const size_t Clipped = static_cast<size_t>(
+            FMath::Min<int64>(RunLen, static_cast<int64>(FullU16.size()) - static_cast<int64>(U16Offset)));
+        const std::u16string SliceU16 = FullU16.substr(U16Offset, Clipped);
+        U16Offset += Clipped;
+        // Convert UTF-16LE slice back to UTF-8, then to FString via UTF8_TO_TCHAR.
+        // This path is correct on both Windows and Mac regardless of TCHAR width.
+        Span.Text = FString(UTF8_TO_TCHAR(
+            UnicodeString::convertUTF16LEtoUTF8(SliceU16).c_str()));
+    }
+    // ...
+}
+```
+
+`UnicodeString::convertUTF8ToUTF16LE` and `UnicodeString::convertUTF16LEtoUTF8` are declared in `Core/Struct/UnicodeString.h` which is included transitively by the PhotoshopAPI headers already included in `PsdParser.cpp`.
+
+### No new headers, modules, or library additions required
+
+The conversion utilities are already in the PhotoshopAPI include tree. No changes to `Build.cs`, `PsdTypes.h`, `FRichTextLayerMapper.cpp`, or any mapper.
+
+**Confidence: HIGH** — Root cause confirmed by `TextLayer.h` doc comment and `TextLayerRunSplitUtils.h` source. Fix uses only already-included PhotoshopAPI utilities. The cross-platform correctness argument (UTF-16 code-unit-aligned slicing then convert to UTF-8 → TCHAR) is sound.
+
+---
+
+## v1.3 Change Summary
+
+| Feature | Where to change | What to add | New UE5 API | New modules |
+|---------|----------------|-------------|-------------|-------------|
+| vstk stroke | `PsdParser.cpp`: new `ScanVstkStroke()` static fn | Called before lfx2 path in `ConvertLayerRecursive` | None | None |
+| frameFXMulti VlLs | `PsdParser.cpp`: extend `ParseFrFXDescriptor` | New `frameFXMulti` branch in top-level descriptor walk | None | None |
+| PtFl pattern fill | `PsdParser.cpp`: new `ScanPatternFill()` static fn; `PsdTypes.h`: `EPsdLayerType::PatternFill` + 3 `FPsdLayerEffects` fields; new `FPatternFillLayerMapper.cpp` | Priority-101 mapper emitting placeholder UImage | None | None |
+| lrFX RGBC confirm | No code changes | Fixture PSD + automation spec assertions | None | None |
+| UTF-16 span slicing | `PsdParser.cpp`: span-extraction loop, replace `FString::Mid` with `u16string::substr` + round-trip through UTF-8 | Removes existing TODO comment | None | None |
+
+## v1.3 Sources
+
+- `Source/ThirdParty/PhotoshopAPI/Win64/include/PhotoshopAPI/Util/Enum.h` — TaggedBlockKey enumeration confirming `vstk` = `vecStrokeData`, `PtFl` = `adjPattern`
+- `Source/PSD2UMG/Private/Parser/PsdParser.cpp` lines 800–1500 — `ParseFrFXDescriptor`, `ScanSolidFillColor`, `ScanShapeFillColor`, span-extraction loop
+- `Source/PSD2UMG/Public/Parser/PsdTypes.h` — `FPsdLayerEffects`, `EPsdLayerType`, `FPsdTextRunSpan`
+- `Source/ThirdParty/PhotoshopAPI/Win64/include/PhotoshopAPI/LayeredFile/LayerTypes/TextLayer/TextLayer.h` lines 242–251 — `style_run_lengths()` documented as "code-unit counts"
+- `Source/ThirdParty/PhotoshopAPI/Win64/include/PhotoshopAPI/LayeredFile/LayerTypes/TextLayer/TextLayerRunSplitUtils.h` lines 144–153 — `get_style_run_lengths()` reads `RunLengthArray` verbatim
+- `Source/ThirdParty/PhotoshopAPI/Win64/include/PhotoshopAPI/LayeredFile/LayerTypes/TextLayer/TextLayerU16Utils.h` — `decode_utf16be_bytes`, `encode_utf16be_bytes`
+- `Source/ThirdParty/PhotoshopAPI/Win64/include/PhotoshopAPI/Core/Struct/UnicodeString.h` — `convertUTF8ToUTF16LE`, `convertUTF16LEtoUTF8`
+- Adobe Photoshop File Format Specification (2023 revision) — `vstk`/`vscg` descriptor structure, `lrFX` sofi/dsdw channel layout, `PtFl` descriptor keys, `frameFXMulti` VlLs format

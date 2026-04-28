@@ -77,6 +77,43 @@ namespace PSD2UMG::Parser::Internal
 		return FString(UTF8_TO_TCHAR(In.c_str()));
 	}
 
+	/**
+	 * LFXC-01: Convert a Photoshop lrFX color triple to a UE FLinearColor according
+	 * to the descriptor's ColorSpace word. Photoshop stores the channels as 16-bit
+	 * fixed-point values in [0..65535]; the caller has already divided by 65535.f
+	 * so C0/C1/C2 are in [0, 1] when this helper runs (see RESEARCH Pitfall 5).
+	 *
+	 *   ColorSpace == 0  -> RGB        : FLinearColor(C0, C1, C2, A)            (legacy path; byte-identical)
+	 *   ColorSpace == 1  -> HSB        : FLinearColor(C0 * 360.f, C1, C2, A).HSVToLinearRGB()
+	 *                                    UE expects H in [0, 360], S/V in [0, 1]; alpha passes through.
+	 *   ColorSpace == 2  -> CMYK       : UE_LOG Warning + best-effort identity pass-through.
+	 *   any other value  -> Lab / etc.: UE_LOG Warning + best-effort identity pass-through.
+	 *
+	 * Never crashes, never returns Black/zero -- the warn+identity contract is locked
+	 * by CONTEXT.md D-05 so a malformed ColorSpace cannot silently zero out a designer's
+	 * authored color.
+	 */
+	static FLinearColor ConvertLfx2Color(
+		uint16 ColorSpace,
+		float C0, float C1, float C2, float A,
+		const FString& LayerName)
+	{
+		switch (ColorSpace)
+		{
+			case 0: // RGB -- legacy path, byte-identical pre-LFXC-01.
+				return FLinearColor(C0, C1, C2, A);
+
+			case 1: // HSB -- convert via UE 5.7 FLinearColor::HSVToLinearRGB.
+				return FLinearColor(C0 * 360.f, C1, C2, A).HSVToLinearRGB();
+
+			default: // 2 (CMYK), 7 (Lab), or unknown -- warn + identity pass-through.
+				UE_LOG(LogPSD2UMG, Warning,
+					TEXT("Layer '%s' lrFX: unsupported ColorSpace=%u; channel values used as-is (best-effort identity)."),
+					*LayerName, static_cast<uint32>(ColorSpace));
+				return FLinearColor(C0, C1, C2, A);
+		}
+	}
+
 	/** Build an FIntRect from a PhotoshopAPI layer's center + size. */
 	static FIntRect ComputeBounds(const std::shared_ptr<PsdLayer>& InLayer)
 	{

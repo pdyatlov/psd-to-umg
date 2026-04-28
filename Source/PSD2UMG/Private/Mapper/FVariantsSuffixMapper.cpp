@@ -14,11 +14,14 @@ int32 FVariantsSuffixMapper::GetPriority() const { return 200; }
 
 bool FVariantsSuffixMapper::CanMap(const FPsdLayer& Layer) const
 {
-    // D-01 (Phase 17.1): explicit type tag beats @variants modifier. Without this
-    // guard, @button @variants would race FButtonLayerMapper at priority 200 because
-    // TArray::Sort is introsort (unstable). HasType() reflects whether any explicit
-    // @type tag (e.g. @button, @progress, @hbox) resolved to EPsdTagType::Non-None.
-    return Layer.ParsedTags.bIsVariants && !Layer.ParsedTags.HasType();
+    // D-01 (Phase 17.1 / d85 fix): Allow Canvas because EPsdLayerType::Group is
+    // silently mapped to EPsdTagType::Canvas by the D-02 default-type pass in
+    // FLayerTagParser — it is the implicit group default, not an explicit @canvas
+    // tag. Only a *different* explicit type tag (e.g. @button, @progress, @hbox)
+    // should prevent FVariantsSuffixMapper from claiming the layer.
+    return Layer.ParsedTags.bIsVariants
+        && (Layer.ParsedTags.Type == EPsdTagType::None
+            || Layer.ParsedTags.Type == EPsdTagType::Canvas);
 }
 
 UWidget* FVariantsSuffixMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc*/, UWidgetTree* Tree)

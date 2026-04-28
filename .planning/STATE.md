@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Advanced Effects
 status: executing
-stopped_at: Completed 21-02-PLAN.md — LFXC-01 ConvertLfx2Color helper + sofi/dsdw callsite wiring
-last_updated: "2026-04-28T13:30:04.776Z"
+stopped_at: Completed 21-03-PLAN.md (FXFMT-01 VlLs branch)
+last_updated: "2026-04-28T13:35:40.219Z"
 last_activity: 2026-04-28
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 21 (parser-correctness-fixes) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-28
 
@@ -101,6 +101,7 @@ Last activity: 2026-04-28
 | Phase 20-integration-stability-fixes P02 | 5min | 2 tasks | 2 files |
 | Phase 20-integration-stability-fixes P01 | 5m | 3 tasks | 6 files |
 | Phase 21-parser-correctness-fixes P02 | 10min | 2 tasks | 1 files |
+| Phase 21-parser-correctness-fixes P03 | 3m | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -189,6 +190,8 @@ Recent decisions affecting current work:
 - [Phase 20-integration-stability-fixes]: Priority delta (100->101) chosen over sort-stability workaround for fill/shape mappers: deterministic, minimal-diff, CI-verifiable
 - [Phase 20-integration-stability-fixes]: Priority assertions added to existing FButtonLayerMapperSpec.cpp (AllMappers.h already included) to avoid new file/include overhead
 - [Phase 21-parser-correctness-fixes]: ConvertLfx2Color shared helper in Parser::Internal namespace dispatches on Photoshop lrFX ColorSpace; ColorSpace==0 byte-identical, ColorSpace==1 HSB via HSVToLinearRGB, default warn+identity (D-05)
+- [Phase 21-parser-correctness-fixes]: ParseFrFXObjcItem extracted as lambda (not free function) — captures Pos/Read*/Skip*/Out by ref; consistent with established inner-lambda pattern; no parameter explosion
+- [Phase 21-parser-correctness-fixes]: bFoundStroke = true kept unconditional in Objc branch (legacy semantics); VlLs branch sets bFoundStroke only on ParseFrFXObjcItem() returning true; Out.bEnabled is source of truth for final return
 
 ### Roadmap Evolution
 
@@ -213,6 +216,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-28T13:30:04.772Z
-Stopped at: Completed 21-02-PLAN.md — LFXC-01 ConvertLfx2Color helper + sofi/dsdw callsite wiring
+Last session: 2026-04-28T13:35:40.215Z
+Stopped at: Completed 21-03-PLAN.md (FXFMT-01 VlLs branch)
 Resume file: None

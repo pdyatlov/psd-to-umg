@@ -87,7 +87,7 @@ CP-03 (VlLs branch), CP-04 (PtFl has no Clr key), CP-05 (Utf8ToFString null-sent
 | RTXT-01 | Phase 21 / Phase 21-01 | Complete — sentinel strip at Content scalar + FullUtf8 callsites; FPsdParserCJKSpec added (2026-04-28) |
 | LFXC-01 | Phase 21 | Complete |
 | LFXC-02 | Phase 21 | Pending |
-| FXFMT-01 | Phase 21 | Pending |
+| FXFMT-01 | Phase 21 | Complete |
 | STROKE-02 | Phase 22 | Pending |
 | STROKE-01 | Phase 22 | Pending |
 | STROKE-03 | Phase 22 | Pending |

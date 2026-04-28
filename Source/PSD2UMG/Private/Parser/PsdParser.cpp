@@ -201,7 +201,17 @@ namespace PSD2UMG::Parser::Internal
 			// Content.
 			if (auto Content = Text->text(); Content.has_value())
 			{
-				OutLayer.Text.Content = Utf8ToFString(*Content);
+				// RTXT-01 / CP-05: PhotoshopAPI text() may embed a trailing '\0' sentinel in the
+				// returned std::string. Utf8ToFString uses c_str() which truncates at the first
+				// NUL, corrupting CJK / emoji content. Strip the sentinel locally (D-03: fix at
+				// call site, NOT inside Utf8ToFString -- the helper is generic).
+				std::string ContentStr = *Content;
+				const size_t LastNonNull = ContentStr.find_last_not_of('\0');
+				if (LastNonNull != std::string::npos)
+					ContentStr.erase(LastNonNull + 1);
+				else
+					ContentStr.clear();
+				OutLayer.Text.Content = Utf8ToFString(ContentStr);
 			}
 
 			// Multi-run detection: find dominant run by character length. When runs differ
@@ -403,6 +413,10 @@ namespace PSD2UMG::Parser::Internal
 				{
 					OutLayer.Text.BoxWidthPx = static_cast<float>(*BW);
 				}
+				if (auto BH = Text->box_height(); BH.has_value())
+				{
+					OutLayer.Text.BoxHeightPx = static_cast<float>(*BH);
+				}
 			}
 
 			// Phase 4 -- outline (stroke).
@@ -478,7 +492,18 @@ namespace PSD2UMG::Parser::Internal
 				if (RunCount > 1)
 				{
 					auto LengthsOpt = Text->style_run_lengths();
-					const std::string FullUtf8 = Text->text().value_or("");
+					std::string FullUtf8 = Text->text().value_or("");
+					{
+						// RTXT-01 / CP-05: PhotoshopAPI text() may embed a trailing '\0' sentinel.
+						// Strip before passing to Utf8ToFString (which terminates at first NUL via
+						// c_str()). Sentinel survival here truncates CJK content past the null byte
+						// and yields zero-length spans for trailing runs.
+						const size_t LastNonNull = FullUtf8.find_last_not_of('\0');
+						if (LastNonNull != std::string::npos)
+							FullUtf8.erase(LastNonNull + 1);
+						else
+							FullUtf8.clear();
+					}
 
 					// PhotoshopAPI's style_run_lengths entries are code-unit counts
 					// (UTF-16 per PSD spec). The exposed text() is UTF-8. We slice by
@@ -1734,6 +1759,10 @@ namespace PSD2UMG::Parser::Internal
 		{
 			Layer.Text.Color = Layer.Effects.ColorOverlayColor;
 			Layer.Effects.bHasColorOverlay = false; // D-13 double-render guard
+			// Overlay wins over all per-span colors. Clearing Spans collapses
+			// multi-run rich text to single-run so FTextLayerMapper handles it
+			// with the uniform overlay color (FRichTextLayerMapper requires Spans.Num()>1).
+			Layer.Text.Spans.Empty();
 		}
 	}
 

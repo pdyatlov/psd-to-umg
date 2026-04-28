@@ -775,7 +775,9 @@ namespace PSD2UMG::Parser::Internal
 							C0, C1, C2, OpacityByte, Enabled);
 
 						OutLayer.Effects.bHasColorOverlay = (Enabled != 0);
-						OutLayer.Effects.ColorOverlayColor = Enabled ? FLinearColor(C0, C1, C2, A) : FLinearColor::White;
+						OutLayer.Effects.ColorOverlayColor = Enabled
+							? ConvertLfx2Color(ColorSpace, C0, C1, C2, A, OutLayer.Name)
+							: FLinearColor::White;
 					}
 					else if (FCStringAnsi::Strcmp(Key, "dsdw") == 0)
 					{
@@ -831,7 +833,7 @@ namespace PSD2UMG::Parser::Internal
 						OutLayer.Effects.DropShadowOffset = FVector2D(OffsetX, OffsetY);
 						OutLayer.Effects.bHasDropShadow   = (ShadowEnabled != 0);
 						OutLayer.Effects.DropShadowColor  = ShadowEnabled
-							? FLinearColor(C0, C1, C2, ShadowA)
+							? ConvertLfx2Color(ColorSpace, C0, C1, C2, ShadowA, OutLayer.Name)
 							: FLinearColor(0, 0, 0, 0);
 					}
 					else if (FCStringAnsi::Strcmp(Key, "isdw") == 0

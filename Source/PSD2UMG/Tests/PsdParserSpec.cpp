@@ -876,4 +876,137 @@ void FPsdParserShapeSpec::Define()
     });
 }
 
+// ------------------------------------------------------------------
+// Phase 21: CJK / non-ASCII rich-text fixture spec (RTXT-01)
+// Validates the null-sentinel strip fix in PsdParser.cpp at both
+// the single-run Content scalar path and the multi-run FullUtf8 path.
+//
+// Fixture: Source/PSD2UMG/Tests/Fixtures/RichTextCJK.psd
+// D-01: file is user-supplied. When absent the BeforeEach emits
+// AddWarning and short-circuits so all It() bodies are no-ops.
+// This keeps CI green even without the fixture.
+// When the fixture IS present and the sentinel fix IS in place,
+// all 5 It() blocks pass.
+// ------------------------------------------------------------------
+BEGIN_DEFINE_SPEC(FPsdParserCJKSpec, "PSD2UMG.Parser.CJK",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FString FixturePath;
+    FPsdDocument Doc;
+    FPsdParseDiagnostics Diag;
+    bool bParsed = false;
+
+    // Recursive find: locate first layer where Predicate returns true; nullptr otherwise.
+    static const FPsdLayer* FindLayerRecursive(const TArray<FPsdLayer>& Layers, TFunctionRef<bool(const FPsdLayer&)> Pred)
+    {
+        for (const FPsdLayer& L : Layers)
+        {
+            if (Pred(L)) return &L;
+            if (const FPsdLayer* R = FindLayerRecursive(L.Children, Pred)) return R;
+        }
+        return nullptr;
+    }
+
+    // True if S has any TCHAR outside basic ASCII range (CJK / emoji marker).
+    static bool ContainsNonAscii(const FString& S)
+    {
+        for (TCHAR Ch : S) { if (static_cast<uint32>(Ch) > 0x7F) return true; }
+        return false;
+    }
+
+END_DEFINE_SPEC(FPsdParserCJKSpec)
+
+void FPsdParserCJKSpec::Define()
+{
+    BeforeEach([this]()
+    {
+        Doc = FPsdDocument();
+        Diag = FPsdParseDiagnostics();
+        bParsed = false;
+
+        TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"));
+        if (!Plugin.IsValid())
+        {
+            AddError(TEXT("PSD2UMG plugin not found via IPluginManager"));
+            return;
+        }
+
+        FixturePath = FPaths::Combine(
+            Plugin->GetBaseDir(),
+            TEXT("Source/PSD2UMG/Tests/Fixtures/RichTextCJK.psd"));
+
+        if (!FPaths::FileExists(FixturePath))
+        {
+            AddWarning(TEXT("RichTextCJK.psd fixture missing — RTXT-01 spec skipped (D-01 user-supplied)"));
+            return;
+        }
+
+        bParsed = PSD2UMG::Parser::ParseFile(FixturePath, Doc, Diag);
+    });
+
+    Describe("ParseFile on RichTextCJK.psd", [this]()
+    {
+        It("returns true with no error diagnostics", [this]()
+        {
+            if (FixturePath.IsEmpty() || !FPaths::FileExists(FixturePath)) { return; }
+            TestTrue(TEXT("bParsed"), bParsed);
+            TestFalse(TEXT("Diag.HasErrors()"), Diag.HasErrors());
+        });
+
+        It("contains a CJK / non-ASCII text layer", [this]()
+        {
+            if (!bParsed) { return; }
+            const FPsdLayer* CJK = FindLayerRecursive(Doc.RootLayers, [](const FPsdLayer& L){
+                return L.Type == EPsdLayerType::Text && ContainsNonAscii(L.Text.Content);
+            });
+            TestNotNull(TEXT("CJK text layer present"), CJK);
+        });
+
+        It("CJK text Content has no embedded NUL sentinel (RTXT-01 single-run path)", [this]()
+        {
+            if (!bParsed) { return; }
+            const FPsdLayer* CJK = FindLayerRecursive(Doc.RootLayers, [](const FPsdLayer& L){
+                return L.Type == EPsdLayerType::Text && ContainsNonAscii(L.Text.Content);
+            });
+            if (!TestNotNull(TEXT("CJK layer"), CJK)) return;
+            const FString Nul(1, TEXT("\0"));
+            TestFalse(TEXT("Content contains no \\0"), CJK->Text.Content.Contains(Nul));
+            TestTrue(TEXT("Content has length > 0"), CJK->Text.Content.Len() > 0);
+        });
+
+        It("CJK multi-run spans have no embedded NUL and non-empty Text (RTXT-01 multi-run path)", [this]()
+        {
+            if (!bParsed) { return; }
+            const FPsdLayer* CJK = FindLayerRecursive(Doc.RootLayers, [](const FPsdLayer& L){
+                return L.Type == EPsdLayerType::Text && ContainsNonAscii(L.Text.Content);
+            });
+            if (!TestNotNull(TEXT("CJK layer"), CJK)) return;
+            if (CJK->Text.Spans.Num() <= 1)
+            {
+                AddWarning(TEXT("CJK fixture is single-run; multi-run NUL assertion skipped"));
+                return;
+            }
+            const FString Nul(1, TEXT("\0"));
+            for (int32 i = 0; i < CJK->Text.Spans.Num(); ++i)
+            {
+                TestFalse(*FString::Printf(TEXT("Span[%d] no \\0"), i), CJK->Text.Spans[i].Text.Contains(Nul));
+                TestTrue(*FString::Printf(TEXT("Span[%d] non-empty"), i), CJK->Text.Spans[i].Text.Len() > 0);
+            }
+        });
+
+        It("Span lengths sum equals Content length (RTXT-01 / D-04 BMP CJK boundary alignment)", [this]()
+        {
+            if (!bParsed) { return; }
+            const FPsdLayer* CJK = FindLayerRecursive(Doc.RootLayers, [](const FPsdLayer& L){
+                return L.Type == EPsdLayerType::Text && ContainsNonAscii(L.Text.Content);
+            });
+            if (!TestNotNull(TEXT("CJK layer"), CJK)) return;
+            if (CJK->Text.Spans.Num() <= 1) { return; }
+            int32 Sum = 0;
+            for (const FPsdTextRunSpan& Sp : CJK->Text.Spans) { Sum += Sp.Text.Len(); }
+            TestEqual(TEXT("Sum(Span.Text.Len) == Content.Len"), Sum, CJK->Text.Content.Len());
+        });
+    });
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

@@ -1142,6 +1142,42 @@ namespace PSD2UMG::Parser::Internal
 				ParseFrFXObjcItem();
 				bFoundStroke = true; // stop searching this descriptor (matches legacy semantics)
 			}
+			else if (ItemKey == "FrFX" && FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
+			{
+				// FXFMT-01 / CP-03: Photoshop CC 2014+ stores FrFX as a VlLs (list) of
+				// Objc-typed descriptors instead of a bare Objc. Iterate list items;
+				// dispatch Objc items into ParseFrFXObjcItem. Unknown item ostypes fall
+				// through to the safe SkipValueAfterOsType so the loop cannot wedge.
+				//
+				// Loop-stop semantics (D-06 + Pitfall 4): match the Objc branch -- once
+				// any item parses an enabled stroke, set bFoundStroke and break. Items
+				// that parse with bEnab=false leave Out.bEnabled untouched and the loop
+				// continues to the next item.
+				const uint32 N = ReadU32BE();
+				for (uint32 k = 0; k < N && CheckRemaining(4) && !bFoundStroke; ++k)
+				{
+					char ElemOT[5] = {};
+					for (int c = 0; c < 4; ++c)
+						ElemOT[c] = static_cast<char>(Data[Pos + c]);
+					Pos += 4;
+
+					if (FCStringAnsi::Strcmp(ElemOT, "Objc") == 0)
+					{
+						if (ParseFrFXObjcItem())
+						{
+							bFoundStroke = true; // matched: stop scanning this VlLs
+						}
+					}
+					else
+					{
+						SkipValueAfterOsType(ElemOT);
+					}
+				}
+				// If no enabled Objc was found inside the VlLs, leave bFoundStroke false
+				// so the outer descriptor walk continues to the next top-level item -- this
+				// matches the spirit of the Objc branch (Out.bEnabled is the source of
+				// truth for the function's final return).
+			}
 			else
 			{
 				SkipValueAfterOsType(OsType);

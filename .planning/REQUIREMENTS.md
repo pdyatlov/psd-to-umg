@@ -1,105 +1,95 @@
-# PSD2UMG — v1.1 / v1.2 Requirements
+# v1.3 Advanced Effects — Requirements
 
-**Milestone:** v1.1 + v1.2 (active)
-**Parent:** v1.0.1 (archived 2026-04-17)
-**Scope:** Import dialog fidelity (hidden layers, checkbox filtering) + text property correctness + layer fidelity expansion (gradients, shapes, group effects, rich text).
-
-## Active Requirements
-
-### Import Dialog — Hidden Layers (HIDDEN-*)
-
-- [ ] **HIDDEN-01**: PSD layers with `bVisible = false` are displayed in the import dialog with their checkbox **unchecked** by default.
-- [x] **HIDDEN-02**: The import dialog visually distinguishes hidden layers from visible ones (e.g., dimmed row, eye-closed icon, or `[hidden]` label).
-
-### Import Dialog — Checkbox Filtering (FILTER-*)
-
-- [ ] **FILTER-01**: Layers whose checkbox is unchecked in the import dialog are **not added** to the generated Widget Blueprint.
-- [ ] **FILTER-02**: Children of an unchecked group layer are also excluded from the WBP (unchecking a group implicitly excludes its subtree).
-
-### Text Fidelity — Font Size (TEXT-F-*)
-
-- [x] **TEXT-F-01**: Font point size from PhotoshopAPI is converted to UMG font size using the correct formula so `FSlateFontInfo.Size` matches PSD design intent (24.45 pt PSD → correct UMG value, not inflated to 30).
-
-### Text Fidelity — Alignment (TEXT-F-*)
-
-- [x] **TEXT-F-02**: PSD paragraph justification (left/center/right) maps to `ETextJustify::Left/Center/Right` on the generated `UTextBlock` and survives compile+save.
-
-### Text Fidelity — Base Color (TEXT-F-*)
-
-- [x] **TEXT-F-03**: PSD text fill color is imported as the correct `FSlateColor` on `UTextBlock::ColorAndOpacity` — gray in PSD imports as gray (not red); channel order must be verified.
-
-### Gradient Layers (GRAD-*)
-
-- [x] **GRAD-01**: A linear gradient fill layer in PSD produces a valid UMG widget (UImage with pre-rendered texture) after import.
-- [x] **GRAD-02**: Gradient color stops and direction are preserved with no visible banding at standard resolutions.
-
-### Shape/Vector Layers (SHAPE-*)
-
-- [x] **SHAPE-01**: A solid-color rectangle shape layer in PSD produces a UImage with a solid SlateBrush of the correct color after import.
-- [x] **SHAPE-02**: Position and size of the shape widget match the PSD layer bounds within 1px.
-
-### Group Effects (GRPFX-*)
-
-- [x] **GRPFX-01**: A group layer with a drop shadow effect produces a container widget with a matching drop shadow applied (`_Shadow` UImage sibling at correct offset, ZOrder = main - 1).
-- [x] **GRPFX-02**: A group layer with a color overlay produces a container widget with the overlay color applied (`_ColorOverlay` UImage as last child with fill anchors).
-
-### Rich Text — Multiple Style Runs (RICH-*)
-
-- [x] **RICH-01**: A text layer with two differently-colored spans produces a `URichTextBlock` with both colors represented in inline markup.
-- [x] **RICH-02**: A text layer with bold and normal weight runs produces a `URichTextBlock` with correct weight styling per span.
-
-### Typography — Font Matching (FONT-*)
-
-- [x] **FONT-01**: A Photoshop PostScript font name (e.g. "Roboto-Bold") is resolved automatically via AssetRegistry scan over `/Game/` and `/Engine/EngineFonts/` to the correct UFont asset when no explicit `FontMap` entry exists and the asset's base name matches case-insensitively (after `ParseSuffix` strips style suffix). New enum value `EFontResolutionSource::AutoDiscovered` reports the resolution source.
-- [x] **FONT-02**: When a PSD font name cannot be resolved via FontMap or AutoDiscovered, `FFontResolver::Resolve` logs a warning (`LogPSD2UMG Warning: Font '%s' not found in FontMap; using DefaultFont`) and falls back to the project's configured `DefaultFont` (or engine default if DefaultFont is unset). Prevents silent "no font" output.
-
-### Button State Wiring (BTN-STATE-*)
-
-- [x] **BTN-STATE-01**: A PSD layer tagged `@button @variants` resolves deterministically to `FButtonLayerMapper` (produces `UButton`), never to `FVariantsSuffixMapper` (`UWidgetSwitcher`). `FVariantsSuffixMapper::CanMap` returns `false` when `Layer.ParsedTags.HasType()` is `true` — an explicit type tag always beats the `@variants` modifier (D-01). No warning or error is emitted when `@button` and `@variants` coexist on one layer (D-02, silent accept consistent with `@9s` on non-image layers).
-- [x] **BTN-STATE-02**: Child layers `@state:normal`, `@state:hover`, `@state:pressed`, `@state:disabled` on a `@button` group wire to `FButtonStyle::Normal/Hovered/Pressed/Disabled` via `FLayerTagParser::FindChildByState` (D-12 explicit match, D-13 Normal fallback to first untagged image child). When fewer than four slots are populated, `FButtonLayerMapper::Map` emits one aggregate `UE_LOG(LogPSD2UMG, Warning, ...)` naming the layer and listing missing slots (D-03); import does NOT abort and unfilled slots retain the default `FButtonStyle` brush.
-
-### Button State Text Animation (BTN-ANIM-*)
-
-- [x] **BTN-ANIM-01**: `FPsdWidgetAnimationBuilder::CreateColorAnim` produces a `UWidgetAnimation` whose `MovieScene` contains exactly one `UMovieSceneColorTrack` bound via the possessable GUID to the target widget name. The track's single `UMovieSceneColorSection` holds four `FMovieSceneFloatChannel` accessors (R, G, B, A) each with a linear key at `StartFrame=0` (FromColor) and a linear key at `EndFrame = RoundToInt(DurationSec * 24000)` (ToColor). `WBP->Animations` contains the animation and `AnimationBindings` has one entry with `WidgetName == TargetWidgetName` and `SlotWidgetName == NAME_None`. Property path is `"ColorAndOpacity"`.
-- [x] **BTN-ANIM-02**: Given a `@button` group containing `@state:normal` and `@state:hover` child groups, each with a text layer carrying a different `FPsdTextRun::Color`, the generator produces a `UButton` with the `@state:normal` text content as its child AND creates a `UWidgetAnimation` named `{CleanName}_Hover` targeting that text widget, with start-key colour equal to the normal text colour and end-key colour equal to the hover text colour. If the `@state:hover` group has no text layer (D-07), no hover animation is created (silent skip). When parent widget IS a `UButton`, `PopulateChildren` skips all `@state:*` direct children (D-08/D-09) and never adds them as widget children — the button's single child comes from `@state:normal` content only.
-- [x] **BTN-ANIM-03**: After `FWidgetBlueprintGenerator::Generate` returns a WBP for a `@button` PSD with `@state:normal`/`@state:hover`/`@state:pressed` text colours (manual-only — UE Editor UI verification): the WBP's Event Graph contains a `UK2Node_ComponentBoundEvent` for `OnHovered` bound to the button variable, wired (then-pin → exec-pin) to a `UK2Node_CallFunction` targeting `UUserWidget::PlayAnimation`, whose `InAnimation` pin is fed by a `UK2Node_VariableGet` referencing the `{CleanName}_Hover` animation. Symmetric pairs exist for `OnUnhovered→PlayAnimation(Reverse)`, `OnPressed→PlayAnimation({CleanName}_Pressed)`, `OnReleased→PlayAnimation({CleanName}_Hover, Forward)`. `Disabled` animation is intentionally NOT wired (D-02 limitation — UButton has no disabled delegate). In PIE: hovering the button plays the colour transition on the text widget.
-
-### Text + Layout Correctness (TXT-FX-*, TXT-CAPS-*, LAYOUT-ORDER-*)
-
-- [x] **TXT-FX-01**: When a text layer has a Color Overlay effect (`FPsdLayerEffects::ColorOverlay` present and enabled), the overlay color is used for `UTextBlock::SetColorAndOpacity` instead of the PSD text color property (`FPsdTextRun::Color`). Color Overlay takes priority; the base text color is ignored when an overlay is present.
-- [x] **TXT-CAPS-01**: When a text layer has the All Caps transformation enabled in Photoshop, the generated `UTextBlock` has `TextTransformPolicy` set to `ETextTransformPolicy::ToUpper`. Layers without All Caps produce `ETextTransformPolicy::None` (default).
-- [x] **LAYOUT-ORDER-01**: Children added to `UHorizontalBox` (`@hbox`) and `UVerticalBox` (`@vbox`) panels appear in the same visual order as the Photoshop layer stack — the topmost layer in the PSD panel corresponds to the first child slot in UE.
-
-## Traceability
-
-| REQ-ID | Assigned Phase | Status |
-|---|---|---|
-| HIDDEN-01 | Phase 11 / Phase 18 | Pending (Phase 18 gap closure) |
-| HIDDEN-02 | Phase 11 / Phase 16.1 | Complete (verified 2026-04-22 — eye icon from Phase 11, row dimming from Phase 16.1) |
-| FILTER-01 | Phase 11 / Phase 18 | Pending (Phase 18 gap closure) |
-| FILTER-02 | Phase 11 / Phase 18 | Pending (Phase 18 gap closure) |
-| TEXT-F-01 | Phase 12 | Complete |
-| TEXT-F-02 | Phase 12 | Complete |
-| TEXT-F-03 | Phase 12 | Complete |
-| GRAD-01 | Phase 13 / Phase 16.1 / Phase 20 | Complete (verified 2026-04-22 — Phase 16.1 FLayerTagParser fix closes the untagged-layer gap; Phase 20 hardened with priority 101 on FFillLayerMapper to eliminate sort-race vs FImageLayerMapper at priority 100) |
-| GRAD-02 | Phase 13 | Complete (verified 2026-04-22) |
-| SHAPE-01 | Phase 14 / Phase 16.1 / Phase 20 | Complete (verified 2026-04-22 — Phase 16.1 FLayerTagParser fix closes the untagged-layer gap; Phase 20 hardened with priority 101 on FShapeLayerMapper / FSolidFillLayerMapper to eliminate sort-race vs FImageLayerMapper at priority 100) |
-| SHAPE-02 | Phase 14 | Complete (verified 2026-04-22) |
-| GRPFX-01 | Phase 15 | Complete (verified 2026-04-22) |
-| GRPFX-02 | Phase 15 | Complete (verified 2026-04-22) |
-| RICH-01 | Phase 16 | Complete (verified 2026-04-22) |
-| RICH-02 | Phase 16 | Complete (verified 2026-04-22) |
-| FONT-01 | Phase 17 / Phase 20 | Complete (verified 2026-04-22 — AssetRegistry scan cache lands in 17-02 Task 1; cache lifecycle hook in 17-02 Task 2; Phase 20 hardened reimport path with ON_SCOPE_EXIT InvalidateDiscoveryCache in FPsdReimportHandler::Reimport so a UFont asset added between import and reimport is picked up without engine restart) |
-| FONT-02 | Phase 17 | Complete (already implemented in FontResolver.cpp DefaultFont fallback; D-06 marks it closed) |
-| BTN-STATE-01 | Phase 17.1 / Phase 18 | Complete (verified 2026-04-22 via PSD2UMG.Mapper.ButtonLayerMapper BTN-STATE-01; corrected 2026-04-28 by quick fix 260428-d85 — initial !HasType() over-rejected bare @variants groups with Type==Canvas; fixed to explicit None/Canvas whitelist in FVariantsSuffixMapper::CanMap; 17.1-VERIFICATION.md created 2026-04-28) |
-| BTN-STATE-02 | Phase 17.1 | Complete (verified 2026-04-22 via PSD2UMG.Mapper.ButtonLayerMapper BTN-STATE-02 — D-03 aggregate missing-slots warning in FButtonLayerMapper::Map lands in 17.1-02) |
-| BTN-ANIM-01 | Phase 17.2 | Complete (verified 2026-04-24 via PSD2UMG.ButtonStateTextAnim — CreateColorAnim landed in 17.2-02) |
-| BTN-ANIM-02 | Phase 17.2 | Complete (verified 2026-04-24 via PSD2UMG.ButtonStateTextAnim — skip guard in 17.2-02 + generator integration in 17.2-03) |
-| BTN-ANIM-03 | Phase 17.2 | Complete (verified 2026-04-27 manual PIE — K2 nodes visible, text colour transitions in PIE) |
-| TXT-FX-01 | Phase 12 / Phase 19 | Complete (verified 2026-04-27 — Phase 12 RouteTextEffects routing chain proven by PSD2UMG.Parser.Typography "text_overlay_gray" + PSD2UMG.TextPipeline "text_overlay_gray uses OVERLAY color, not white character fill (TXT-FX-01 priority)" added in Phase 19-01) |
-| TXT-CAPS-01 | Phase 19 | Complete (verified 2026-04-27 — bAllCaps field + style_run_font_caps parse + SetTextTransformPolicy(ToUpper); pinned by PSD2UMG.Parser.Typography "text_caps has bAllCaps=true" and PSD2UMG.TextPipeline "text_caps TextTransformPolicy is ToUpper") |
-| LAYOUT-ORDER-01 | Phase 19 | Complete (verified 2026-04-27 — empirical first-run of FPanelAttachmentSpec "VBoxGroup_Slot0IsItemA_LAYOUT-ORDER-01" + "HBoxGroup_Slot0IsTopmostPSDLayer_LAYOUT-ORDER-01" PASSED on Phase 19 baseline; Phase 10 PopulateChildren forward iteration already preserves PSD layer-panel reading order. No production-code change required; spec assertions retained as permanent regression guard) |
+**Milestone:** v1.3 Advanced Effects
+**Status:** Defining
+**Date:** 2026-04-28
 
 ---
 
-*Last updated: 2026-04-27 (Phase 20 mapper priority hardening)*
+## Scope
+
+Close the visual delta between PSD and UMG by implementing stroke rendering, pattern fill
+import, lrFX format correctness, and non-ASCII rich text robustness.
+
+---
+
+## Requirements
+
+### Stroke Rendering
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| STROKE-01 | Image/shape layers with lfx2 `bHasStroke` set emit a stroke sibling UImage (size + 2×StrokePx, offset -StrokePx, tinted StrokeColor, ZOrder = main - 1). Canvas-only; mirrors existing drop-shadow pattern. No texture required. | Must |
+| STROKE-02 | `ScanVstkStroke()` parses the `vstk` (vecStrokeData) tagged block at **byte offset 0** (not 4 or 8) and writes new fields `bHasVectorStroke`, `VectorStrokeSize`, `VectorStrokeColor` to `FPsdLayerEffects`. Must NOT write to `bHasStroke` (already owned by lfx2 for all layer types — CP-02). | Must |
+| STROKE-03 | `FShapeLayerMapper` reads `bHasVectorStroke`; when set, emits stroke geometry (sibling UImage or DrawType::Border depending on texture presence). | Must |
+
+### Effects Format
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| FXFMT-01 | `ParseFrFXDescriptor` adds a `VlLs` branch so Photoshop CC 2014+ effects (stored as a `VlLs` list under `"FrFX"` instead of a single `Objc`) are parsed rather than silently discarded via `SkipValueAfterOsType`. | Must |
+
+### Pattern Fill
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| PTFL-01 | `ConvertLayerRecursive` detects the `adjPattern` (`TaggedBlockKey::adjPattern`) tagged block and sets `EPsdLayerType::PatternFill` (new enum value, parallel to `SolidFill`/`Gradient`). Without this the layer falls to `Unknown` and is silently skipped. | Must |
+| PTFL-02 | `FPatternFillLayerMapper` (new mapper, priority 101) returns a UImage backed by PhotoshopAPI's composited `RGBAPixels`. If `RGBAPixels` is empty, falls back to `bFlattenComplexEffects` flatten path and logs a warning. | Must |
+
+### Rich Text & Typography
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| RTXT-01 | Fix `Utf8ToFString` call in PSD text span extraction: pass explicit `FullUtf8.size()` (not implicit `strlen`) and strip any trailing `\0` sentinel before conversion. Add `RichTextCJK.psd` fixture with a CJK/emoji multi-run layer to make slicing correctness empirical. | Must |
+
+### lrFX Channel Order
+
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| LFXC-01 | `ExtractLfx2*` functions add a ColorSpace branch: ColorSpace=1 (HSB) converts via `FLinearColor::HSVToLinearRGB`; ColorSpace=2 (CMYK) or other non-RGB spaces log `UE_LOG Warning` and use a best-effort identity mapping. ColorSpace=0 (RGB) unchanged. | Must |
+| LFXC-02 | Human UAT: visual confirm that color overlay and drop shadow render with correct RGBC channel order on a real UE 5.7 host project. No code change expected (code verified correct for RGB); task closes the open empirical question. | Should |
+
+---
+
+## Out of Scope (v1.3)
+
+- Material-based tiling for pattern fills (composited PNG is always visually correct for v1.3)
+- Inside/outside/center stroke precision (sibling-image approximation acceptable)
+- CMYK/Lab lrFX full conversion (warn path sufficient)
+- URichTextBlock multi-run beyond first dominant run improvements (separate initiative)
+- frameFXMulti VlLs stroke rendering (FXFMT-01 unlocks parsing; stroke emission for VlLs-origin data is post-v1.3 unless trivial)
+
+---
+
+## Dependencies
+
+- STROKE-01 depends on nothing (lfx2 data already in place since Phase 4.1)
+- STROKE-02 depends on nothing (new parser path, no overlap with STROKE-01)
+- STROKE-03 depends on STROKE-02
+- FXFMT-01 depends on nothing (isolated branch in ParseFrFXDescriptor)
+- PTFL-01 depends on nothing
+- PTFL-02 depends on PTFL-01
+- RTXT-01 depends on nothing
+- LFXC-01 depends on nothing
+- LFXC-02 depends on LFXC-01 (UAT after code fix)
+
+---
+
+## Traceability
+
+Continuing from v1.2 (25 requirements, Phases 13-20).
+Research basis: `.planning/research/SUMMARY.md` (synthesized 2026-04-28).
+Critical pitfalls: CP-01 (vstk offset=0), CP-02 (bHasVectorStroke not bHasStroke),
+CP-03 (VlLs branch), CP-04 (PtFl has no Clr key), CP-05 (Utf8ToFString null-sentinel).
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| RTXT-01 | Phase 21 / Phase 21-01 | Complete — sentinel strip at Content scalar + FullUtf8 callsites; FPsdParserCJKSpec added (2026-04-28) |
+| LFXC-01 | Phase 21 | Pending |
+| LFXC-02 | Phase 21 | Pending |
+| FXFMT-01 | Phase 21 | Pending |
+| STROKE-02 | Phase 22 | Pending |
+| STROKE-01 | Phase 22 | Pending |
+| STROKE-03 | Phase 22 | Pending |
+| PTFL-01 | Phase 23 | Pending |
+| PTFL-02 | Phase 23 | Pending |

@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Import Fidelity Fixes
-status: verifying
-stopped_at: Completed quick/260428-d85-PLAN.md
-last_updated: "2026-04-28T07:33:26.180Z"
-last_activity: 2026-04-27
+milestone: v1.3
+milestone_name: Advanced Effects
+status: executing
+stopped_at: Phase 21 context gathered
+last_updated: "2026-04-28T13:07:59.124Z"
+last_activity: 2026-04-28 -- Phase 21 execution started
 progress:
-  total_phases: 2
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 4
+  completed_plans: 0
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 20 — integration-stability-fixes
+**Current focus:** Phase 21 — parser-correctness-fixes
 
 ## Current Position
 
-Phase: 20
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-27
+Phase: 21 (parser-correctness-fixes) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 21
+Last activity: 2026-04-28 -- Phase 21 execution started
 
 ## Performance Metrics
 
@@ -198,6 +198,12 @@ Recent decisions affecting current work:
 
 None yet.
 
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260428-d85 | Fix FVariantsSuffixMapper::CanMap Canvas over-reject (BTN-STATE-01) | 2026-04-28 | 9c42bbb | [260428-d85-fix-fvariantssuffixmapper-canmap-line-21](./quick/260428-d85-fix-fvariantssuffixmapper-canmap-line-21/) |
+
 ### Blockers/Concerns
 
 - TEXT-F-01: pt→px formula needs verification. Decision log says "1:1" but user reports 24.45→30 inflation. Likely a 72/96 DPI ratio being applied somewhere (24.45 * 96/72 ≈ 32.6; 24.45 * 4/3 ≈ 32.6 — actual 30 suggests a different multiplier). Needs code inspection of FTextLayerMapper before planning.
@@ -205,6 +211,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-28T07:33:26.175Z
-Stopped at: Completed quick/260428-d85-PLAN.md
-Resume file: None
+Last session: 2026-04-28T12:41:00.522Z
+Stopped at: Phase 21 context gathered
+Resume file: .planning/phases/21-parser-correctness-fixes/21-CONTEXT.md

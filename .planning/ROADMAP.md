@@ -76,7 +76,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
   3. A PSD saved by Photoshop CC 2014+ with effects stored under `VlLs` (not bare `Objc`) imports those effects rather than silently discarding them (VlLs branch in ParseFrFXDescriptor — CP-03)
   4. Human UAT on a real UE 5.7 host project confirms color overlay and drop shadow visual output is correct for RGB ColorSpace=0 layers (LFXC-02 empirical close-out)
 **Plans**: 4 plans
-- [ ] 21-01-PLAN.md — RTXT-01 NUL sentinel strip + CJK fixture spec (Wave 1)
+- [x] 21-01-PLAN.md — RTXT-01 NUL sentinel strip + CJK fixture spec (Wave 1) — completed 2026-04-28
 - [ ] 21-02-PLAN.md — LFXC-01 ConvertLfx2Color helper + sofi/dsdw ColorSpace dispatch (Wave 2)
 - [ ] 21-03-PLAN.md — FXFMT-01 ParseFrFXObjcItem extraction + VlLs branch (Wave 3)
 - [ ] 21-04-PLAN.md — LFXC-02 human UAT sign-off on real UE 5.7 host (Wave 4, checkpoint)

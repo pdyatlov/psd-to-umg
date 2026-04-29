@@ -37,7 +37,7 @@ completed: 2026-04-29
 
 # Plan 21-04: LFXC-02 UAT Summary
 
-**Human UAT confirmed RGB color overlay and drop shadow render correct hue on UE 5.7 host; LFXC-02 closed.**
+**LFXC-02 visual UAT deferred to pre-v1.3 session; code correctness confirmed by implementation review; UAT log created with deferral rationale.**
 
 ## Performance
 

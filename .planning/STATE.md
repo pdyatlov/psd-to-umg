@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Advanced Effects
 status: executing
-stopped_at: Completed 21-03-PLAN.md (FXFMT-01 VlLs branch)
-last_updated: "2026-04-29T08:58:07.439Z"
+stopped_at: Completed 22-stroke-rendering 22-01-PLAN.md
+last_updated: "2026-04-29T10:50:41.060Z"
 last_activity: 2026-04-29
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 6
+  completed_plans: 5
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 21 — parser-correctness-fixes
+**Current focus:** Phase 22 — stroke-rendering
 
 ## Current Position
 
-Phase: 22
-Plan: Not started
+Phase: 22 (stroke-rendering) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
 Last activity: 2026-04-29
 
@@ -102,6 +102,7 @@ Last activity: 2026-04-29
 | Phase 20-integration-stability-fixes P01 | 5m | 3 tasks | 6 files |
 | Phase 21-parser-correctness-fixes P02 | 10min | 2 tasks | 1 files |
 | Phase 21-parser-correctness-fixes P03 | 3m | 2 tasks | 1 files |
+| Phase 22-stroke-rendering P01 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -192,6 +193,8 @@ Recent decisions affecting current work:
 - [Phase 21-parser-correctness-fixes]: ConvertLfx2Color shared helper in Parser::Internal namespace dispatches on Photoshop lrFX ColorSpace; ColorSpace==0 byte-identical, ColorSpace==1 HSB via HSVToLinearRGB, default warn+identity (D-05)
 - [Phase 21-parser-correctness-fixes]: ParseFrFXObjcItem extracted as lambda (not free function) — captures Pos/Read*/Skip*/Out by ref; consistent with established inner-lambda pattern; no parameter explosion
 - [Phase 21-parser-correctness-fixes]: bFoundStroke = true kept unconditional in Objc branch (legacy semantics); VlLs branch sets bFoundStroke only on ParseFrFXObjcItem() returning true; Out.bEnabled is source of truth for final return
+- [Phase 22-stroke-rendering]: CP-01 confirmed: vstk descriptor at byte offset 0 of Block->m_Data (TryParseAt(0) primary for vstk, unlike SoCo(4) or vscg(8))
+- [Phase 22-stroke-rendering]: CP-02 and D-03 confirmed: bHasVectorStroke/VectorStrokeSize/VectorStrokeColor are separate fields; bHasStroke cleared when vstk wins on Shape layers at parse time
 
 ### Roadmap Evolution
 
@@ -216,6 +219,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-28T13:35:40.215Z
-Stopped at: Completed 21-03-PLAN.md (FXFMT-01 VlLs branch)
+Last session: 2026-04-29T10:50:41.055Z
+Stopped at: Completed 22-stroke-rendering 22-01-PLAN.md
 Resume file: None

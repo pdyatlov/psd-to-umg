@@ -90,7 +90,9 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
   2. An image layer with `bHasStroke` set (lfx2 path — STROKE-01) emits a sibling UImage sized `+2×StrokePx`, offset `-StrokePx`, tinted `StrokeColor`, at `ZOrder = main - 1`
   3. A shape layer with `bHasVectorStroke` set (vstk path — STROKE-03) emits equivalent stroke geometry; the two stroke sources (lfx2 and vstk) do not double-emit on the same layer
   4. Importing the existing ButtonStyles.psd fixture produces no regression on non-stroke layers
-**Plans**: TBD
+**Plans**: 2 plans
+- [x] 22-01-PLAN.md — STROKE-02 ScanVstkStroke parser + new FPsdLayerEffects fields + ButtonStyles.psd regression spec (Wave 1)
+- [ ] 22-02-PLAN.md — STROKE-01 + STROKE-03 FX-06 stroke sibling block in FWidgetBlueprintGenerator + 3 generator specs (Wave 2)
 
 ### Phase 23: Pattern Fill Layers
 **Goal**: Pattern fill adjustment layers are imported as UImage widgets backed by the layer's composited pixel data rather than silently skipped
@@ -107,7 +109,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 21. Parser Correctness Fixes | 3/4 | Complete    | 2026-04-29 |
-| 22. Stroke Rendering | 0/? | Not started | - |
+| 22. Stroke Rendering | 1/2 | In Progress|  |
 | 23. Pattern Fill Layers | 0/? | Not started | - |
 
 ## v1.3+ Backlog

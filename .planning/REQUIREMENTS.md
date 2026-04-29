@@ -88,7 +88,7 @@ CP-03 (VlLs branch), CP-04 (PtFl has no Clr key), CP-05 (Utf8ToFString null-sent
 | LFXC-01 | Phase 21 | Complete |
 | LFXC-02 | Phase 21 | Deferred — code correct (ConvertLfx2Color RGB path byte-identical, HSB via HSVToLinearRGB); visual UAT on real UE 5.7 host deferred to pre-v1.3 session (see 21-04-UAT-LOG.md) |
 | FXFMT-01 | Phase 21 | Complete |
-| STROKE-02 | Phase 22 | Pending |
+| STROKE-02 | Phase 22 | Complete |
 | STROKE-01 | Phase 22 | Pending |
 | STROKE-03 | Phase 22 | Pending |
 | PTFL-01 | Phase 23 | Pending |

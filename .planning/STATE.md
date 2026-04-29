@@ -211,6 +211,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260428-d85 | Fix FVariantsSuffixMapper::CanMap Canvas over-reject (BTN-STATE-01) | 2026-04-28 | 9c42bbb | [260428-d85-fix-fvariantssuffixmapper-canmap-line-21](./quick/260428-d85-fix-fvariantssuffixmapper-canmap-line-21/) |
+| 260429-juj | Fix text bottom overflow: WrapTextAt + AutoSize for non-stretch text slots | 2026-04-29 | b8eb7f7 | [260429-juj-fix-text-bottom-overflow-ftextlayermappe](./quick/260429-juj-fix-text-bottom-overflow-ftextlayermappe/) |
 
 ### Blockers/Concerns
 

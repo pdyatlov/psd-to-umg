@@ -109,7 +109,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 21. Parser Correctness Fixes | 3/4 | Complete    | 2026-04-29 |
-| 22. Stroke Rendering | 2/2 | Complete   | 2026-04-29 |
+| 22. Stroke Rendering | 2/2 | Complete    | 2026-04-29 |
 | 23. Pattern Fill Layers | 0/? | Not started | - |
 
 ## v1.3+ Backlog

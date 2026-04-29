@@ -298,6 +298,272 @@ void FWidgetBlueprintGenSpec::Define()
             }
         });
 
+        It("should create stroke sibling for image layers with lfx2 stroke (STROKE-01 Image)", [this]()
+        {
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(400, 400);
+            Doc.SourcePath = TEXT("C:/test/ImageStroke.psd");
+
+            FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
+            Layer.Name = TEXT("StrokedImage");
+            Layer.Type = EPsdLayerType::Image;
+            Layer.Bounds = FIntRect(50, 50, 150, 150);
+            Layer.PixelWidth = 100;
+            Layer.PixelHeight = 100;
+            Layer.RGBAPixels.SetNumZeroed(100 * 100 * 4);
+            Layer.Effects.bHasStroke = true;
+            Layer.Effects.StrokeSize = 4.f;
+            Layer.Effects.StrokeColor = FLinearColor(1.f, 0.f, 0.f, 1.f); // red
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_ImageStroke"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP) return;
+
+            UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("Root is UCanvasPanel"), Root);
+            if (!Root) return;
+
+            TestEqual(TEXT("Canvas has main + stroke sibling (2 children)"), Root->GetChildrenCount(), 2);
+            if (Root->GetChildrenCount() != 2) return;
+
+            // Identify sibling by name suffix
+            UImage* StrokeImg = nullptr;
+            UImage* MainImg = nullptr;
+            for (int32 c = 0; c < Root->GetChildrenCount(); ++c)
+            {
+                if (UImage* AsImg = Cast<UImage>(Root->GetChildAt(c)))
+                {
+                    if (AsImg->GetName().Contains(TEXT("_Stroke"))) StrokeImg = AsImg;
+                    else MainImg = AsImg;
+                }
+            }
+            TestNotNull(TEXT("Stroke UImage exists"), StrokeImg);
+            TestNotNull(TEXT("Main UImage exists"), MainImg);
+            if (!StrokeImg || !MainImg) return;
+
+            UCanvasPanelSlot* StrokeSlot = Cast<UCanvasPanelSlot>(StrokeImg->Slot);
+            UCanvasPanelSlot* MainSlot   = Cast<UCanvasPanelSlot>(MainImg->Slot);
+            TestNotNull(TEXT("StrokeSlot valid"), StrokeSlot);
+            TestNotNull(TEXT("MainSlot valid"), MainSlot);
+            if (StrokeSlot && MainSlot)
+            {
+                TestEqual(TEXT("Stroke ZOrder = main ZOrder - 1"),
+                    StrokeSlot->GetZOrder(), MainSlot->GetZOrder() - 1);
+
+                // Pitfall 6: stroke offsets are shifted Left/Top by -StrokePx and Right/Bottom by +2*StrokePx
+                FMargin MainOffsets   = MainSlot->GetLayout().Offsets;
+                FMargin StrokeOffsets = StrokeSlot->GetLayout().Offsets;
+                TestTrue(TEXT("Stroke Left = main Left - 4"),
+                    FMath::IsNearlyEqual(StrokeOffsets.Left, MainOffsets.Left - 4.f, 0.01f));
+                TestTrue(TEXT("Stroke Top = main Top - 4"),
+                    FMath::IsNearlyEqual(StrokeOffsets.Top, MainOffsets.Top - 4.f, 0.01f));
+                TestTrue(TEXT("Stroke Right = main Right + 8"),
+                    FMath::IsNearlyEqual(StrokeOffsets.Right, MainOffsets.Right + 8.f, 0.01f));
+                TestTrue(TEXT("Stroke Bottom = main Bottom + 8"),
+                    FMath::IsNearlyEqual(StrokeOffsets.Bottom, MainOffsets.Bottom + 8.f, 0.01f));
+            }
+
+            // Tint matches StrokeColor
+            FSlateBrush StrokeBrush = StrokeImg->GetBrush();
+            FLinearColor Tint = StrokeBrush.TintColor.GetSpecifiedColor();
+            TestTrue(TEXT("Stroke tint R near 1"), FMath::IsNearlyEqual(Tint.R, 1.f, 0.01f));
+            TestTrue(TEXT("Stroke tint G near 0"), FMath::IsNearlyEqual(Tint.G, 0.f, 0.01f));
+            TestTrue(TEXT("Stroke tint B near 0"), FMath::IsNearlyEqual(Tint.B, 0.f, 0.01f));
+            TestEqual(TEXT("Stroke brush DrawAs is NoDrawType"),
+                (int32)StrokeBrush.DrawAs, (int32)ESlateBrushDrawType::NoDrawType);
+        });
+
+        It("should create stroke sibling for shape layers with lfx2 stroke (STROKE-01 Shape residual)", [this]()
+        {
+            // STROKE-01 covers BOTH Image AND Shape layers carrying lfx2 bHasStroke.
+            // A Shape layer reaches the generator with bHasStroke=true ONLY when no vstk
+            // block was found (D-03 in plan 22-01 only clears bHasStroke when bHasVectorStroke
+            // is set). This synthetic test exercises that residual path: bHasStroke=true,
+            // bHasVectorStroke=false, Type=Shape -> generator MUST emit a _Stroke sibling.
+            // Without this case the bImageStroke condition would silently drop Shape layers
+            // with lfx2-only stroke (gap flagged by checker in original revision).
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(400, 400);
+            Doc.SourcePath = TEXT("C:/test/ShapeLfx2Stroke.psd");
+
+            FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
+            Layer.Name = TEXT("StrokedShapeLfx2");
+            Layer.Type = EPsdLayerType::Shape;
+            Layer.Bounds = FIntRect(80, 80, 200, 200);
+            Layer.bVisible = true;
+            // FShapeLayerMapper produces a zero-texture UImage tinted by FX-03 from ColorOverlayColor;
+            // populate that so the main widget renders cleanly.
+            Layer.Effects.bHasColorOverlay = true;
+            Layer.Effects.ColorOverlayColor = FLinearColor(0.5f, 0.5f, 0.5f, 1.f);
+            // lfx2 stroke (STROKE-01 — Shape residual case; vstk did NOT win, so bHasStroke remains)
+            Layer.Effects.bHasStroke = true;
+            Layer.Effects.StrokeSize = 2.f;
+            Layer.Effects.StrokeColor = FLinearColor(0.f, 1.f, 0.f, 1.f); // green
+            Layer.Effects.bHasVectorStroke = false; // explicit: no vstk parsed
+            Layer.Effects.VectorStrokeSize = 0.f;
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_ShapeLfx2Stroke"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP) return;
+
+            UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("Root is UCanvasPanel"), Root);
+            if (!Root) return;
+
+            TestEqual(TEXT("Shape lfx2: canvas has main + stroke sibling (2 children)"),
+                Root->GetChildrenCount(), 2);
+            if (Root->GetChildrenCount() != 2) return;
+
+            UImage* StrokeImg = nullptr;
+            UImage* MainImg = nullptr;
+            for (int32 c = 0; c < Root->GetChildrenCount(); ++c)
+            {
+                if (UImage* AsImg = Cast<UImage>(Root->GetChildAt(c)))
+                {
+                    if (AsImg->GetName().Contains(TEXT("_Stroke"))) StrokeImg = AsImg;
+                    else MainImg = AsImg;
+                }
+            }
+            TestNotNull(TEXT("Shape lfx2 stroke UImage exists (STROKE-01 residual on Shape)"), StrokeImg);
+            TestNotNull(TEXT("Shape lfx2 main UImage exists"), MainImg);
+            if (!StrokeImg || !MainImg) return;
+
+            UCanvasPanelSlot* StrokeSlot = Cast<UCanvasPanelSlot>(StrokeImg->Slot);
+            UCanvasPanelSlot* MainSlot   = Cast<UCanvasPanelSlot>(MainImg->Slot);
+            if (StrokeSlot && MainSlot)
+            {
+                TestEqual(TEXT("Shape lfx2 stroke ZOrder = main - 1"),
+                    StrokeSlot->GetZOrder(), MainSlot->GetZOrder() - 1);
+
+                // Pitfall 6 verification on the lfx2-on-Shape path
+                FMargin MainOffsets   = MainSlot->GetLayout().Offsets;
+                FMargin StrokeOffsets = StrokeSlot->GetLayout().Offsets;
+                TestTrue(TEXT("Shape lfx2 stroke Left = main Left - 2"),
+                    FMath::IsNearlyEqual(StrokeOffsets.Left, MainOffsets.Left - 2.f, 0.01f));
+                TestTrue(TEXT("Shape lfx2 stroke Right = main Right + 4"),
+                    FMath::IsNearlyEqual(StrokeOffsets.Right, MainOffsets.Right + 4.f, 0.01f));
+            }
+
+            // Tint must come from lfx2 StrokeColor (green), not VectorStrokeColor (zero)
+            FSlateBrush StrokeBrush = StrokeImg->GetBrush();
+            FLinearColor Tint = StrokeBrush.TintColor.GetSpecifiedColor();
+            TestTrue(TEXT("Shape lfx2 stroke tint R near 0"), FMath::IsNearlyEqual(Tint.R, 0.f, 0.01f));
+            TestTrue(TEXT("Shape lfx2 stroke tint G near 1 (lfx2 StrokeColor wins, not VectorStrokeColor)"),
+                FMath::IsNearlyEqual(Tint.G, 1.f, 0.01f));
+            TestTrue(TEXT("Shape lfx2 stroke tint B near 0"), FMath::IsNearlyEqual(Tint.B, 0.f, 0.01f));
+        });
+
+        It("should create stroke sibling for shape layers with vstk vector stroke (STROKE-03)", [this]()
+        {
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(400, 400);
+            Doc.SourcePath = TEXT("C:/test/ShapeStroke.psd");
+
+            FPsdLayer& Layer = Doc.RootLayers.AddDefaulted_GetRef();
+            Layer.Name = TEXT("StrokedShape");
+            Layer.Type = EPsdLayerType::Shape;
+            Layer.Bounds = FIntRect(80, 80, 200, 200);
+            Layer.bVisible = true;
+            // FShapeLayerMapper produces a zero-texture UImage tinted by FX-03 from ColorOverlayColor;
+            // populate that so the main widget renders cleanly.
+            Layer.Effects.bHasColorOverlay = true;
+            Layer.Effects.ColorOverlayColor = FLinearColor(0.5f, 0.5f, 0.5f, 1.f);
+            // Vector stroke (STROKE-03)
+            Layer.Effects.bHasVectorStroke = true;
+            Layer.Effects.VectorStrokeSize = 3.f;
+            Layer.Effects.VectorStrokeColor = FLinearColor(0.f, 0.f, 1.f, 1.f); // blue
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_ShapeStroke"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP) return;
+
+            UCanvasPanel* Root = Cast<UCanvasPanel>(WBP->WidgetTree->RootWidget);
+            TestNotNull(TEXT("Root is UCanvasPanel"), Root);
+            if (!Root) return;
+
+            TestEqual(TEXT("Canvas has main + stroke sibling (2 children)"), Root->GetChildrenCount(), 2);
+            if (Root->GetChildrenCount() != 2) return;
+
+            UImage* StrokeImg = nullptr;
+            UImage* MainImg   = nullptr;
+            for (int32 c = 0; c < Root->GetChildrenCount(); ++c)
+            {
+                if (UImage* AsImg = Cast<UImage>(Root->GetChildAt(c)))
+                {
+                    if (AsImg->GetName().Contains(TEXT("_Stroke"))) StrokeImg = AsImg;
+                    else MainImg = AsImg;
+                }
+            }
+            TestNotNull(TEXT("Shape stroke UImage exists"), StrokeImg);
+            TestNotNull(TEXT("Shape main UImage exists"), MainImg);
+            if (!StrokeImg || !MainImg) return;
+
+            UCanvasPanelSlot* StrokeSlot = Cast<UCanvasPanelSlot>(StrokeImg->Slot);
+            UCanvasPanelSlot* MainSlot   = Cast<UCanvasPanelSlot>(MainImg->Slot);
+            if (StrokeSlot && MainSlot)
+            {
+                TestEqual(TEXT("Shape stroke ZOrder = main - 1"),
+                    StrokeSlot->GetZOrder(), MainSlot->GetZOrder() - 1);
+
+                FMargin MainOffsets   = MainSlot->GetLayout().Offsets;
+                FMargin StrokeOffsets = StrokeSlot->GetLayout().Offsets;
+                TestTrue(TEXT("Shape stroke Left = main Left - 3"),
+                    FMath::IsNearlyEqual(StrokeOffsets.Left, MainOffsets.Left - 3.f, 0.01f));
+                TestTrue(TEXT("Shape stroke Right = main Right + 6"),
+                    FMath::IsNearlyEqual(StrokeOffsets.Right, MainOffsets.Right + 6.f, 0.01f));
+            }
+
+            FSlateBrush StrokeBrush = StrokeImg->GetBrush();
+            FLinearColor Tint = StrokeBrush.TintColor.GetSpecifiedColor();
+            TestTrue(TEXT("Shape stroke tint R near 0"), FMath::IsNearlyEqual(Tint.R, 0.f, 0.01f));
+            TestTrue(TEXT("Shape stroke tint G near 0"), FMath::IsNearlyEqual(Tint.G, 0.f, 0.01f));
+            TestTrue(TEXT("Shape stroke tint B near 1"), FMath::IsNearlyEqual(Tint.B, 1.f, 0.01f));
+        });
+
+        It("should NOT create stroke sibling on non-canvas parent (image lfx2 stroke inside @vbox)", [this]()
+        {
+            // Mirrors the FX-04 GroupShadowNonCanvas test (lines 831-880): stroke sibling pattern
+            // is canvas-only. Inside a UVerticalBox parent the generator must emit no _Stroke widget.
+            FPsdDocument Doc;
+            Doc.CanvasSize = FIntPoint(400, 400);
+            Doc.SourcePath = TEXT("C:/test/ImageStrokeNonCanvas.psd");
+
+            // Outer @vbox group (maps to UVerticalBox)
+            FPsdLayer& OuterLayer = Doc.RootLayers.AddDefaulted_GetRef();
+            OuterLayer.Name = TEXT("Container @vbox");
+            OuterLayer.Type = EPsdLayerType::Group;
+            OuterLayer.Bounds = FIntRect(0, 0, 400, 400);
+            OuterLayer.bVisible = true;
+
+            // Inner image with lfx2 stroke
+            FPsdLayer& InnerLayer = OuterLayer.Children.AddDefaulted_GetRef();
+            InnerLayer.Name = TEXT("InnerStroked");
+            InnerLayer.Type = EPsdLayerType::Image;
+            InnerLayer.Bounds = FIntRect(10, 10, 100, 100);
+            InnerLayer.PixelWidth = 90;
+            InnerLayer.PixelHeight = 90;
+            InnerLayer.RGBAPixels.SetNumZeroed(90 * 90 * 4);
+            InnerLayer.bVisible = true;
+            InnerLayer.Effects.bHasStroke = true;
+            InnerLayer.Effects.StrokeSize = 2.f;
+            InnerLayer.Effects.StrokeColor = FLinearColor(0.f, 1.f, 0.f, 1.f);
+
+            AddExpectedError(TEXT("Stroke on .* layer .* inside non-canvas parent"),
+                EAutomationExpectedErrorFlags::Contains, 0);
+
+            UWidgetBlueprint* WBP = GenerateTracked(Doc, TEXT("/Game/_Test/WBPGen"), TEXT("WBP_ImageStrokeNonCanvas"));
+            TestNotNull(TEXT("WBP created"), WBP);
+            if (!WBP) return;
+
+            // Walk the entire widget tree; assert no widget name contains "_Stroke".
+            int32 StrokeWidgetCount = 0;
+            WBP->WidgetTree->ForEachWidget([&](UWidget* W)
+            {
+                if (W && W->GetName().Contains(TEXT("_Stroke"))) ++StrokeWidgetCount;
+            });
+            TestEqual(TEXT("No _Stroke widget anywhere in tree"), StrokeWidgetCount, 0);
+        });
+
         It("should assign ZOrder inversely from layer index", [this]()
         {
             FPsdDocument Doc;

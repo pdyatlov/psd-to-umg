@@ -186,6 +186,8 @@ static void PopulateChildren(
 
                     VBoxSlot->SetSize(Size);
                 }
+                VBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+                VBoxSlot->SetVerticalAlignment(VAlign_Center);
             }
             else if (UHorizontalBoxSlot* HBoxSlot = Cast<UHorizontalBoxSlot>(Slot))
             {
@@ -198,6 +200,8 @@ static void PopulateChildren(
 
                     HBoxSlot->SetSize(Size);
                 }
+                HBoxSlot->SetHorizontalAlignment(HAlign_Fill);
+                HBoxSlot->SetVerticalAlignment(VAlign_Center);
             }
         }
         if (!Slot) { continue; }
@@ -367,6 +371,94 @@ static void PopulateChildren(
                     TEXT("Drop shadow on layer '%s' (type=%d) — no-op (per D-08)."),
                     *LayerPtr->Name, static_cast<int32>(LayerPtr->Type));
             }
+
+            // FX-06: Stroke sibling — canvas-only sibling UImage (STROKE-01 / STROKE-03)
+            // STROKE-01: Image OR Shape layers with lfx2 bHasStroke (populated by ExtractLfx2Stroke
+            //            since Phase 4.1). REQUIREMENTS.md says "Image/shape layers with lfx2 bHasStroke"
+            //            so BOTH EPsdLayerType::Image AND EPsdLayerType::Shape qualify under this branch.
+            //            A Shape layer reaches this branch with bHasStroke=true ONLY when no vstk block
+            //            was found (D-03 only clears bHasStroke when bHasVectorStroke is set), so the
+            //            STROKE-01 lfx2-on-Shape residual path is correctly handled here.
+            // STROKE-03: Shape layers with vstk bHasVectorStroke (populated by ScanVstkStroke in Plan 22-01).
+            // D-02: always a sibling UImage with NoDrawType brush — no DrawType::Border, no texture.
+            // D-03: parser cleared bHasStroke on Shape layers when bHasVectorStroke was set, so the two
+            //       conditions are mutually exclusive PER SHAPE LAYER — the OR never double-emits.
+            // Pitfall 5: this block is FX-06; line 107's // FX-05: Flatten fallback comment is unchanged.
+            // Pitfall 6: in non-stretch canvas slots Offsets.Right and Offsets.Bottom encode Width
+            //            and Height — both must be expanded by 2*StrokePx in addition to shifting
+            //            Offsets.Left and Offsets.Top by -StrokePx, otherwise the sibling renders at
+            //            the original size, displaced.
+            const bool bImageStroke = LayerPtr->Effects.bHasStroke
+                && (LayerPtr->Type == EPsdLayerType::Image
+                    || LayerPtr->Type == EPsdLayerType::Shape);
+            const bool bShapeStroke = LayerPtr->Effects.bHasVectorStroke
+                && LayerPtr->Type == EPsdLayerType::Shape;
+
+            if (bImageStroke || bShapeStroke)
+            {
+                // bShapeStroke (vstk) takes precedence over bImageStroke (lfx2) when both
+                // happen to be set on the same Shape layer. In practice the parser's D-03
+                // guard already cleared bHasStroke when bHasVectorStroke was set, so on a
+                // real Shape layer at most one path is true. This conditional is a defence
+                // -in-depth guarantee that ONE sibling is emitted per layer regardless.
+                const FLinearColor StrokeColor = bShapeStroke
+                    ? LayerPtr->Effects.VectorStrokeColor
+                    : LayerPtr->Effects.StrokeColor;
+                const float StrokePx = bShapeStroke
+                    ? LayerPtr->Effects.VectorStrokeSize
+                    : LayerPtr->Effects.StrokeSize;
+
+                // Skip degenerate strokes (zero width or fully transparent — nothing to render).
+                if (StrokePx > 0.f && StrokeColor.A > 0.f)
+                {
+                    const FString StrokeBaseName = !LayerPtr->ParsedTags.CleanName.IsEmpty()
+                        ? LayerPtr->ParsedTags.CleanName
+                        : LayerPtr->Name;
+                    const FName StrokeFName = MakeUniqueObjectName(
+                        Tree, UImage::StaticClass(),
+                        FName(*FString::Printf(TEXT("%s_Stroke"), *StrokeBaseName)));
+                    UImage* StrokeImg = Tree->ConstructWidget<UImage>(UImage::StaticClass(), StrokeFName);
+
+                    FSlateBrush StrokeBrush;
+                    StrokeBrush.DrawAs = ESlateBrushDrawType::NoDrawType; // D-02: no texture
+                    StrokeBrush.TintColor = FSlateColor(StrokeColor);
+                    StrokeBrush.ImageSize = FVector2D(
+                        static_cast<float>(LayerPtr->Bounds.Width())  + 2.f * StrokePx,
+                        static_cast<float>(LayerPtr->Bounds.Height()) + 2.f * StrokePx);
+                    StrokeImg->SetBrush(StrokeBrush);
+                    StrokeImg->SetRenderOpacity(StrokeColor.A);
+
+                    UCanvasPanelSlot* StrokeSlot = CanvasParent->AddChildToCanvas(StrokeImg);
+                    if (StrokeSlot)
+                    {
+                        FAnchorData StrokeData;
+                        StrokeData.Anchors = CanvasSlot->GetLayout().Anchors;
+                        FMargin StrokeOffsets = CanvasSlot->GetLayout().Offsets;
+                        // Pitfall 6: shift Left/Top AND expand Right/Bottom (which encode W/H in non-stretch).
+                        StrokeOffsets.Left   -= StrokePx;
+                        StrokeOffsets.Top    -= StrokePx;
+                        StrokeOffsets.Right  += 2.f * StrokePx;
+                        StrokeOffsets.Bottom += 2.f * StrokePx;
+                        StrokeData.Offsets = StrokeOffsets;
+                        StrokeData.Alignment = CanvasSlot->GetLayout().Alignment;
+                        StrokeSlot->SetLayout(StrokeData);
+                        // ZOrder = main - 1 (behind main widget; mirrors FX-04 drop shadow)
+                        StrokeSlot->SetZOrder(CanvasSlot->GetZOrder() - 1);
+
+                        UE_LOG(LogPSD2UMG, Log,
+                            TEXT("FX-06 stroke sibling for layer '%s' (type=%d): StrokePx=%.2f tint=(%.2f,%.2f,%.2f,%.2f) ZOrder=%d"),
+                            *LayerPtr->Name, static_cast<int32>(LayerPtr->Type),
+                            StrokePx, StrokeColor.R, StrokeColor.G, StrokeColor.B, StrokeColor.A,
+                            StrokeSlot->GetZOrder());
+                    }
+                }
+                else
+                {
+                    UE_LOG(LogPSD2UMG, Verbose,
+                        TEXT("FX-06 stroke skipped for layer '%s': degenerate StrokePx=%.2f StrokeColor.A=%.2f"),
+                        *LayerPtr->Name, StrokePx, StrokeColor.A);
+                }
+            }
         } // end canvas-only block
 
         // ---- Drop-shadow skip warning for non-canvas parents (D-03 / Pitfall 4) ----
@@ -378,6 +470,27 @@ static void PopulateChildren(
                 TEXT("Drop shadow on %s layer '%s' inside non-canvas parent '%s' — no-op (canvas-only sibling pattern)."),
                 LayerPtr->Type == EPsdLayerType::Group ? TEXT("group") : TEXT("image"),
                 *LayerPtr->Name, *Parent->GetName());
+        }
+
+        // ---- FX-06 stroke skip warning for non-canvas parents (mirror of FX-04 D-03 / Pitfall 4) ----
+        // STROKE-01/STROKE-03: stroke sibling pattern is canvas-only. Inside a non-canvas parent
+        // (UVerticalBox, UHorizontalBox, UScrollBox, etc.) we cannot place a free-floating sibling
+        // at a sized + offset slot, so we emit a warning and skip — mirroring the FX-04 drop-shadow
+        // non-canvas behaviour.
+        if (!CanvasParent)
+        {
+            const bool bImageStrokeNoCanvas = LayerPtr->Effects.bHasStroke
+                && (LayerPtr->Type == EPsdLayerType::Image
+                    || LayerPtr->Type == EPsdLayerType::Shape);
+            const bool bShapeStrokeNoCanvas = LayerPtr->Effects.bHasVectorStroke
+                && LayerPtr->Type == EPsdLayerType::Shape;
+            if (bImageStrokeNoCanvas || bShapeStrokeNoCanvas)
+            {
+                UE_LOG(LogPSD2UMG, Warning,
+                    TEXT("Stroke on %s layer '%s' inside non-canvas parent '%s' — no-op (canvas-only sibling pattern)."),
+                    bShapeStrokeNoCanvas ? TEXT("shape-vstk") : TEXT("image-or-shape-lfx2"),
+                    *LayerPtr->Name, *Parent->GetName());
+            }
         }
 
         // ---- Phase 5: Layer Effects — operate on Widget directly, independent of parent type ----

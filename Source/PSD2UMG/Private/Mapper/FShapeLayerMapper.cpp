@@ -9,8 +9,9 @@
 // Semantically distinct from FSolidFillLayerMapper (D-03): SolidFill =
 // AdjustmentLayer with SoCo tagged block (a fill layer). Shape = ShapeLayer
 // (Rectangle/Ellipse/Pen tool) with vscg tagged block carrying
-// Type==solidColorLayer (a drawn vector shape). Future stroke rendering
-// (vstk -> UMG border/outline) will attach here, not in FSolidFillLayerMapper.
+// Type==solidColorLayer (a drawn vector shape). Stroke rendering (vstk) is
+// emitted by FWidgetBlueprintGenerator's FX-06 stroke-sibling block (Phase 22
+// STROKE-03, D-01) — NOT in this mapper.
 
 #include "Mapper/AllMappers.h"
 #include "Parser/PsdTypes.h"

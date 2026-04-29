@@ -285,6 +285,26 @@ static void PopulateChildren(
             }
 
             CanvasSlot->SetLayout(Data);
+
+            // TXT-OVERFLOW-01 — AutoSize for non-stretch text canvas slots.
+            // PhotoshopAPI layer bounds are tight visual pixel bounds; Slate's line
+            // height (font metrics + leading) is typically taller.  SetAutoSize(true)
+            // tells the canvas slot to use UTextBlock's desired size (driven by Slate
+            // font metrics) rather than the Offsets.Right/Bottom values we set above.
+            //
+            //   Point text:     desired = content_width × font_line_height
+            //   Paragraph text: desired = BoxWidthPx    × wrapped_text_height
+            //                   (WrapTextAt set by FTextLayerMapper Task 1)
+            //
+            // Stretch-anchored slots already derive size from margin math; applying
+            // AutoSize there would break the fill behaviour — guard is required.
+            if (LayerPtr->Type == EPsdLayerType::Text
+                && !AnchorResult.bStretchH
+                && !AnchorResult.bStretchV)
+            {
+                CanvasSlot->SetAutoSize(true);
+            }
+
             // ZOrder: PSD index 0 = topmost. UMG higher = on top. Invert.
             CanvasSlot->SetZOrder(TotalLayers - 1 - i);
 

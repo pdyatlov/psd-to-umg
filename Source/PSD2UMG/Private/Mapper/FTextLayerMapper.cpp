@@ -109,9 +109,16 @@ UWidget* FTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /*Doc
         TextWidget->SetFont(OutlineInfo);
     }
 
-    // TEXT-06 — AutoWrapText on paragraph (box) text only. Point text layers keep
-    // wrap disabled so short button/title labels never wrap unexpectedly.
-    TextWidget->SetAutoWrapText(Layer.Text.bHasExplicitWidth);
+    // TEXT-06 — paragraph (box) text: wrap at the designer's explicit width.
+    // SetWrapTextAt supplies a fixed pixel wrap boundary that functions correctly
+    // when the canvas slot uses AutoSize=true (see FWidgetBlueprintGenerator).
+    // SetAutoWrapText is NOT used because it relies on the slot width, which
+    // becomes undefined once AutoSize=true.  Point text (bHasExplicitWidth=false)
+    // leaves WrapTextAt at 0 (no wrap), matching pre-fix behaviour.
+    if (Layer.Text.bHasExplicitWidth && Layer.Text.BoxWidthPx > 0.f)
+    {
+        TextWidget->SetWrapTextAt(Layer.Text.BoxWidthPx);
+    }
 
     // TEXT-04 — drop shadow via UTextBlock native API (D-08).
     // DPI conversion (x0.75) applied here to match the outline pattern above (D-09 Option B).

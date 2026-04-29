@@ -60,7 +60,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 
 ### v1.3 Advanced Effects (Phases 21-23)
 
-- [ ] **Phase 21: Parser Correctness Fixes** — Fix Utf8ToFString null-sentinel, lrFX ColorSpace branch, VlLs format branch, and human UAT sign-off
+- [x] **Phase 21: Parser Correctness Fixes** — Fix Utf8ToFString null-sentinel, lrFX ColorSpace branch, VlLs format branch, and human UAT sign-off (completed 2026-04-29)
 - [ ] **Phase 22: Stroke Rendering** — Parse vstk vector stroke data and emit stroke sibling UImage for image and shape layers
 - [ ] **Phase 23: Pattern Fill Layers** — Detect and map adjPattern tagged blocks to UImage via composited RGBAPixels
 
@@ -106,7 +106,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 21. Parser Correctness Fixes | 3/4 | In Progress|  |
+| 21. Parser Correctness Fixes | 3/4 | Complete    | 2026-04-29 |
 | 22. Stroke Rendering | 0/? | Not started | - |
 | 23. Pattern Fill Layers | 0/? | Not started | - |
 

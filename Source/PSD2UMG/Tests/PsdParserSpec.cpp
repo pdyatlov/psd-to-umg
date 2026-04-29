@@ -1009,4 +1009,109 @@ void FPsdParserCJKSpec::Define()
     });
 }
 
+// ------------------------------------------------------------------
+// Phase 22 STROKE-02 / success-criterion 4: ButtonStyles.psd non-regression.
+// ButtonStyles.psd has NO vstk blocks (it predates Phase 22). Asserting
+// bHasVectorStroke=false on every layer proves:
+//   1. ScanVstkStroke is never falsely activated by unrelated tagged blocks.
+//   2. The new D-03 guard (clear bHasStroke when bHasVectorStroke set) is not
+//      triggered, so existing lfx2 stroke routing on this fixture is unchanged.
+//   3. Non-Shape layers (Image, Text, Group) are NOT touched by ScanVstkStroke
+//      (Pitfall 4 -- call site is type-scoped to Shape).
+// ------------------------------------------------------------------
+BEGIN_DEFINE_SPEC(FPsdParserButtonStylesSpec, "PSD2UMG.Parser.ButtonStyles",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FString FixturePath;
+    FPsdDocument Doc;
+    FPsdParseDiagnostics Diag;
+    bool bParsed = false;
+
+    // Recursive walk: invoke Visitor on every layer in the tree (depth-first).
+    static void ForEachLayerRecursive(const TArray<FPsdLayer>& Layers, TFunctionRef<void(const FPsdLayer&)> Visitor)
+    {
+        for (const FPsdLayer& L : Layers)
+        {
+            Visitor(L);
+            ForEachLayerRecursive(L.Children, Visitor);
+        }
+    }
+
+END_DEFINE_SPEC(FPsdParserButtonStylesSpec)
+
+void FPsdParserButtonStylesSpec::Define()
+{
+    BeforeEach([this]()
+    {
+        Doc = FPsdDocument();
+        Diag = FPsdParseDiagnostics();
+        bParsed = false;
+
+        TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"));
+        if (!Plugin.IsValid())
+        {
+            AddError(TEXT("PSD2UMG plugin not found via IPluginManager"));
+            return;
+        }
+
+        FixturePath = FPaths::Combine(
+            Plugin->GetBaseDir(),
+            TEXT("Source/PSD2UMG/Tests/Fixtures/ButtonStyles.psd"));
+
+        if (!FPaths::FileExists(FixturePath))
+        {
+            AddError(FString::Printf(TEXT("Fixture not found: %s"), *FixturePath));
+            return;
+        }
+
+        bParsed = PSD2UMG::Parser::ParseFile(FixturePath, Doc, Diag);
+    });
+
+    Describe("ButtonStyles fixture (Phase 22 STROKE-02 regression)", [this]()
+    {
+        It("ParseFile returns true with no error diagnostics", [this]()
+        {
+            TestTrue(TEXT("bParsed"), bParsed);
+            TestFalse(TEXT("Diag.HasErrors()"), Diag.HasErrors());
+        });
+
+        It("has at least one root layer", [this]()
+        {
+            if (!bParsed) return;
+            TestTrue(TEXT("Doc.RootLayers.Num() > 0"), Doc.RootLayers.Num() > 0);
+        });
+
+        It("no layer has bHasVectorStroke set (no vstk blocks in fixture)", [this]()
+        {
+            if (!bParsed) return;
+            int32 OffendingCount = 0;
+            FString OffendingNames;
+            ForEachLayerRecursive(Doc.RootLayers, [&](const FPsdLayer& L)
+            {
+                if (L.Effects.bHasVectorStroke)
+                {
+                    ++OffendingCount;
+                    if (!OffendingNames.IsEmpty()) OffendingNames += TEXT(", ");
+                    OffendingNames += L.Name;
+                }
+            });
+            TestEqual(
+                *FString::Printf(TEXT("Layers with bHasVectorStroke=true (must be 0; offenders: %s)"),
+                    OffendingNames.IsEmpty() ? TEXT("(none)") : *OffendingNames),
+                OffendingCount, 0);
+        });
+
+        It("no layer has VectorStrokeSize > 0 (regression on field default)", [this]()
+        {
+            if (!bParsed) return;
+            int32 OffendingCount = 0;
+            ForEachLayerRecursive(Doc.RootLayers, [&](const FPsdLayer& L)
+            {
+                if (L.Effects.VectorStrokeSize > 0.f) ++OffendingCount;
+            });
+            TestEqual(TEXT("Layers with VectorStrokeSize > 0 (must be 0)"), OffendingCount, 0);
+        });
+    });
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

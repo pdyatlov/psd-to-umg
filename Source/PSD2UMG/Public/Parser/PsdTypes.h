@@ -77,6 +77,7 @@ struct PSD2UMG_API FPsdTextRun
 	// Phase 4 additions -- layout
 	bool bHasExplicitWidth = false;
 	float BoxWidthPx = 0.f;
+	float BoxHeightPx = 0.f;
 
 	// Phase 4 additions -- outline (best-effort; zero when not present)
 	FLinearColor OutlineColor = FLinearColor::Transparent;
@@ -114,11 +115,20 @@ struct PSD2UMG_API FPsdLayerEffects
 	bool bHasComplexEffects = false;
 
 	// Phase 4.1 TEXT-03 -- Layer-Style Stroke (from lfx2/FrFX descriptor).
-	// D-02: populated for ALL layer types; rendering on non-text is deferred to a future phase.
+	// D-02: populated for ALL layer types; rendering on non-text emitted by FWidgetBlueprintGenerator FX-06 stroke block (Phase 22 STROKE-01).
 	// Units: raw PSD pixels (DPI applied by FTextLayerMapper -- Option B per D-09).
 	bool bHasStroke = false;
 	FLinearColor StrokeColor = FLinearColor::Transparent;
 	float StrokeSize = 0.f;
+
+	// Phase 22 STROKE-02 -- Vector Shape Stroke (from vstk/vecStrokeData tagged block).
+	// CP-02: separate fields; must NOT alias bHasStroke/StrokeSize/StrokeColor.
+	// Populated by ScanVstkStroke for EPsdLayerType::Shape layers only (D-03 type guard).
+	// D-03: when bHasVectorStroke is set, ConvertLayerRecursive clears bHasStroke so the
+	// generator never sees both flags simultaneously on a Shape layer (vstk wins).
+	bool bHasVectorStroke = false;
+	float VectorStrokeSize = 0.f;
+	FLinearColor VectorStrokeColor = FLinearColor::Transparent;
 };
 
 /**

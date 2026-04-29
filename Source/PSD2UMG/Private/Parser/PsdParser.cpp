@@ -1660,6 +1660,275 @@ namespace PSD2UMG::Parser::Internal
 		return false; // vscg block not present in this layer
 	}
 
+	/**
+	 * Phase 22 STROKE-02: scan the vstk (vecStrokeData) tagged block for a vector
+	 * stroke descriptor. Called only for ShapeLayer-typed layers (Pitfall 4 guard
+	 * at call site). Writes bHasVectorStroke / VectorStrokeSize / VectorStrokeColor
+	 * to OutLayer.Effects on success; returns false otherwise (no field mutation).
+	 *
+	 * CP-01: descriptor begins at byte offset 0 of Block->m_Data — no class-ID or
+	 * version prefix (PhotoshopAPI vendored headers strip the version=16 wrapper
+	 * before exposing m_Data). TryParseAt(0) is primary; (4) and (8) are defensive
+	 * fallbacks. This differs from ScanShapeFillColor (vscg primary at offset 8)
+	 * and ScanSolidFillColor (SoCo primary at offset 4).
+	 *
+	 * CP-02: writes ONLY to bHasVectorStroke / VectorStrokeSize / VectorStrokeColor.
+	 * Never writes to bHasStroke / StrokeSize / StrokeColor (those are owned by
+	 * ExtractLfx2Stroke).
+	 *
+	 * Long-form keys (RESEARCH Pitfall 3): vstk uses "strokeEnabled",
+	 * "strokeStyleLineWidth", "strokeStyleContent" (not 4-char FrFX-style keys).
+	 * ReadPsString returns the full std::string for keys with Len > 0, so direct
+	 * == comparison works.
+	 */
+	static bool ScanVstkStroke(
+		const std::shared_ptr<PsdLayer>& InLayer,
+		FPsdLayer& OutLayer,
+		FPsdParseDiagnostics& OutDiag)
+	{
+		for (const auto& Block : InLayer->unparsed_tagged_blocks())
+		{
+			if (!Block || Block->getKey() != NAMESPACE_PSAPI::Enum::TaggedBlockKey::vecStrokeData)
+				continue;
+
+			const auto& Data = Block->m_Data;
+			if (Data.size() < 16)
+			{
+				OutDiag.AddWarning(OutLayer.Name,
+					TEXT("vstk block too small to contain a descriptor; skipping."));
+				return false;
+			}
+
+			// Verbose hex-dump diagnostic (mirror of ScanShapeFillColor lines 1456-1461).
+			{
+				FString Hex;
+				const size_t DumpLen = FMath::Min<size_t>(Data.size(), 40);
+				for (size_t i = 0; i < DumpLen; ++i)
+				{
+					Hex += FString::Printf(TEXT("%02X "), std::to_integer<uint8>(Data[i]));
+				}
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Layer '%s' vstk payload[0..%zu]= %s"),
+					*OutLayer.Name, DumpLen, *Hex);
+			}
+
+			auto TryParseAt = [&](size_t StartPos) -> bool
+			{
+				size_t Pos = StartPos;
+
+				auto CheckRemaining = [&](size_t Need) -> bool {
+					return (Pos + Need) <= Data.size();
+				};
+				auto ReadU8 = [&]() -> uint8 {
+					if (!CheckRemaining(1)) return 0;
+					uint8 V = std::to_integer<uint8>(Data[Pos]);
+					Pos += 1;
+					return V;
+				};
+				auto ReadU32BE = [&]() -> uint32 {
+					if (!CheckRemaining(4)) return 0;
+					uint32 V = (std::to_integer<uint32>(Data[Pos])   << 24)
+					         | (std::to_integer<uint32>(Data[Pos+1]) << 16)
+					         | (std::to_integer<uint32>(Data[Pos+2]) << 8)
+					         |  std::to_integer<uint32>(Data[Pos+3]);
+					Pos += 4;
+					return V;
+				};
+				auto ReadDoubleBE = [&]() -> double {
+					if (!CheckRemaining(8)) return 0.0;
+					uint8 Buf[8];
+					for (int i = 0; i < 8; ++i) Buf[i] = std::to_integer<uint8>(Data[Pos + i]);
+					Pos += 8;
+					uint8 Rev[8] = { Buf[7], Buf[6], Buf[5], Buf[4], Buf[3], Buf[2], Buf[1], Buf[0] };
+					double V;
+					FMemory::Memcpy(&V, Rev, 8);
+					return V;
+				};
+				auto ReadPsString = [&]() -> std::string {
+					uint32 Len = ReadU32BE();
+					if (Len == 0)
+					{
+						if (!CheckRemaining(4)) return {};
+						char Tag[5] = {};
+						for (int i = 0; i < 4; ++i) Tag[i] = std::to_integer<char>(Data[Pos + i]);
+						Pos += 4;
+						return std::string(Tag);
+					}
+					if (!CheckRemaining(Len)) return {};
+					std::string S;
+					S.resize(Len);
+					for (uint32 i = 0; i < Len; ++i) S[i] = std::to_integer<char>(Data[Pos + i]);
+					Pos += Len;
+					return S;
+				};
+				auto SkipUnicodeString = [&]() {
+					uint32 Len = ReadU32BE();
+					Pos += Len * 2;
+				};
+				auto ReadOsType = [&](char OutOsType[5]) -> bool {
+					if (!CheckRemaining(4)) return false;
+					for (int k = 0; k < 4; ++k) OutOsType[k] = std::to_integer<char>(Data[Pos + k]);
+					OutOsType[4] = '\0';
+					Pos += 4;
+					return true;
+				};
+
+				std::function<void(const char*)> SkipValueAfterOsType;
+				SkipValueAfterOsType = [&](const char* OsType) {
+					if (FCStringAnsi::Strcmp(OsType, "bool") == 0) { Pos += 1; }
+					else if (FCStringAnsi::Strcmp(OsType, "long") == 0) { Pos += 4; }
+					else if (FCStringAnsi::Strcmp(OsType, "doub") == 0) { Pos += 8; }
+					else if (FCStringAnsi::Strcmp(OsType, "UntF") == 0) { Pos += 12; }
+					else if (FCStringAnsi::Strcmp(OsType, "enum") == 0) { ReadPsString(); ReadPsString(); }
+					else if (FCStringAnsi::Strcmp(OsType, "TEXT") == 0) { uint32 Len = ReadU32BE(); Pos += Len * 2; }
+					else if (FCStringAnsi::Strcmp(OsType, "tdta") == 0) { uint32 Len = ReadU32BE(); Pos += Len; }
+					else if (FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					{
+						SkipUnicodeString();
+						ReadPsString();
+						uint32 Count = ReadU32BE();
+						for (uint32 i = 0; i < Count && CheckRemaining(8); ++i)
+						{
+							ReadPsString();
+							char OT2[5] = {};
+							if (!ReadOsType(OT2)) break;
+							SkipValueAfterOsType(OT2);
+						}
+					}
+					else if (FCStringAnsi::Strcmp(OsType, "VlLs") == 0)
+					{
+						uint32 N = ReadU32BE();
+						for (uint32 i = 0; i < N && CheckRemaining(4); ++i)
+						{
+							char OT2[5] = {};
+							if (!ReadOsType(OT2)) break;
+							SkipValueAfterOsType(OT2);
+						}
+					}
+					else
+					{
+						UE_LOG(LogPSD2UMG, Verbose,
+							TEXT("ScanVstkStroke: unknown ostype '%.4hs' at pos %zu; aborting"),
+							OsType, Pos);
+						Pos = Data.size();
+					}
+				};
+
+				// Top-level descriptor header: unicode_class_name, ps_string classID, uint32 item_count.
+				SkipUnicodeString();
+				ReadPsString();
+				uint32 TopCount = ReadU32BE();
+
+				if (TopCount == 0 || TopCount > 256) return false;
+
+				bool bEnabled = false;
+				double SzRaw = 0.0;
+				bool bFoundColor = false;
+				double Rd = 0.0, Grn = 0.0, Bl = 0.0;
+
+				for (uint32 i = 0; i < TopCount && CheckRemaining(8); ++i)
+				{
+					std::string ItemKey = ReadPsString();
+					char OsType[5] = {};
+					if (!ReadOsType(OsType)) break;
+
+					if (ItemKey == "strokeEnabled" && FCStringAnsi::Strcmp(OsType, "bool") == 0)
+					{
+						bEnabled = (ReadU8() != 0);
+					}
+					else if (ItemKey == "strokeStyleLineWidth" && FCStringAnsi::Strcmp(OsType, "UntF") == 0)
+					{
+						// MiP-01: skip 4-byte unit tag (#Pnt or #Pxl); treat 1pt = 1px (72 DPI assumption,
+						// matches existing ParseFrFXObjcItem behaviour).
+						Pos += 4;
+						SzRaw = ReadDoubleBE();
+					}
+					else if (ItemKey == "strokeStyleContent" && FCStringAnsi::Strcmp(OsType, "Objc") == 0)
+					{
+						// Sub-descriptor: header then item list. Look for "Clr "/"FlCl" Objc with RGBC body.
+						SkipUnicodeString();
+						ReadPsString();
+						uint32 ContentCount = ReadU32BE();
+						for (uint32 j = 0; j < ContentCount && CheckRemaining(8); ++j)
+						{
+							std::string CKey = ReadPsString();
+							char COT[5] = {};
+							if (!ReadOsType(COT)) break;
+
+							if ((CKey == "Clr " || CKey == "FlCl")
+							      && FCStringAnsi::Strcmp(COT, "Objc") == 0)
+							{
+								SkipUnicodeString();
+								ReadPsString(); // "RGBC" classID
+								uint32 ClrCount = ReadU32BE();
+								for (uint32 c = 0; c < ClrCount && CheckRemaining(8); ++c)
+								{
+									std::string ClrKey = ReadPsString();
+									char CCOT[5] = {};
+									if (!ReadOsType(CCOT)) break;
+
+									if (FCStringAnsi::Strcmp(CCOT, "doub") == 0)
+									{
+										double V = ReadDoubleBE();
+										// Named-key assignment ONLY -- no ARGB swizzle (mirror ScanShapeFillColor).
+										if (ClrKey == "Rd  ") Rd = V;
+										else if (ClrKey == "Grn ") Grn = V;
+										else if (ClrKey == "Bl  ") Bl = V;
+									}
+									else
+									{
+										SkipValueAfterOsType(CCOT);
+									}
+								}
+								bFoundColor = true;
+							}
+							else
+							{
+								SkipValueAfterOsType(COT);
+							}
+						}
+					}
+					else
+					{
+						SkipValueAfterOsType(OsType);
+					}
+				}
+
+				if (!bEnabled || !bFoundColor)
+				{
+					UE_LOG(LogPSD2UMG, Verbose,
+						TEXT("ScanVstkStroke: vstk at startPos=%zu missing strokeEnabled or color (Enabled=%d Color=%d); reject"),
+						StartPos, bEnabled ? 1 : 0, bFoundColor ? 1 : 0);
+					return false;
+				}
+
+				const uint8 R8 = static_cast<uint8>(FMath::Clamp(Rd,  0.0, 255.0));
+				const uint8 G8 = static_cast<uint8>(FMath::Clamp(Grn, 0.0, 255.0));
+				const uint8 B8 = static_cast<uint8>(FMath::Clamp(Bl,  0.0, 255.0));
+				OutLayer.Effects.bHasVectorStroke = true;
+				OutLayer.Effects.VectorStrokeSize = static_cast<float>(SzRaw);
+				OutLayer.Effects.VectorStrokeColor = FLinearColor::FromSRGBColor(FColor(R8, G8, B8, 255));
+
+				UE_LOG(LogPSD2UMG, Verbose,
+					TEXT("Layer '%s' vstk parsed at startPos=%zu: SzPx=%.2f R=%.1f G=%.1f B=%.1f"),
+					*OutLayer.Name, StartPos, SzRaw, Rd, Grn, Bl);
+				return true;
+			};
+
+			// CP-01: descriptor at offset 0 is primary for vstk (PhotoshopAPI strips the
+			// version=16 prefix). Try (4) and (8) as defensive fallbacks for any future
+			// PhotoshopAPI version that exposes the raw payload.
+			if (TryParseAt(0)) return true;
+			if (TryParseAt(4)) return true;
+			if (TryParseAt(8)) return true;
+
+			OutDiag.AddWarning(OutLayer.Name,
+				TEXT("vstk descriptor parse failed at offsets 0, 4, and 8; vector stroke not extracted."));
+			return false; // only one vstk block per layer
+		}
+		return false; // vstk block not present in this layer
+	}
+
 	// ---------------------------------------------------------------------------
 	// Raw PSD lfx2 scanner
 	//
@@ -2029,6 +2298,16 @@ namespace PSD2UMG::Parser::Internal
 				// 14-03) produces a zero-texture UImage and FX-03 tints it.
 				OutLayer.Type = EPsdLayerType::Shape;
 				DispatchTag = TEXT("Shape");
+
+				// Phase 22 STROKE-02: scan vstk for vector stroke on shape layers.
+				// Pitfall 4: must be called AFTER Type=Shape is set (D-03 guard is type-conditional).
+				ScanVstkStroke(InLayer, OutLayer, OutDiag);
+				if (OutLayer.Effects.bHasVectorStroke)
+				{
+					// D-03: vstk wins; clear lfx2 stroke so the generator never sees both
+					// bHasStroke and bHasVectorStroke simultaneously on a Shape layer.
+					OutLayer.Effects.bHasStroke = false;
+				}
 			}
 			else
 			{

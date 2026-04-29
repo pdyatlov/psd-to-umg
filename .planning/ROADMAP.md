@@ -61,7 +61,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 ### v1.3 Advanced Effects (Phases 21-23)
 
 - [x] **Phase 21: Parser Correctness Fixes** — Fix Utf8ToFString null-sentinel, lrFX ColorSpace branch, VlLs format branch, and human UAT sign-off (completed 2026-04-29)
-- [ ] **Phase 22: Stroke Rendering** — Parse vstk vector stroke data and emit stroke sibling UImage for image and shape layers
+- [x] **Phase 22: Stroke Rendering** — Parse vstk vector stroke data and emit stroke sibling UImage for image and shape layers (completed 2026-04-29)
 - [ ] **Phase 23: Pattern Fill Layers** — Detect and map adjPattern tagged blocks to UImage via composited RGBAPixels
 
 ## Phase Details
@@ -92,7 +92,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
   4. Importing the existing ButtonStyles.psd fixture produces no regression on non-stroke layers
 **Plans**: 2 plans
 - [x] 22-01-PLAN.md — STROKE-02 ScanVstkStroke parser + new FPsdLayerEffects fields + ButtonStyles.psd regression spec (Wave 1)
-- [ ] 22-02-PLAN.md — STROKE-01 + STROKE-03 FX-06 stroke sibling block in FWidgetBlueprintGenerator + 3 generator specs (Wave 2)
+- [x] 22-02-PLAN.md — STROKE-01 + STROKE-03 FX-06 stroke sibling block in FWidgetBlueprintGenerator + 3 generator specs (Wave 2)
 
 ### Phase 23: Pattern Fill Layers
 **Goal**: Pattern fill adjustment layers are imported as UImage widgets backed by the layer's composited pixel data rather than silently skipped
@@ -109,7 +109,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 21. Parser Correctness Fixes | 3/4 | Complete    | 2026-04-29 |
-| 22. Stroke Rendering | 1/2 | In Progress|  |
+| 22. Stroke Rendering | 2/2 | Complete   | 2026-04-29 |
 | 23. Pattern Fill Layers | 0/? | Not started | - |
 
 ## v1.3+ Backlog

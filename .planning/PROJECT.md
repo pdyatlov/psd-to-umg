@@ -2,22 +2,22 @@
 
 ## Current State
 
-**v1.0.1 shipped 2026-04-17. Phase 19 (text + layout correctness) complete 2026-04-27.**
+**v1.0.1 shipped 2026-04-17. Phase 21 (parser correctness fixes) complete 2026-04-29 — RTXT-01 (NUL sentinel strip for CJK text), LFXC-01 (ColorSpace dispatch for lrFX sofi/dsdw), FXFMT-01 (VlLs branch in ParseFrFXDescriptor) all done. LFXC-02 visual UAT deferred to pre-v1.3 session.**
 
-The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirely in C++20. It delivers a complete one-click PSD-to-Widget-Blueprint import pipeline: a native PhotoshopAPI-backed parser (FPsdParser), a pluggable layer-mapper registry with 15 widget types, full typography support including Layer-Style stroke and drop shadow routing, layer effects with flatten fallback, 9-slice borders, Smart Object recursive import, row/column anchor heuristics, an SPsdImportPreviewDialog, non-destructive reimport, CommonUI/animation interop, a comprehensive automation spec suite, and a unified `@`-tag grammar. Non-canvas panel child attachment (`@vbox`, `@hbox`, `@scrollbox`, `@overlay`) now correctly dispatches via `UPanelWidget::AddChild` — the v1.0 silent-drop bug is fixed. All 75 v1 + 7 v1.0.1 requirements satisfied. Phase 19 added: Color Overlay priority for text (TXT-FX-01), All Caps TextTransformPolicy mapping (TXT-CAPS-01), and empirical confirmation that VBox/HBox child slot order is already correct (LAYOUT-ORDER-01).
+The plugin is a production-grade Unreal Engine 5.7 editor plugin written entirely in C++20. It delivers a complete one-click PSD-to-Widget-Blueprint import pipeline: a native PhotoshopAPI-backed parser (FPsdParser), a pluggable layer-mapper registry with 15 widget types, full typography support including Layer-Style stroke and drop shadow routing, layer effects with flatten fallback, 9-slice borders, Smart Object recursive import, row/column anchor heuristics, an SPsdImportPreviewDialog, non-destructive reimport, CommonUI/animation interop, a comprehensive automation spec suite, and a unified `@`-tag grammar. Non-canvas panel child attachment (`@vbox`, `@hbox`, `@scrollbox`, `@overlay`) now correctly dispatches via `UPanelWidget::AddChild` — the v1.0 silent-drop bug is fixed. All 75 v1 + 7 v1.0.1 requirements satisfied. Phase 19 added: Color Overlay priority for text (TXT-FX-01), All Caps TextTransformPolicy mapping (TXT-CAPS-01), and empirical confirmation that VBox/HBox child slot order is already correct (LAYOUT-ORDER-01). Phase 20 hardened two v1.1/v1.2 audit gaps: fill/shape mapper priorities raised to 101 (eliminates non-stable sort race with FImageLayerMapper), and FPsdReimportHandler::Reimport now clears the FFontResolver auto-discovery cache on all exit paths via ON_SCOPE_EXIT (GRAD-01, SHAPE-01, FONT-01 validated).
 
 See `.planning/milestones/v1.0.1-ROADMAP.md` for the v1.0.1 archive.
 
-## Current Milestone: v1.1 Import Fidelity Fixes
+## Current Milestone: v1.3 Advanced Effects
 
-**Goal:** Fix import dialog correctness (hidden layer filtering, checkbox exclusion) and text property fidelity (font size, alignment, base color).
+**Goal:** Close the visual delta between PSD and UMG by implementing stroke rendering, pattern fills, lrFX channel-order correctness, and non-ASCII rich text.
 
-**Target fixes:**
-- Hidden PSD layers shown as unchecked by default in import dialog
-- Unchecked layers in import dialog actually excluded from WBP output
-- Font size: PSD pt value imported correctly into UMG (currently inflated)
-- Text alignment: PSD alignment preserved in UTextBlock after import
-- Text base color: correct color imported (currently corrupted to red)
+**Target features:**
+- Stroke rendering — `vstk` descriptor → UMG border/outline; `frameFXMulti` VlLs (newer Photoshop format)
+- Image-layer stroke — D-12 data already populated, needs mapper
+- Pattern fill layers — `PtFl` descriptor → tiled texture UImage
+- lrFX channel-order visual confirm — RGBC correctness for color overlay/shadow on real host project
+- Non-ASCII rich text — UTF-16 code-unit slicing fix for CJK/emoji in multi-run text (URichTextBlock)
 
 ## Next Milestone Goals (v1.2+)
 
@@ -202,4 +202,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-22 — Phase 17 complete: FFontResolver::AutoDiscovered step via AssetRegistry cache; FONT-01 closed (Validated in Phase 17); FONT-02 confirmed Complete*
+*Last updated: 2026-04-28 — v1.3 Advanced Effects milestone started. v1.2 archived (phases 13-20, 27 plans, 25 requirements). v1.3 scope: stroke rendering, pattern fills, lrFX channel-order fix, non-ASCII rich text.*

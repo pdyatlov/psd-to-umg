@@ -1197,4 +1197,113 @@ void FPsdParserPatternSpec::Define()
     });
 }
 
+// ------------------------------------------------------------------
+// Phase 23: FPatternFillLayerMapper unit spec (PTFL-02)
+// No PSD fixture required -- synthetic FPsdLayer covers CanMap matrix
+// and empty-RGBAPixels nullptr+warning fallback (D-04). Success-path
+// UImage construction tested via integration (real PSD with pattern fill).
+// ------------------------------------------------------------------
+
+#include "Mapper/AllMappers.h"
+#include "TestHelpers.h"
+#include "Blueprint/WidgetTree.h"
+#include "WidgetBlueprint.h"
+
+BEGIN_DEFINE_SPEC(FPatternFillLayerMapperSpec, "PSD2UMG.Mapper.PatternFillLayerMapper",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FPatternFillLayerMapper Mapper;
+
+END_DEFINE_SPEC(FPatternFillLayerMapperSpec)
+
+void FPatternFillLayerMapperSpec::Define()
+{
+    Describe("Priority", [this]()
+    {
+        It("GetPriority() returns 101 (D-06; matches Fill/SolidFill/Shape mappers)", [this]()
+        {
+            TestEqual(TEXT("Priority"), Mapper.GetPriority(), 101);
+        });
+    });
+
+    Describe("CanMap dispatch matrix", [this]()
+    {
+        It("Accepts EPsdLayerType::PatternFill", [this]()
+        {
+            FPsdLayer L = PSD2UMG::Tests::MakeTaggedTestLayer(TEXT("pattern_tile"), EPsdLayerType::PatternFill);
+            TestTrue(TEXT("CanMap(PatternFill)"), Mapper.CanMap(L));
+        });
+
+        It("Rejects EPsdLayerType::Image", [this]()
+        {
+            FPsdLayer L = PSD2UMG::Tests::MakeTaggedTestLayer(TEXT("img"), EPsdLayerType::Image);
+            TestFalse(TEXT("CanMap(Image)"), Mapper.CanMap(L));
+        });
+
+        It("Rejects EPsdLayerType::Gradient", [this]()
+        {
+            FPsdLayer L = PSD2UMG::Tests::MakeTaggedTestLayer(TEXT("grad"), EPsdLayerType::Gradient);
+            TestFalse(TEXT("CanMap(Gradient)"), Mapper.CanMap(L));
+        });
+
+        It("Rejects EPsdLayerType::SolidFill", [this]()
+        {
+            FPsdLayer L = PSD2UMG::Tests::MakeTaggedTestLayer(TEXT("solid"), EPsdLayerType::SolidFill);
+            TestFalse(TEXT("CanMap(SolidFill)"), Mapper.CanMap(L));
+        });
+
+        It("Rejects EPsdLayerType::Shape", [this]()
+        {
+            FPsdLayer L = PSD2UMG::Tests::MakeTaggedTestLayer(TEXT("shape"), EPsdLayerType::Shape);
+            TestFalse(TEXT("CanMap(Shape)"), Mapper.CanMap(L));
+        });
+
+        It("Rejects EPsdLayerType::Group", [this]()
+        {
+            FPsdLayer L = PSD2UMG::Tests::MakeTaggedTestLayer(TEXT("grp"), EPsdLayerType::Group);
+            TestFalse(TEXT("CanMap(Group)"), Mapper.CanMap(L));
+        });
+
+        It("Rejects EPsdLayerType::Text", [this]()
+        {
+            FPsdLayer L = PSD2UMG::Tests::MakeTaggedTestLayer(TEXT("txt"), EPsdLayerType::Text);
+            TestFalse(TEXT("CanMap(Text)"), Mapper.CanMap(L));
+        });
+
+        It("Rejects EPsdLayerType::Unknown", [this]()
+        {
+            FPsdLayer L;
+            L.Name = TEXT("unk");
+            L.Type = EPsdLayerType::Unknown;
+            PSD2UMG::Tests::PopulateParsedTags(L);
+            TestFalse(TEXT("CanMap(Unknown)"), Mapper.CanMap(L));
+        });
+    });
+
+    Describe("Empty RGBAPixels fallback (D-04)", [this]()
+    {
+        It("Map returns nullptr when RGBAPixels.Num() == 0", [this]()
+        {
+            FPsdLayer L = PSD2UMG::Tests::MakeTaggedTestLayer(TEXT("pattern_tile"), EPsdLayerType::PatternFill);
+            L.Bounds = FIntRect(0, 0, 64, 64);
+            L.PixelWidth = 64;
+            L.PixelHeight = 64;
+            // RGBAPixels deliberately empty -- ImportLayer returns nullptr -> mapper returns nullptr + Warning.
+            TestEqual(TEXT("RGBAPixels empty"), L.RGBAPixels.Num(), 0);
+
+            UWidgetBlueprint* WBP = NewObject<UWidgetBlueprint>();
+            UWidgetTree* Tree = NewObject<UWidgetTree>(WBP);
+
+            FPsdDocument Doc;
+            Doc.SourcePath = TEXT("C:/test/PatternFillSpec.psd");
+
+            AddExpectedError(TEXT("FPatternFillLayerMapper: Texture import returned nullptr"),
+                             EAutomationExpectedErrorFlags::Contains, 0);
+
+            UWidget* Result = Mapper.Map(L, Doc, Tree);
+            TestNull(TEXT("Result is nullptr (D-04 fallback)"), Result);
+        });
+    });
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

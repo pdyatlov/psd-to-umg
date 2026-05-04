@@ -1114,4 +1114,87 @@ void FPsdParserButtonStylesSpec::Define()
     });
 }
 
+// ------------------------------------------------------------------
+// Phase 23: PatternFill fixture spec (PTFL-01)
+// Fixture: Source/PSD2UMG/Tests/Fixtures/PatternFill.psd (D-05 user-supplied)
+// When fixture absent, BeforeEach AddWarning + short-circuits; all It() blocks
+// guard on bParsed and become no-ops. CI stays green without fixture.
+// ------------------------------------------------------------------
+BEGIN_DEFINE_SPEC(FPsdParserPatternSpec, "PSD2UMG.Parser.PatternFill",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+    FString FixturePath;
+    FPsdDocument Doc;
+    FPsdParseDiagnostics Diag;
+    bool bParsed = false;
+
+    static const FPsdLayer* FindPatternLayer(const TArray<FPsdLayer>& Layers, const FString& Name)
+    {
+        for (const FPsdLayer& L : Layers)
+        {
+            if (L.Name.Equals(Name, ESearchCase::CaseSensitive))
+                return &L;
+        }
+        return nullptr;
+    }
+
+END_DEFINE_SPEC(FPsdParserPatternSpec)
+
+void FPsdParserPatternSpec::Define()
+{
+    BeforeEach([this]()
+    {
+        Doc = FPsdDocument();
+        Diag = FPsdParseDiagnostics();
+        bParsed = false;
+
+        TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("PSD2UMG"));
+        if (!Plugin.IsValid())
+        {
+            AddError(TEXT("PSD2UMG plugin not found via IPluginManager"));
+            return;
+        }
+
+        FixturePath = FPaths::Combine(
+            Plugin->GetBaseDir(),
+            TEXT("Source/PSD2UMG/Tests/Fixtures/PatternFill.psd"));
+
+        if (!FPaths::FileExists(FixturePath))
+        {
+            AddWarning(TEXT("PatternFill.psd fixture missing -- PTFL-01 spec skipped (D-05 user-supplied)"));
+            return;
+        }
+
+        bParsed = PSD2UMG::Parser::ParseFile(FixturePath, Doc, Diag);
+    });
+
+    Describe("PatternFill fixture", [this]()
+    {
+        It("loads successfully with no error diagnostics", [this]()
+        {
+            if (FixturePath.IsEmpty() || !FPaths::FileExists(FixturePath)) { return; }
+            TestTrue(TEXT("bParsed"), bParsed);
+            TestFalse(TEXT("Diag.HasErrors()"), Diag.HasErrors());
+        });
+
+        It("pattern_tile has Type == EPsdLayerType::PatternFill (PTFL-01)", [this]()
+        {
+            if (FixturePath.IsEmpty() || !FPaths::FileExists(FixturePath)) { return; }
+            const FPsdLayer* L = FindPatternLayer(Doc.RootLayers, TEXT("pattern_tile"));
+            if (!TestNotNull(TEXT("pattern_tile exists in fixture"), L)) return;
+            TestEqual(TEXT("Type"), (int32)L->Type, (int32)EPsdLayerType::PatternFill);
+        });
+
+        It("pattern_tile has RGBAPixels populated (Adj cast pixel extraction)", [this]()
+        {
+            if (FixturePath.IsEmpty() || !FPaths::FileExists(FixturePath)) { return; }
+            const FPsdLayer* L = FindPatternLayer(Doc.RootLayers, TEXT("pattern_tile"));
+            if (!TestNotNull(TEXT("pattern_tile exists in fixture"), L)) return;
+            TestTrue(TEXT("RGBAPixels.Num() > 0"), L->RGBAPixels.Num() > 0);
+            TestTrue(TEXT("PixelWidth > 0"), L->PixelWidth > 0);
+            TestTrue(TEXT("PixelHeight > 0"), L->PixelHeight > 0);
+        });
+    });
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

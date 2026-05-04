@@ -112,7 +112,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 |-------|----------------|--------|-----------|
 | 21. Parser Correctness Fixes | 3/4 | Complete    | 2026-04-29 |
 | 22. Stroke Rendering | 2/2 | Complete    | 2026-04-29 |
-| 23. Pattern Fill Layers | 2/2 | Complete   | 2026-05-04 |
+| 23. Pattern Fill Layers | 2/2 | Complete    | 2026-05-04 |
 
 ## v1.3+ Backlog
 

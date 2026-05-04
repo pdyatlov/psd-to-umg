@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Advanced Effects
 status: executing
-stopped_at: Completed 22-stroke-rendering 22-01-PLAN.md
-last_updated: "2026-04-29T11:00:27.911Z"
-last_activity: 2026-04-29
+stopped_at: Completed 23-pattern-fill-layers 23-01-PLAN.md
+last_updated: "2026-05-04T09:15:53.075Z"
+last_activity: 2026-05-04
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** A designer drops a PSD into Unreal Editor and gets a correctly structured, immediately usable Widget Blueprint -- with no Python dependency, no manual tweaking, and no loss of layer intent.
-**Current focus:** Phase 22 — stroke-rendering
+**Current focus:** Phase 23 — pattern-fill-layers
 
 ## Current Position
 
-Phase: 23
-Plan: Not started
+Phase: 23 (pattern-fill-layers) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-04-29
+Last activity: 2026-05-04
 
 ## Performance Metrics
 
@@ -103,6 +103,7 @@ Last activity: 2026-04-29
 | Phase 21-parser-correctness-fixes P02 | 10min | 2 tasks | 1 files |
 | Phase 21-parser-correctness-fixes P03 | 3m | 2 tasks | 1 files |
 | Phase 22-stroke-rendering P01 | 3 | 2 tasks | 3 files |
+| Phase 23-pattern-fill-layers P01 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -195,6 +196,7 @@ Recent decisions affecting current work:
 - [Phase 21-parser-correctness-fixes]: bFoundStroke = true kept unconditional in Objc branch (legacy semantics); VlLs branch sets bFoundStroke only on ParseFrFXObjcItem() returning true; Out.bEnabled is source of truth for final return
 - [Phase 22-stroke-rendering]: CP-01 confirmed: vstk descriptor at byte offset 0 of Block->m_Data (TryParseAt(0) primary for vstk, unlike SoCo(4) or vscg(8))
 - [Phase 22-stroke-rendering]: CP-02 and D-03 confirmed: bHasVectorStroke/VectorStrokeSize/VectorStrokeColor are separate fields; bHasStroke cleared when vstk wins on Shape layers at parse time
+- [Phase 23-pattern-fill-layers]: PatternFill enum value inserted between SolidFill and Shape (slot 6) for fill-type adjacency; detection stays inside existing { } scope at PsdParser.cpp lines 2161-2194 (Pitfall 2 avoided); no ScanPatternFillColor (D-02 locked, CP-04: PtFl has no Clr key); FLayerTagParser PatternFill->Image mapping explicit
 
 ### Roadmap Evolution
 
@@ -220,6 +222,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-29T10:50:41.055Z
-Stopped at: Completed 22-stroke-rendering 22-01-PLAN.md
+Last session: 2026-05-04T09:15:53.070Z
+Stopped at: Completed 23-pattern-fill-layers 23-01-PLAN.md
 Resume file: None

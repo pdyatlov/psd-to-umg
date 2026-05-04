@@ -91,5 +91,5 @@ CP-03 (VlLs branch), CP-04 (PtFl has no Clr key), CP-05 (Utf8ToFString null-sent
 | STROKE-02 | Phase 22 | Complete |
 | STROKE-01 | Phase 22 | Complete |
 | STROKE-03 | Phase 22 | Complete |
-| PTFL-01 | Phase 23 | Pending |
+| PTFL-01 | Phase 23 | Complete |
 | PTFL-02 | Phase 23 | Pending |

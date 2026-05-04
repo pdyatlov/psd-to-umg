@@ -102,7 +102,9 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
   1. A PSD containing an `adjPattern` tagged block is assigned `EPsdLayerType::PatternFill` during `ConvertLayerRecursive` — it does not fall to `Unknown` and is not skipped
   2. `FPatternFillLayerMapper` (priority 101) produces a UImage populated from `RGBAPixels`; the widget is positioned and sized correctly relative to its parent canvas
   3. When `RGBAPixels` is empty, the mapper falls back to the `bFlattenComplexEffects` path and emits a `UE_LOG Warning` — import completes rather than crashing (CP-04: no `Clr ` key; dedicated scan path required)
-**Plans**: TBD
+**Plans**: 2 plans
+- [x] 23-01-PLAN.md — PTFL-01 EPsdLayerType::PatternFill enum + ConvertLayerRecursive adjPattern detection + FLayerTagParser switch + FPsdParserPatternSpec (Wave 1)
+- [ ] 23-02-PLAN.md — PTFL-02 FPatternFillLayerMapper (priority 101) + AllMappers.h + Registry registration + FPatternFillLayerMapperSpec (Wave 2)
 
 ## Progress Table
 
@@ -110,7 +112,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 |-------|----------------|--------|-----------|
 | 21. Parser Correctness Fixes | 3/4 | Complete    | 2026-04-29 |
 | 22. Stroke Rendering | 2/2 | Complete    | 2026-04-29 |
-| 23. Pattern Fill Layers | 0/? | Not started | - |
+| 23. Pattern Fill Layers | 1/2 | In Progress|  |
 
 ## v1.3+ Backlog
 

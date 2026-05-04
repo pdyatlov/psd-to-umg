@@ -48,6 +48,7 @@ void FLayerMappingRegistry::RegisterDefaults()
     Mappers.Add(MakeUnique<FFillLayerMapper>());        // Phase 13 / GRAD-01, GRAD-02 -- gradient fill (priority 101)
     Mappers.Add(MakeUnique<FSolidFillLayerMapper>());   // Phase 13 / GRAD-01 -- solid color fill (priority 101)
     Mappers.Add(MakeUnique<FShapeLayerMapper>());       // Phase 14 / SHAPE-01 -- drawn vector shape, solid-color fill (vscg) (priority 101)
+    Mappers.Add(MakeUnique<FPatternFillLayerMapper>()); // Phase 23 / PTFL-01, PTFL-02 -- pattern fill (priority 101)
 
     // Default group mapper (priority 50)
     Mappers.Add(MakeUnique<FGroupLayerMapper>());

@@ -64,6 +64,15 @@ public:
     UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
 };
 
+// Defined in FPatternFillLayerMapper.cpp  (Phase 23 / PTFL-01, PTFL-02 -- pattern fill)
+class FPatternFillLayerMapper : public IPsdLayerMapper
+{
+public:
+    int32 GetPriority() const override;
+    bool CanMap(const FPsdLayer& Layer) const override;
+    UWidget* Map(const FPsdLayer& Layer, const FPsdDocument& Doc, UWidgetTree* Tree) override;
+};
+
 // --- Fallback group mapper (priority 50) ---
 // Defined in FGroupLayerMapper.cpp
 class FGroupLayerMapper : public IPsdLayerMapper

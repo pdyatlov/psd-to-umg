@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Advanced Effects
-status: executing
-stopped_at: Completed 23-pattern-fill-layers 23-01-PLAN.md
-last_updated: "2026-05-04T09:15:53.075Z"
+status: verifying
+stopped_at: Completed 23-pattern-fill-layers 23-02-PLAN.md
+last_updated: "2026-05-04T09:20:40.012Z"
 last_activity: 2026-05-04
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 23 (pattern-fill-layers) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-04
 
 ## Performance Metrics
@@ -104,6 +104,7 @@ Last activity: 2026-05-04
 | Phase 21-parser-correctness-fixes P03 | 3m | 2 tasks | 1 files |
 | Phase 22-stroke-rendering P01 | 3 | 2 tasks | 3 files |
 | Phase 23-pattern-fill-layers P01 | 3min | 2 tasks | 4 files |
+| Phase 23-pattern-fill-layers P02 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -197,6 +198,7 @@ Recent decisions affecting current work:
 - [Phase 22-stroke-rendering]: CP-01 confirmed: vstk descriptor at byte offset 0 of Block->m_Data (TryParseAt(0) primary for vstk, unlike SoCo(4) or vscg(8))
 - [Phase 22-stroke-rendering]: CP-02 and D-03 confirmed: bHasVectorStroke/VectorStrokeSize/VectorStrokeColor are separate fields; bHasStroke cleared when vstk wins on Shape layers at parse time
 - [Phase 23-pattern-fill-layers]: PatternFill enum value inserted between SolidFill and Shape (slot 6) for fill-type adjacency; detection stays inside existing { } scope at PsdParser.cpp lines 2161-2194 (Pitfall 2 avoided); no ScanPatternFillColor (D-02 locked, CP-04: PtFl has no Clr key); FLayerTagParser PatternFill->Image mapping explicit
+- [Phase 23-pattern-fill-layers]: FPatternFillLayerMapper mirrors FFillLayerMapper byte-for-byte; only CanMap predicate changes (EPsdLayerType::PatternFill); priority 101 matches fill/shape tier (D-06)
 
 ### Roadmap Evolution
 
@@ -222,6 +224,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-04T09:15:53.070Z
-Stopped at: Completed 23-pattern-fill-layers 23-01-PLAN.md
+Last session: 2026-05-04T09:20:40.008Z
+Stopped at: Completed 23-pattern-fill-layers 23-02-PLAN.md
 Resume file: None

@@ -62,7 +62,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 
 - [x] **Phase 21: Parser Correctness Fixes** — Fix Utf8ToFString null-sentinel, lrFX ColorSpace branch, VlLs format branch, and human UAT sign-off (completed 2026-04-29)
 - [x] **Phase 22: Stroke Rendering** — Parse vstk vector stroke data and emit stroke sibling UImage for image and shape layers (completed 2026-04-29)
-- [ ] **Phase 23: Pattern Fill Layers** — Detect and map adjPattern tagged blocks to UImage via composited RGBAPixels
+- [x] **Phase 23: Pattern Fill Layers** — Detect and map adjPattern tagged blocks to UImage via composited RGBAPixels (completed 2026-05-04)
 
 ## Phase Details
 
@@ -104,7 +104,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
   3. When `RGBAPixels` is empty, the mapper falls back to the `bFlattenComplexEffects` path and emits a `UE_LOG Warning` — import completes rather than crashing (CP-04: no `Clr ` key; dedicated scan path required)
 **Plans**: 2 plans
 - [x] 23-01-PLAN.md — PTFL-01 EPsdLayerType::PatternFill enum + ConvertLayerRecursive adjPattern detection + FLayerTagParser switch + FPsdParserPatternSpec (Wave 1)
-- [ ] 23-02-PLAN.md — PTFL-02 FPatternFillLayerMapper (priority 101) + AllMappers.h + Registry registration + FPatternFillLayerMapperSpec (Wave 2)
+- [x] 23-02-PLAN.md — PTFL-02 FPatternFillLayerMapper (priority 101) + AllMappers.h + Registry registration + FPatternFillLayerMapperSpec (Wave 2)
 
 ## Progress Table
 
@@ -112,7 +112,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full phase deta
 |-------|----------------|--------|-----------|
 | 21. Parser Correctness Fixes | 3/4 | Complete    | 2026-04-29 |
 | 22. Stroke Rendering | 2/2 | Complete    | 2026-04-29 |
-| 23. Pattern Fill Layers | 1/2 | In Progress|  |
+| 23. Pattern Fill Layers | 2/2 | Complete   | 2026-05-04 |
 
 ## v1.3+ Backlog
 

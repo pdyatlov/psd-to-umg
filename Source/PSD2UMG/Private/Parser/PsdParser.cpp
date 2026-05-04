@@ -2159,13 +2159,14 @@ namespace PSD2UMG::Parser::Internal
 		// tagged-block presence instead — type-agnostic and robust across PhotoshopAPI versions.
 		// adjSolidColor = "SoCo", adjGradient = "GdFl" per Enum.h TaggedBlockKey.
 		{
-			bool bIsSolidFill = false, bIsGradientFill = false;
+			bool bIsSolidFill = false, bIsGradientFill = false, bIsPatternFill = false;
 			for (const auto& Block : InLayer->unparsed_tagged_blocks())
 			{
 				if (!Block) continue;
 				const auto Key = Block->getKey();
 				if (Key == NAMESPACE_PSAPI::Enum::TaggedBlockKey::adjSolidColor) bIsSolidFill = true;
 				if (Key == NAMESPACE_PSAPI::Enum::TaggedBlockKey::adjGradient)   bIsGradientFill = true;
+				if (Key == NAMESPACE_PSAPI::Enum::TaggedBlockKey::adjPattern)    bIsPatternFill = true;
 			}
 			if (bIsSolidFill)
 			{
@@ -2189,6 +2190,22 @@ namespace PSD2UMG::Parser::Internal
 					OutDiag.AddWarning(OutLayer.Name, TEXT("Gradient fill: unknown concrete type, pixel extraction skipped."));
 				UE_LOG(LogPSD2UMG, Log,
 					TEXT("Layer '%s' dispatched as Gradient (fill tag branch)"), *OutLayer.Name);
+				return;
+			}
+			if (bIsPatternFill)
+			{
+				OutLayer.Type = EPsdLayerType::PatternFill;
+				// CP-04: PtFl has no Clr key. Composited RGBAPixels are the only data source.
+				// Mirror the adjGradient Adj-cast path -- AdjustmentLayer<T> is the concrete
+				// type PhotoshopAPI uses for pattern fill layers, identical to gradient fills.
+				if (auto Adj = std::dynamic_pointer_cast<AdjustmentLayer<PsdPixelType>>(InLayer))
+					ExtractImagePixels(Adj, OutLayer, OutDiag);
+				else if (auto Shape = std::dynamic_pointer_cast<ShapeLayer<PsdPixelType>>(InLayer))
+					ExtractImagePixels(Shape, OutLayer, OutDiag);
+				else
+					OutDiag.AddWarning(OutLayer.Name, TEXT("Pattern fill: unknown concrete type, pixel extraction skipped."));
+				UE_LOG(LogPSD2UMG, Log,
+					TEXT("Layer '%s' dispatched as PatternFill (fill tag branch)"), *OutLayer.Name);
 				return;
 			}
 		}

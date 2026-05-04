@@ -20,6 +20,7 @@ enum class EPsdLayerType : uint8
 	SmartObject,
 	Gradient,    // Phase 13: gradient fill layer (GdFl tagged block); carries RGBAPixels baked from ShapeLayer composited channels
 	SolidFill,   // Phase 13: solid color fill layer (SoCo tagged block); carries Effects.ColorOverlayColor (no texture)
+	PatternFill, // Phase 23 PTFL-01: pattern fill layer (PtFl tagged block); composited via RGBAPixels (CP-04: no Clr key)
 	Shape,       // Phase 14: drawn vector shape (Rectangle/Ellipse/Pen tool) with solid-color fill (vscg tagged block); carries Effects.ColorOverlayColor (no texture); future home for stroke rendering
 	Unknown
 };

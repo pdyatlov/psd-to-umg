@@ -240,6 +240,10 @@ UWidget* FRichTextLayerMapper::Map(const FPsdLayer& Layer, const FPsdDocument& /
     // URichTextBlock::SetJustification takes ETextJustify::Type. Layer.Text.Alignment is
     // TEnumAsByte<ETextJustify::Type>, so extract the underlying enum value explicitly.
     RTB->SetJustification(static_cast<ETextJustify::Type>(Layer.Text.Alignment.GetValue()));
+    if (Layer.Text.bAllCaps)
+    {
+        RTB->SetTextTransformPolicy(ETextTransformPolicy::ToUpper);
+    }
 
     UE_LOG(LogPSD2UMG, Log,
         TEXT("FRichTextLayerMapper: '%s' -> URichTextBlock (%d spans, markup len=%d)"),
